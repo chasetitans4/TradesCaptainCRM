@@ -1,0 +1,43 @@
+// =====================================================
+// FEATURE REQUEST UPVOTE API
+// POST /api/feature-requests/[requestId]/upvote - Toggle upvote
+// =====================================================
+
+import { NextRequest, NextResponse } from 'next/server';
+import { upvoteFeatureRequest } from '@/lib/feature-requests';
+
+// POST - Toggle upvote on a feature request
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ requestId: string }> }
+) {
+  try {
+    const { requestId } = await params;
+    const body = await request.json();
+    const { user_id } = body;
+
+    if (!user_id) {
+      return NextResponse.json(
+        { error: 'User ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const result = await upvoteFeatureRequest(requestId, user_id);
+
+    if (!result.success) {
+      return NextResponse.json(
+        { error: 'Feature request not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ upvotes: result.upvotes });
+  } catch (error) {
+    console.error('Error upvoting feature request:', error);
+    return NextResponse.json(
+      { error: 'Failed to upvote feature request' },
+      { status: 500 }
+    );
+  }
+}

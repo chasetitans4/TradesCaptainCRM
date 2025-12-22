@@ -1,0 +1,368 @@
+// =====================================================
+// BOOKING SLOT CALCULATION
+// Calculate available appointment slots
+// =====================================================
+
+import { createClient } from '@/lib/supabase/server';
+import { getBookingSettings, BookingSettings } from './settings';
+
+export interface TimeSlot {
+  start: string; // ISO datetime
+  end: string;
+  available: boolean;
+  reason?: string; // Why unavailable
+}
+
+export interface DaySlots {
+  date: string; // YYYY-MM-DD
+  dayName: string;
+  slots: TimeSlot[];
+  hasAvailability: boolean;
+}
+
+export interface AvailabilityResult {
+  days: DaySlots[];
+  settings: {
+    slotDuration: number;
+    leadTimeHours: number;
+    maxDaysAhead: number;
+  };
+}
+
+/**
+ * Get available booking slots for a date range
+ */
+export async function getAvailableSlots(
+  businessId: string,
+  startDate?: Date,
+  endDate?: Date
+): Promise<AvailabilityResult> {
+  const settings = await getBookingSettings(businessId);
+
+  if (!settings || !settings.isEnabled) {
+    return {
+      days: [],
+      settings: {
+        slotDuration: 60,
+        leadTimeHours: 24,
+        maxDaysAhead: 30,
+      },
+    };
+  }
+
+  const now = new Date();
+  const minDate = new Date(now.getTime() + settings.leadTimeHours * 60 * 60 * 1000);
+  const maxDate = new Date(now.getTime() + settings.maxDaysAhead * 24 * 60 * 60 * 1000);
+
+  // Default to next 2 weeks if not specified
+  const rangeStart = startDate && startDate > minDate ? startDate : minDate;
+  const rangeEnd = endDate && endDate < maxDate ? endDate : new Date(Math.min(
+    rangeStart.getTime() + 14 * 24 * 60 * 60 * 1000,
+    maxDate.getTime()
+  ));
+
+  // Get existing appointments/jobs for the date range
+  const existingAppointments = await getExistingAppointments(businessId, rangeStart, rangeEnd);
+
+  const days: DaySlots[] = [];
+  const current = new Date(rangeStart);
+  current.setHours(0, 0, 0, 0);
+
+  while (current <= rangeEnd) {
+    const dayOfWeek = current.getDay(); // 0=Sunday
+
+    // Check if this day is available
+    if (settings.availableDays.includes(dayOfWeek)) {
+      const daySlots = generateDaySlots(
+        current,
+        settings,
+        existingAppointments,
+        now,
+        minDate
+      );
+
+      days.push({
+        date: formatDate(current),
+        dayName: getDayName(dayOfWeek),
+        slots: daySlots,
+        hasAvailability: daySlots.some(s => s.available),
+      });
+    }
+
+    current.setDate(current.getDate() + 1);
+  }
+
+  return {
+    days,
+    settings: {
+      slotDuration: settings.slotDurationMinutes,
+      leadTimeHours: settings.leadTimeHours,
+      maxDaysAhead: settings.maxDaysAhead,
+    },
+  };
+}
+
+/**
+ * Get available slots for a specific date
+ */
+export async function getSlotsForDate(
+  businessId: string,
+  date: Date
+): Promise<TimeSlot[]> {
+  const settings = await getBookingSettings(businessId);
+
+  if (!settings || !settings.isEnabled) {
+    return [];
+  }
+
+  const now = new Date();
+  const minDate = new Date(now.getTime() + settings.leadTimeHours * 60 * 60 * 1000);
+
+  const dayOfWeek = date.getDay();
+  if (!settings.availableDays.includes(dayOfWeek)) {
+    return [];
+  }
+
+  const dayStart = new Date(date);
+  dayStart.setHours(0, 0, 0, 0);
+
+  const dayEnd = new Date(date);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  const existingAppointments = await getExistingAppointments(businessId, dayStart, dayEnd);
+
+  return generateDaySlots(date, settings, existingAppointments, now, minDate);
+}
+
+/**
+ * Check if a specific time slot is available
+ */
+export async function isSlotAvailable(
+  businessId: string,
+  dateTime: Date,
+  durationMinutes?: number
+): Promise<{ available: boolean; reason?: string }> {
+  const settings = await getBookingSettings(businessId);
+
+  if (!settings || !settings.isEnabled) {
+    return { available: false, reason: 'Online booking is not enabled' };
+  }
+
+  const duration = durationMinutes || settings.slotDurationMinutes;
+  const now = new Date();
+  const minDate = new Date(now.getTime() + settings.leadTimeHours * 60 * 60 * 1000);
+  const maxDate = new Date(now.getTime() + settings.maxDaysAhead * 24 * 60 * 60 * 1000);
+
+  // Check lead time
+  if (dateTime < minDate) {
+    return {
+      available: false,
+      reason: `Appointments must be booked at least ${settings.leadTimeHours} hours in advance`,
+    };
+  }
+
+  // Check max days ahead
+  if (dateTime > maxDate) {
+    return {
+      available: false,
+      reason: `Appointments can only be booked up to ${settings.maxDaysAhead} days in advance`,
+    };
+  }
+
+  // Check day of week
+  const dayOfWeek = dateTime.getDay();
+  if (!settings.availableDays.includes(dayOfWeek)) {
+    return { available: false, reason: 'This day is not available for booking' };
+  }
+
+  // Check time is within business hours
+  const timeStr = formatTime(dateTime);
+  if (timeStr < settings.dayStartTime || timeStr >= settings.dayEndTime) {
+    return { available: false, reason: 'This time is outside business hours' };
+  }
+
+  // Check for conflicts with existing appointments
+  const slotEnd = new Date(dateTime.getTime() + duration * 60 * 1000);
+  const existingAppointments = await getExistingAppointments(
+    businessId,
+    new Date(dateTime.getTime() - settings.bufferMinutes * 60 * 1000),
+    new Date(slotEnd.getTime() + settings.bufferMinutes * 60 * 1000)
+  );
+
+  if (existingAppointments.length > 0) {
+    return { available: false, reason: 'This time slot is already booked' };
+  }
+
+  return { available: true };
+}
+
+/**
+ * Get existing appointments/jobs that block availability
+ */
+async function getExistingAppointments(
+  businessId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<Array<{ start: Date; end: Date }>> {
+  const supabase = await createClient();
+
+  // Get scheduled jobs
+  const { data: jobs } = await supabase
+    .from('jobs')
+    .select('scheduled_date, scheduled_time, estimated_duration')
+    .eq('business_id', businessId)
+    .in('status', ['scheduled', 'in_progress'])
+    .gte('scheduled_date', formatDate(startDate))
+    .lte('scheduled_date', formatDate(endDate));
+
+  // Get confirmed booking requests (that haven't been converted to jobs yet)
+  const { data: bookings } = await supabase
+    .from('booking_requests')
+    .select('confirmed_date, confirmed_time')
+    .eq('business_id', businessId)
+    .eq('status', 'confirmed')
+    .gte('confirmed_date', formatDate(startDate))
+    .lte('confirmed_date', formatDate(endDate));
+
+  const appointments: Array<{ start: Date; end: Date }> = [];
+
+  // Process jobs
+  for (const job of jobs || []) {
+    if (job.scheduled_date && job.scheduled_time) {
+      const start = new Date(`${job.scheduled_date}T${job.scheduled_time}`);
+      const durationMinutes = job.estimated_duration || 60;
+      const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
+      appointments.push({ start, end });
+    }
+  }
+
+  // Process confirmed bookings
+  for (const booking of bookings || []) {
+    if (booking.confirmed_date && booking.confirmed_time) {
+      const start = new Date(`${booking.confirmed_date}T${booking.confirmed_time}`);
+      const end = new Date(start.getTime() + 60 * 60 * 1000); // Default 1 hour
+      appointments.push({ start, end });
+    }
+  }
+
+  return appointments;
+}
+
+/**
+ * Generate time slots for a day
+ */
+function generateDaySlots(
+  date: Date,
+  settings: BookingSettings,
+  existingAppointments: Array<{ start: Date; end: Date }>,
+  now: Date,
+  minDate: Date
+): TimeSlot[] {
+  const slots: TimeSlot[] = [];
+
+  const [startHour, startMin] = settings.dayStartTime.split(':').map(Number);
+  const [endHour, endMin] = settings.dayEndTime.split(':').map(Number);
+
+  const dayStart = new Date(date);
+  dayStart.setHours(startHour, startMin, 0, 0);
+
+  const dayEnd = new Date(date);
+  dayEnd.setHours(endHour, endMin, 0, 0);
+
+  let current = new Date(dayStart);
+
+  while (current < dayEnd) {
+    const slotEnd = new Date(current.getTime() + settings.slotDurationMinutes * 60 * 1000);
+
+    // Don't exceed day end time
+    if (slotEnd > dayEnd) break;
+
+    let available = true;
+    let reason: string | undefined;
+
+    // Check if slot is in the past or before minimum booking time
+    if (current < minDate) {
+      available = false;
+      reason = current < now ? 'Past time slot' : 'Insufficient lead time';
+    }
+
+    // Check for conflicts with existing appointments (including buffer)
+    if (available) {
+      const bufferedStart = new Date(current.getTime() - settings.bufferMinutes * 60 * 1000);
+      const bufferedEnd = new Date(slotEnd.getTime() + settings.bufferMinutes * 60 * 1000);
+
+      for (const appt of existingAppointments) {
+        if (bufferedStart < appt.end && bufferedEnd > appt.start) {
+          available = false;
+          reason = 'Already booked';
+          break;
+        }
+      }
+    }
+
+    slots.push({
+      start: current.toISOString(),
+      end: slotEnd.toISOString(),
+      available,
+      reason,
+    });
+
+    current = new Date(slotEnd);
+  }
+
+  return slots;
+}
+
+/**
+ * Format date as YYYY-MM-DD
+ */
+function formatDate(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
+/**
+ * Format time as HH:MM
+ */
+function formatTime(date: Date): string {
+  return date.toTimeString().slice(0, 5);
+}
+
+/**
+ * Get day name from day of week number
+ */
+function getDayName(dayOfWeek: number): string {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return days[dayOfWeek];
+}
+
+/**
+ * Get summary of availability for next N days
+ */
+export async function getAvailabilitySummary(
+  businessId: string,
+  days: number = 7
+): Promise<{
+  totalSlots: number;
+  availableSlots: number;
+  nextAvailable: string | null;
+}> {
+  const result = await getAvailableSlots(businessId);
+
+  let totalSlots = 0;
+  let availableSlots = 0;
+  let nextAvailable: string | null = null;
+
+  for (const day of result.days.slice(0, days)) {
+    for (const slot of day.slots) {
+      totalSlots++;
+      if (slot.available) {
+        availableSlots++;
+        if (!nextAvailable) {
+          nextAvailable = slot.start;
+        }
+      }
+    }
+  }
+
+  return { totalSlots, availableSlots, nextAvailable };
+}

@@ -1,0 +1,571 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light mode - Clean white background with blue accents */
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 199 89% 48%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 221 83% 53%;
+
+    --radius: 0.625rem;
+
+    /* Sidebar - Dark charcoal from "TRADES" */
+    --sidebar-bg: 222 47% 11%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-muted: 215 19% 35%;
+    --sidebar-accent: 199 89% 48%;
+
+    /* Chart colors */
+    --chart-1: 217 91% 60%;
+    --chart-2: 142 71% 45%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 0 84% 60%;
+    --chart-5: 262 83% 58%;
+  }
+
+  .dark {
+    /* Dark mode - Deep charcoal with blue accents */
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 199 89% 48%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 199 89% 48%;
+
+    --sidebar-bg: 222 47% 4%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Better focus states */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted/50;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/20 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/30;
+  }
+
+  /* Improve touch targets on mobile */
+  button,
+  a,
+  input[type="checkbox"],
+  input[type="radio"],
+  [role="button"] {
+    @apply min-h-tap-sm;
+  }
+
+  /* Remove tap highlight on mobile */
+  button, a, input, select, textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Safe area support for mobile */
+  .safe-area-inset-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@layer components {
+  /* Brand gradient - The "Captain" text effect */
+  .brand-gradient {
+    @apply bg-gradient-to-r from-secondary-400 via-primary-500 to-primary-600;
+  }
+
+  .brand-gradient-text {
+    @apply bg-gradient-to-r from-secondary-400 via-primary-500 to-primary-600 bg-clip-text text-transparent;
+  }
+
+  /* Subtle gradient backgrounds */
+  .brand-gradient-subtle {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.08) 0%, rgba(37, 99, 235, 0.08) 100%);
+  }
+
+  /* Glass effect for modals/overlays */
+  .glass {
+    @apply bg-white/80 backdrop-blur-xl;
+  }
+
+  .dark .glass {
+    @apply bg-dark-900/80;
+  }
+
+  /* Gradient text (generic) */
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent;
+  }
+
+  /* Card styles */
+  .card {
+    @apply bg-card rounded-xl border shadow-soft;
+  }
+
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-medium hover:-translate-y-0.5;
+  }
+
+  /* Primary button with gradient */
+  .btn-gradient {
+    @apply bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700;
+    @apply text-white font-medium shadow-lg shadow-primary-500/25;
+    @apply transition-all duration-200;
+  }
+
+  /* Status dot animation */
+  .status-dot {
+    @apply relative;
+  }
+
+  .status-dot::before {
+    content: '';
+    @apply absolute inset-0 rounded-full animate-ping opacity-75;
+  }
+
+  /* Glow effects for important elements */
+  .glow-primary {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3), 0 0 40px rgba(59, 130, 246, 0.1);
+  }
+
+  .glow-secondary {
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.3), 0 0 40px rgba(56, 189, 248, 0.1);
+  }
+
+  /* Mobile-first tap target */
+  .tap-target {
+    @apply min-h-tap min-w-tap flex items-center justify-center;
+  }
+
+  /* Status badges */
+  .badge-new {
+    @apply bg-info/10 text-info border border-info/20;
+  }
+  
+  .badge-contacted {
+    @apply bg-warning/10 text-warning border border-warning/20;
+  }
+  
+  .badge-quoted {
+    @apply bg-purple-500/10 text-purple-600 border border-purple-500/20;
+  }
+  
+  .badge-scheduled {
+    @apply bg-brand/10 text-brand border border-brand/20;
+  }
+  
+  .badge-won {
+    @apply bg-success/10 text-success border border-success/20;
+  }
+  
+  .badge-lost {
+    @apply bg-danger/10 text-danger border border-danger/20;
+  }
+
+  /* Job status badges */
+  .badge-in-progress {
+    @apply bg-warning/10 text-warning border border-warning/20;
+  }
+  
+  .badge-completed {
+    @apply bg-success/10 text-success border border-success/20;
+  }
+  
+  .badge-cancelled {
+    @apply bg-text-muted/10 text-text-muted border border-text-muted/20;
+  }
+  
+  .badge-no-show {
+    @apply bg-danger/10 text-danger border border-danger/20;
+  }
+
+  /* Floating Action Button */
+  .fab {
+    @apply fixed bottom-20 right-4 z-50 h-14 w-14 rounded-full bg-brand text-white shadow-fab
+           flex items-center justify-center
+           active:scale-95 transition-transform duration-150;
+  }
+
+  .fab-safe {
+    @apply pb-safe-bottom;
+    bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Bottom navigation */
+  .bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 z-40 bg-surface border-t border-border
+           flex items-center justify-around h-16 pb-safe-bottom;
+  }
+
+  .bottom-nav-item {
+    @apply flex flex-col items-center justify-center flex-1 h-full
+           text-text-muted text-xs gap-1
+           active:bg-muted/50 transition-colors;
+  }
+
+  .bottom-nav-item.active {
+    @apply text-brand;
+  }
+
+  /* Pull to refresh indicator */
+  .pull-indicator {
+    @apply flex items-center justify-center h-12 text-text-muted text-sm;
+  }
+
+  /* Swipe action styles */
+  .swipe-action-left {
+    @apply bg-brand text-white flex items-center justify-center px-6;
+  }
+
+  .swipe-action-right {
+    @apply bg-success text-white flex items-center justify-center px-6;
+  }
+
+  /* Empty state */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-12 px-4 text-center;
+  }
+
+  .empty-state-icon {
+    @apply w-16 h-16 text-text-light mb-4;
+  }
+
+  .empty-state-title {
+    @apply text-lg font-medium text-text mb-2;
+  }
+
+  .empty-state-description {
+    @apply text-sm text-text-muted max-w-xs;
+  }
+
+  /* Loading skeleton */
+  .skeleton {
+    @apply animate-pulse bg-muted rounded;
+  }
+
+  /* Progress bar */
+  .progress-bar {
+    @apply h-2 w-full bg-muted rounded-full overflow-hidden;
+  }
+
+  .progress-bar-fill {
+    @apply h-full bg-brand transition-all duration-300;
+  }
+
+  .progress-bar-warning {
+    @apply bg-warning;
+  }
+
+  .progress-bar-danger {
+    @apply bg-danger;
+  }
+
+  /* Header controls */
+  .header-controls {
+    @apply flex items-center gap-2;
+  }
+
+  .header-control-button {
+    @apply tap-target rounded-full text-text-secondary hover:bg-muted active:bg-muted/80 transition-colors;
+  }
+
+  /* AI toggle states */
+  .ai-toggle-on {
+    @apply text-success;
+  }
+
+  .ai-toggle-off {
+    @apply text-text-muted;
+  }
+
+  /* Section header */
+  .section-header {
+    @apply flex items-center justify-between px-4 py-2 text-xs font-semibold uppercase tracking-wider text-text-muted;
+  }
+
+  /* List item */
+  .list-item {
+    @apply flex items-center gap-3 px-4 py-3 bg-surface border-b border-border
+           active:bg-muted/50 transition-colors;
+  }
+
+  /* Form input */
+  .form-input {
+    @apply w-full h-12 px-4 bg-surface border border-border rounded-lg
+           focus:ring-2 focus:ring-brand focus:border-brand
+           placeholder:text-text-muted;
+  }
+
+  .form-label {
+    @apply block text-sm font-medium text-text mb-1.5;
+  }
+
+  .form-helper {
+    @apply text-xs text-text-muted mt-1;
+  }
+
+  .form-error {
+    @apply text-xs text-danger mt-1;
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbar but allow scrolling */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Line clamp utilities */
+  .line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Sticky header with safe area */
+  .sticky-header {
+    @apply sticky top-0 z-30 bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Content area with bottom nav spacing */
+  .main-content {
+    @apply pb-20;
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Touch manipulation for swipe */
+  .touch-pan-y {
+    touch-action: pan-y;
+  }
+
+  .touch-pan-x {
+    touch-action: pan-x;
+  }
+
+  /* Prevent text selection during swipe */
+  .select-none-touch {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* PWA specific styles */
+@media (display-mode: standalone) {
+  body {
+    /* Prevent overscroll bounce on iOS */
+    overscroll-behavior: none;
+  }
+}
+
+/* Prevent pull-to-refresh on standalone */
+@media (display-mode: standalone) {
+  html {
+    overscroll-behavior-y: contain;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print-break-before {
+    break-before: page;
+  }
+
+  .print-break-after {
+    break-after: page;
+  }
+}
+
+/* Gradient Mesh Backgrounds */
+.bg-gradient-mesh {
+  background-color: hsl(var(--background));
+  background-image:
+    radial-gradient(at 40% 20%, hsla(199, 89%, 48%, 0.15) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, hsla(221, 83%, 53%, 0.15) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, hsla(199, 89%, 48%, 0.1) 0px, transparent 50%),
+    radial-gradient(at 80% 50%, hsla(221, 83%, 53%, 0.1) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, hsla(199, 89%, 48%, 0.1) 0px, transparent 50%);
+}
+
+.bg-gradient-radial {
+  background: radial-gradient(ellipse at top, hsl(var(--primary) / 0.15), transparent 50%),
+              radial-gradient(ellipse at bottom, hsl(var(--secondary) / 0.1), transparent 50%);
+}
+
+.bg-gradient-brand {
+  background: linear-gradient(135deg,
+    hsl(var(--background)) 0%,
+    hsl(var(--primary) / 0.05) 50%,
+    hsl(var(--secondary) / 0.05) 100%
+  );
+}
+
+/* Animated mesh (subtle) */
+.bg-gradient-mesh-animated {
+  background-size: 400% 400%;
+  animation: meshMove 15s ease infinite;
+}
+
+@keyframes meshMove {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* FullCalendar Styling */
+.fc {
+  --fc-border-color: hsl(var(--border));
+  --fc-button-bg-color: hsl(var(--primary));
+  --fc-button-border-color: hsl(var(--primary));
+  --fc-today-bg-color: hsl(var(--primary) / 0.1);
+  --fc-event-bg-color: hsl(var(--primary));
+}
+
+.fc .fc-toolbar-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.fc .fc-button {
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+}
+
+.fc .fc-event {
+  border-radius: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+/* TipTap Editor Styles */
+.ProseMirror {
+  outline: none;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: hsl(var(--muted-foreground));
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* React Day Picker Overrides */
+.rdp {
+  --rdp-cell-size: 40px;
+  --rdp-accent-color: hsl(var(--primary));
+  --rdp-background-color: hsl(var(--primary) / 0.1);
+}
+
+.rdp-button:hover:not([disabled]):not(.rdp-day_selected) {
+  background-color: hsl(var(--muted));
+}
+
+.rdp-day_selected {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}
+
+.rdp-day_today {
+  font-weight: bold;
+  color: hsl(var(--primary));
+}

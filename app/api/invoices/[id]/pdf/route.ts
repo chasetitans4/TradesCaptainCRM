@@ -1,0 +1,124 @@
+// =====================================================
+// INVOICE PDF API
+// GET /api/invoices/[id]/pdf - Generate printable invoice HTML
+// =====================================================
+
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
+import { generateInvoicePdfHtml } from '@/lib/invoices/pdf';
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const profile = await getServerUserProfile();
+    if (!profile) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const supabase = await createServerSupabaseClient();
+
+    // Fetch invoice with all related data
+    const { data: invoice, error: fetchError } = await supabase
+      .from('invoices')
+      .select(`
+        *,
+        customer:customers (
+          name,
+          email,
+          phone,
+          address,
+          city,
+          state,
+          zip_code
+        ),
+        business:businesses (
+          name,
+          phone,
+          email,
+          address,
+          city,
+          state,
+          zip_code,
+          logo_url
+        ),
+        line_items:invoice_items (
+          id,
+          description,
+          quantity,
+          unit_price,
+          is_taxable
+        )
+      `)
+      .eq('id', id)
+      .eq('business_id', profile.business_id)
+      .single();
+
+    if (fetchError || !invoice) {
+      return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
+    }
+
+    // Format addresses
+    const formatAddress = (entity: any) => {
+      if (!entity) return undefined;
+      const parts = [entity.address, entity.city, entity.state, entity.zip_code].filter(Boolean);
+      return parts.length > 0 ? parts.join(', ') : undefined;
+    };
+
+    // Build line items
+    const lineItems = (invoice.line_items || []).map((item: any) => ({
+      description: item.description || 'Service',
+      quantity: item.quantity || 1,
+      unitPrice: item.unit_price || 0,
+      total: (item.quantity || 1) * (item.unit_price || 0),
+    }));
+
+    // If no line items, create from invoice total
+    if (lineItems.length === 0 && invoice.subtotal > 0) {
+      lineItems.push({
+        description: 'Services',
+        quantity: 1,
+        unitPrice: invoice.subtotal,
+        total: invoice.subtotal,
+      });
+    }
+
+    const html = generateInvoicePdfHtml({
+      invoiceNumber: invoice.invoice_number,
+      issueDate: new Date(invoice.created_at).toLocaleDateString(),
+      dueDate: invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'Upon Receipt',
+      status: invoice.status,
+      businessName: invoice.business?.name || 'Business',
+      businessAddress: formatAddress(invoice.business),
+      businessPhone: invoice.business?.phone,
+      businessEmail: invoice.business?.email,
+      businessLogo: invoice.business?.logo_url,
+      customerName: invoice.customer?.name || 'Customer',
+      customerAddress: formatAddress(invoice.customer),
+      customerEmail: invoice.customer?.email,
+      customerPhone: invoice.customer?.phone,
+      lineItems,
+      subtotal: invoice.subtotal || 0,
+      taxRate: invoice.tax_rate,
+      taxAmount: invoice.tax_amount,
+      discountAmount: invoice.discount_amount,
+      total: invoice.total || 0,
+      amountPaid: invoice.amount_paid || 0,
+      amountDue: invoice.amount_due || 0,
+      notes: invoice.notes,
+      terms: invoice.terms,
+      paymentLink: invoice.stripe_payment_link_url,
+    });
+
+    return new NextResponse(html, {
+      headers: {
+        'Content-Type': 'text/html',
+      },
+    });
+  } catch (error) {
+    console.error('Error generating invoice PDF:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
