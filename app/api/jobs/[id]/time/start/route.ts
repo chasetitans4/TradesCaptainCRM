@@ -57,13 +57,12 @@ export async function POST(
 
     const body = await request.json().catch(() => ({}));
 
+    // startJobTimer signature: (jobId, userId, businessId, isTravel)
     const jobTimeEntry = await startJobTimer(
-      profile.business_id,
-      profile.id,
       id,
-      status.currentEntry.id,
-      body.is_travel || false,
-      body.notes
+      profile.id,
+      profile.business_id,
+      body.is_travel || false
     );
 
     return NextResponse.json({ jobTimeEntry }, { status: 201 });

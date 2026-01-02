@@ -7,6 +7,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { uploadJobPhoto, getJobPhotos } from '@/lib/photos';
+import { checkUploadRateLimit } from '@/lib/rate-limit';
+
+// Allowed image types
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export async function GET(request: NextRequest) {
   try {
@@ -43,6 +48,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Rate limit uploads (20 per minute per user)
+    const rateLimit = await checkUploadRateLimit(profile.id);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Upload rate limit exceeded. Please wait a moment.' },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': '20',
+            'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+            'X-RateLimit-Reset': rateLimit.resetAt.toISOString(),
+            'Retry-After': (rateLimit.retryAfter || 60).toString(),
+          },
+        }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const jobId = formData.get('jobId') as string;
@@ -56,13 +78,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate file type
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      return NextResponse.json(
+        { error: 'Invalid file type. Allowed: JPEG, PNG, WebP' },
+        { status: 400 }
+      );
+    }
+
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: 'File too large. Maximum size is 10MB' },
+        { status: 400 }
+      );
+    }
+
     const photoId = await uploadJobPhoto({
       businessId: profile.business_id,
       jobId,
       file,
       photoType,
       caption: caption || undefined,
-      uploadedBy: profile.id,
+      userId: profile.id,
     });
 
     return NextResponse.json({ id: photoId, success: true });

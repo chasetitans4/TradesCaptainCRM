@@ -5,11 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient, getCurrentUserProfile } from '@/lib/supabase/client';
 import { hasPermission, DASHBOARD_SECTIONS } from '@/lib/permissions';
-import { cn, getGreeting, formatRelativeDate, formatCurrency, getUrgencyColor } from '@/lib/utils';
+import { cn, getGreeting, formatRelativeDate, formatCurrency, getUrgencyColor, formatAddress } from '@/lib/utils';
+import { getSmartNavigationUrl } from '@/lib/utils/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
-import type { UserWithBusiness, Reminder, Job, Lead, Customer } from '@/types';
+import { AddressLink } from '@/components/ui/address-link';
+import type { UserWithBusiness, Reminder, Job, Lead, Customer, UserRole } from '@/types';
 import {
   Plus,
   Bell,
@@ -473,7 +475,8 @@ function EmptyState({ message, icon: Icon, action }: EmptyStateProps) {
 }
 
 function ReminderCard({ reminder }: { reminder: Reminder }) {
-  const urgencyColor = getUrgencyColor(reminder.due_at);
+  const reminderTime = reminder.remind_at;
+  const urgencyColor = getUrgencyColor(reminderTime);
 
   return (
     <Link href={`/reminders/${reminder.id}`} className="card p-3 flex items-start gap-3 active:scale-[0.98]">
@@ -485,7 +488,7 @@ function ReminderCard({ reminder }: { reminder: Reminder }) {
         <div className="flex items-center gap-2 mt-1">
           <Clock className="h-3.5 w-3.5 text-text-muted" />
           <span className="text-xs text-text-muted">
-            {formatRelativeDate(reminder.due_at)}
+            {formatRelativeDate(reminderTime)}
           </span>
         </div>
       </div>
@@ -494,11 +497,12 @@ function ReminderCard({ reminder }: { reminder: Reminder }) {
 }
 
 function JobCard({ job, showDate = false }: { job: TodayJob; showDate?: boolean }) {
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     scheduled: 'bg-info/10 text-info',
     in_progress: 'bg-warning/10 text-warning',
     completed: 'bg-success/10 text-success',
     cancelled: 'bg-danger/10 text-danger',
+    no_show: 'bg-muted/10 text-muted-foreground',
   };
 
   return (
@@ -549,18 +553,13 @@ function JobCard({ job, showDate = false }: { job: TodayJob; showDate?: boolean 
           </a>
         )}
         {job.customer?.address_line1 && (
-          <a
-            href={`https://maps.google.com/?q=${encodeURIComponent(
-              `${job.customer.address_line1}, ${job.customer.city || ''}`
-            )}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
+          <AddressLink
+            address={job.customer.address_line1}
+            city={job.customer.city}
             className="flex items-center gap-1 text-xs text-primary"
-          >
-            <MapPin className="h-3.5 w-3.5" />
-            Directions
-          </a>
+            iconClassName="h-3.5 w-3.5"
+            onClick={(e) => e.stopPropagation()}
+          />
         )}
       </div>
     </Link>
@@ -568,11 +567,12 @@ function JobCard({ job, showDate = false }: { job: TodayJob; showDate?: boolean 
 }
 
 function LeadCard({ lead }: { lead: RecentLead }) {
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     new: 'bg-primary/10 text-primary',
     contacted: 'bg-info/10 text-info',
     qualified: 'bg-success/10 text-success',
     quoted: 'bg-warning/10 text-warning',
+    scheduled: 'bg-info/10 text-info',
     won: 'bg-success/10 text-success',
     lost: 'bg-danger/10 text-danger',
   };
@@ -600,14 +600,14 @@ function LeadCard({ lead }: { lead: RecentLead }) {
   );
 }
 
-function QuickActionsButton({ userRole }: { userRole: string }) {
+function QuickActionsButton({ userRole }: { userRole: UserRole }) {
   const [open, setOpen] = useState(false);
 
   const actions = [
-    { label: 'New Lead', href: '/leads/new', icon: Users, permission: 'create_leads' },
-    { label: 'New Job', href: '/jobs/new', icon: Briefcase, permission: 'create_jobs' },
-    { label: 'New Reminder', href: '/reminders/new', icon: Bell, permission: 'view_reminders' },
-    { label: 'Log Call', href: '/calls/new', icon: Phone, permission: 'view_leads' },
+    { label: 'New Lead', href: '/leads/new', icon: Users, permission: 'create_leads' as const },
+    { label: 'New Job', href: '/jobs/new', icon: Briefcase, permission: 'create_jobs' as const },
+    { label: 'New Reminder', href: '/reminders/new', icon: Bell, permission: 'view_reminders' as const },
+    { label: 'Log Call', href: '/calls/new', icon: Phone, permission: 'view_leads' as const },
   ].filter((action) => hasPermission(userRole, action.permission));
 
   return (

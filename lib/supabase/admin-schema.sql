@@ -509,6 +509,26 @@ CREATE INDEX IF NOT EXISTS idx_commissions_status ON commissions(status);
 CREATE INDEX IF NOT EXISTS idx_commissions_type ON commissions(commission_type);
 CREATE INDEX IF NOT EXISTS idx_commissions_eligible ON commissions(status, eligible_at);
 
+ALTER TABLE crm_accounts ADD COLUMN IF NOT EXISTS company_sale BOOLEAN DEFAULT FALSE;
+ALTER TABLE web_customers ADD COLUMN IF NOT EXISTS company_sale BOOLEAN DEFAULT FALSE;
+ALTER TABLE commissions ADD COLUMN IF NOT EXISTS company_sale BOOLEAN DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS sales_attribution_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  crm_account_id UUID REFERENCES crm_accounts(id),
+  web_customer_id UUID REFERENCES web_customers(id),
+  attributed_to TEXT NOT NULL,
+  agent_id UUID REFERENCES admin_users(id),
+  created_by UUID REFERENCES admin_users(id) NOT NULL,
+  sale_amount DECIMAL(10,2),
+  plan_type TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_attribution_agent ON sales_attribution_log(agent_id);
+CREATE INDEX IF NOT EXISTS idx_attribution_created_by ON sales_attribution_log(created_by);
+
 -- =====================================================
 -- COMMISSION RULES (Single Source of Truth)
 -- =====================================================
@@ -706,7 +726,8 @@ CREATE INDEX IF NOT EXISTS idx_admin_invoices_status ON admin_invoices(status);
 -- =====================================================
 CREATE TABLE IF NOT EXISTS processed_webhook_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  stripe_event_id TEXT UNIQUE NOT NULL,
+  event_id TEXT UNIQUE NOT NULL,
+  stripe_event_id TEXT UNIQUE,
   event_type TEXT NOT NULL,
   processed_at TIMESTAMPTZ DEFAULT NOW(),
 
@@ -714,6 +735,8 @@ CREATE TABLE IF NOT EXISTS processed_webhook_events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_webhook_events_stripe ON processed_webhook_events(stripe_event_id);
+CREATE INDEX IF NOT EXISTS idx_webhook_events_event ON processed_webhook_events(event_id);
+ALTER TABLE processed_webhook_events ENABLE ROW LEVEL SECURITY;
 
 -- =====================================================
 -- AGENT GOALS

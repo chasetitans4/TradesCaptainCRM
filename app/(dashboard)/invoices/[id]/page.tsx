@@ -4,100 +4,28 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
-  ArrowLeft,
-  Send,
-  FileText,
-  Edit,
-  Trash2,
-  Download,
   CheckCircle,
-  XCircle,
-  DollarSign,
+  CreditCard,
   Clock,
+  Send,
   Eye,
-  MoreVertical,
   Loader2,
   Phone,
   Mail,
   MapPin,
-  AlertTriangle,
-  Copy,
-  ExternalLink,
-  CreditCard,
-  Banknote,
+  FileText,
   Receipt,
 } from 'lucide-react';
 import { createClient, getCurrentUserProfile } from '@/lib/supabase/client';
 import { cn, formatRelativeDate, formatPhoneNumber } from '@/lib/utils';
 import type { UserWithBusiness } from '@/types';
 
-interface InvoiceItem {
-  id: string;
-  name: string;
-  description: string | null;
-  quantity: number;
-  unit_price: number;
-  total: number;
-  is_taxable: boolean;
-}
-
-interface Payment {
-  id: string;
-  amount: number;
-  payment_method: string;
-  notes: string | null;
-  paid_at: string;
-}
-
-interface Invoice {
-  id: string;
-  invoice_number: string;
-  status: string;
-  subtotal: number;
-  tax_rate: number;
-  tax_amount: number;
-  discount_amount: number;
-  total: number;
-  amount_paid: number;
-  amount_due: number;
-  notes: string | null;
-  customer_notes: string | null;
-  terms: string | null;
-  due_date: string | null;
-  created_at: string;
-  sent_at: string | null;
-  viewed_at: string | null;
-  paid_at: string | null;
-  access_token: string;
-  stripe_payment_link_url: string | null;
-  customer: {
-    id: string;
-    name: string;
-    phone: string | null;
-    email: string | null;
-    address: string | null;
-  };
-  items: InvoiceItem[];
-  payments: Payment[];
-  quote?: {
-    id: string;
-    quote_number: string;
-  } | null;
-  job?: {
-    id: string;
-    title: string;
-  } | null;
-}
-
-const STATUS_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string }> = {
-  draft: { label: 'Draft', icon: FileText, color: 'text-muted-foreground bg-muted' },
-  sent: { label: 'Sent', icon: Send, color: 'text-blue-600 bg-blue-100' },
-  viewed: { label: 'Viewed', icon: Eye, color: 'text-purple-600 bg-purple-100' },
-  paid: { label: 'Paid', icon: CheckCircle, color: 'text-green-600 bg-green-100' },
-  partial: { label: 'Partial', icon: DollarSign, color: 'text-amber-600 bg-amber-100' },
-  overdue: { label: 'Overdue', icon: AlertTriangle, color: 'text-red-600 bg-red-100' },
-  void: { label: 'Void', icon: XCircle, color: 'text-gray-500 bg-gray-100' },
-};
+import type { Invoice } from './_components/types';
+import { InvoiceHeader } from './_components/invoice-header';
+import { InvoiceLineItems } from './_components/invoice-line-items';
+import { PaymentHistory } from './_components/payment-history';
+import { PaymentModal } from './_components/payment-modal';
+import { InvoiceActions } from './_components/invoice-actions';
 
 export default function InvoiceDetailPage() {
   const router = useRouter();
@@ -166,20 +94,16 @@ export default function InvoiceDetailPage() {
 
   const handleSendInvoice = async () => {
     if (!invoice) return;
-
     setSending(true);
     try {
-      const response = await fetch(`/api/invoices/${invoice.id}/send`, {
-        method: 'POST',
-      });
-
+      const response = await fetch(`/api/invoices/${invoice.id}/send`, { method: 'POST' });
       if (response.ok) {
         setInvoice({ ...invoice, status: 'sent', sent_at: new Date().toISOString() });
       } else {
         const data = await response.json();
         alert(data.error || 'Failed to send invoice');
       }
-    } catch (error) {
+    } catch {
       alert('Failed to send invoice');
     } finally {
       setSending(false);
@@ -188,13 +112,9 @@ export default function InvoiceDetailPage() {
 
   const handleGeneratePaymentLink = async () => {
     if (!invoice) return;
-
     setGeneratingPaymentLink(true);
     try {
-      const response = await fetch(`/api/invoices/${invoice.id}/payment-link`, {
-        method: 'POST',
-      });
-
+      const response = await fetch(`/api/invoices/${invoice.id}/payment-link`, { method: 'POST' });
       if (response.ok) {
         const data = await response.json();
         setInvoice({ ...invoice, stripe_payment_link_url: data.url });
@@ -204,7 +124,7 @@ export default function InvoiceDetailPage() {
         const data = await response.json();
         alert(data.error || 'Failed to generate payment link');
       }
-    } catch (error) {
+    } catch {
       alert('Failed to generate payment link');
     } finally {
       setGeneratingPaymentLink(false);
@@ -213,7 +133,6 @@ export default function InvoiceDetailPage() {
 
   const handleRecordPayment = async () => {
     if (!invoice) return;
-
     const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) {
       alert('Please enter a valid amount');
@@ -225,11 +144,7 @@ export default function InvoiceDetailPage() {
       const response = await fetch(`/api/invoices/${invoice.id}/payments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount,
-          method: paymentMethod,
-          notes: paymentNotes || undefined,
-        }),
+        body: JSON.stringify({ amount, method: paymentMethod, notes: paymentNotes || undefined }),
       });
 
       if (response.ok) {
@@ -241,7 +156,7 @@ export default function InvoiceDetailPage() {
         const data = await response.json();
         alert(data.error || 'Failed to record payment');
       }
-    } catch (error) {
+    } catch {
       alert('Failed to record payment');
     } finally {
       setRecordingPayment(false);
@@ -258,13 +173,12 @@ export default function InvoiceDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'void' }),
       });
-
       if (response.ok) {
         setInvoice({ ...invoice, status: 'void' });
       } else {
         alert('Failed to void invoice');
       }
-    } catch (error) {
+    } catch {
       alert('Failed to void invoice');
     }
   };
@@ -274,16 +188,13 @@ export default function InvoiceDetailPage() {
     if (!confirm('Are you sure you want to delete this invoice?')) return;
 
     try {
-      const response = await fetch(`/api/invoices/${invoice.id}`, {
-        method: 'DELETE',
-      });
-
+      const response = await fetch(`/api/invoices/${invoice.id}`, { method: 'DELETE' });
       if (response.ok) {
         router.push('/invoices');
       } else {
         alert('Failed to delete invoice');
       }
-    } catch (error) {
+    } catch {
       alert('Failed to delete invoice');
     }
   };
@@ -309,99 +220,20 @@ export default function InvoiceDetailPage() {
     );
   }
 
-  const statusConfig = STATUS_CONFIG[invoice.status] || STATUS_CONFIG.draft;
-  const StatusIcon = statusConfig.icon;
   const isOverdue = invoice.status === 'overdue';
-  const canEdit = invoice.status === 'draft';
-  const canSend = ['draft', 'sent', 'viewed'].includes(invoice.status) && invoice.status !== 'void';
-  const canRecordPayment = invoice.amount_due > 0 && invoice.status !== 'void';
   const isPaid = invoice.status === 'paid';
 
   return (
     <div className="min-h-screen bg-background pb-32">
-      {/* Header */}
-      <div className="bg-card border-b border-border sticky top-0 z-10">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <button
-            onClick={() => router.back()}
-            className="p-2 -ml-2 hover:bg-accent rounded-lg transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div className="flex-1">
-            <h1 className="text-lg font-semibold">{invoice.invoice_number || 'Invoice'}</h1>
-            <div className="flex items-center gap-2">
-              <span className={cn('text-xs px-2 py-0.5 rounded-full', statusConfig.color)}>
-                {statusConfig.label}
-              </span>
-              {isOverdue && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-                  Overdue
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="relative">
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className="p-2 hover:bg-accent rounded-lg transition-colors"
-            >
-              <MoreVertical className="h-5 w-5" />
-            </button>
-            {showMenu && (
-              <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg py-1 min-w-[180px] z-20">
-                {canEdit && (
-                  <Link
-                    href={`/invoices/${invoice.id}/edit`}
-                    className="flex items-center gap-2 px-4 py-2 hover:bg-muted text-sm"
-                  >
-                    <Edit className="h-4 w-4" />
-                    Edit Invoice
-                  </Link>
-                )}
-                <button
-                  onClick={copyPublicLink}
-                  className="w-full flex items-center gap-2 px-4 py-2 hover:bg-muted text-sm text-left"
-                >
-                  <Copy className="h-4 w-4" />
-                  Copy Link
-                </button>
-                <a
-                  href={`/view/invoice/${invoice.access_token}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 hover:bg-muted text-sm"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Preview
-                </a>
-                <button className="w-full flex items-center gap-2 px-4 py-2 hover:bg-muted text-sm text-left">
-                  <Download className="h-4 w-4" />
-                  Download PDF
-                </button>
-                {!['paid', 'void', 'draft'].includes(invoice.status) && (
-                  <button
-                    onClick={handleVoidInvoice}
-                    className="w-full flex items-center gap-2 px-4 py-2 hover:bg-muted text-sm text-left text-amber-600"
-                  >
-                    <XCircle className="h-4 w-4" />
-                    Void Invoice
-                  </button>
-                )}
-                {canEdit && (
-                  <button
-                    onClick={handleDelete}
-                    className="w-full flex items-center gap-2 px-4 py-2 hover:bg-muted text-sm text-left text-red-600"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <InvoiceHeader
+        invoice={invoice}
+        showMenu={showMenu}
+        setShowMenu={setShowMenu}
+        onBack={() => router.back()}
+        onCopyLink={copyPublicLink}
+        onVoid={handleVoidInvoice}
+        onDelete={handleDelete}
+      />
 
       <div className="p-4 space-y-4 max-w-2xl mx-auto">
         {/* Amount Due Card */}
@@ -451,10 +283,7 @@ export default function InvoiceDetailPage() {
                 <CreditCard className="h-5 w-5 text-primary" />
                 <span className="font-medium">Payment Link</span>
               </div>
-              <button
-                onClick={copyPaymentLink}
-                className="text-sm text-primary hover:underline"
-              >
+              <button onClick={copyPaymentLink} className="text-sm text-primary hover:underline">
                 Copy Link
               </button>
             </div>
@@ -467,19 +296,13 @@ export default function InvoiceDetailPage() {
           <div className="space-y-2">
             <p className="font-semibold text-lg">{invoice.customer.name}</p>
             {invoice.customer.phone && (
-              <a
-                href={`tel:${invoice.customer.phone}`}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary"
-              >
+              <a href={`tel:${invoice.customer.phone}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
                 <Phone className="h-4 w-4" />
                 {formatPhoneNumber(invoice.customer.phone)}
               </a>
             )}
             {invoice.customer.email && (
-              <a
-                href={`mailto:${invoice.customer.email}`}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary"
-              >
+              <a href={`mailto:${invoice.customer.email}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
                 <Mail className="h-4 w-4" />
                 {invoice.customer.email}
               </a>
@@ -499,19 +322,13 @@ export default function InvoiceDetailPage() {
             <h2 className="text-sm font-medium text-muted-foreground mb-3">Related</h2>
             <div className="space-y-2">
               {invoice.quote && (
-                <Link
-                  href={`/quotes/${invoice.quote.id}`}
-                  className="flex items-center gap-2 text-sm text-primary hover:underline"
-                >
+                <Link href={`/quotes/${invoice.quote.id}`} className="flex items-center gap-2 text-sm text-primary hover:underline">
                   <FileText className="h-4 w-4" />
                   Quote {invoice.quote.quote_number}
                 </Link>
               )}
               {invoice.job && (
-                <Link
-                  href={`/jobs/${invoice.job.id}`}
-                  className="flex items-center gap-2 text-sm text-primary hover:underline"
-                >
+                <Link href={`/jobs/${invoice.job.id}`} className="flex items-center gap-2 text-sm text-primary hover:underline">
                   <Receipt className="h-4 w-4" />
                   {invoice.job.title}
                 </Link>
@@ -520,84 +337,8 @@ export default function InvoiceDetailPage() {
           </div>
         )}
 
-        {/* Line Items */}
-        <div className="bg-card rounded-xl border border-border p-4">
-          <h2 className="text-sm font-medium text-muted-foreground mb-3">Items</h2>
-          <div className="space-y-3">
-            {invoice.items.map((item) => (
-              <div key={item.id} className="flex justify-between gap-4 pb-3 border-b border-border last:border-0 last:pb-0">
-                <div className="flex-1">
-                  <p className="font-medium">{item.name}</p>
-                  {item.description && (
-                    <p className="text-sm text-muted-foreground">{item.description}</p>
-                  )}
-                  <p className="text-sm text-muted-foreground">
-                    {item.quantity} × ${item.unit_price.toFixed(2)}
-                    {item.is_taxable && <span className="text-xs ml-1">(taxable)</span>}
-                  </p>
-                </div>
-                <p className="font-medium">${item.total.toFixed(2)}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Totals */}
-          <div className="border-t border-border mt-4 pt-4 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span>${invoice.subtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Tax ({invoice.tax_rate}%)</span>
-              <span>${invoice.tax_amount.toFixed(2)}</span>
-            </div>
-            {invoice.discount_amount > 0 && (
-              <div className="flex justify-between text-red-600">
-                <span>Discount</span>
-                <span>-${invoice.discount_amount.toFixed(2)}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-lg font-semibold pt-2 border-t border-border">
-              <span>Total</span>
-              <span>${invoice.total.toFixed(2)}</span>
-            </div>
-            {invoice.amount_paid > 0 && (
-              <>
-                <div className="flex justify-between text-green-600">
-                  <span>Paid</span>
-                  <span>-${invoice.amount_paid.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between font-semibold">
-                  <span>Balance Due</span>
-                  <span>${invoice.amount_due.toFixed(2)}</span>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Payment History */}
-        {invoice.payments && invoice.payments.length > 0 && (
-          <div className="bg-card rounded-xl border border-border p-4">
-            <h2 className="text-sm font-medium text-muted-foreground mb-3">Payment History</h2>
-            <div className="space-y-3">
-              {invoice.payments.map((payment) => (
-                <div key={payment.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                  <div>
-                    <p className="font-medium text-green-600">+${payment.amount.toFixed(2)}</p>
-                    <p className="text-xs text-muted-foreground capitalize">
-                      {payment.payment_method} • {formatRelativeDate(payment.paid_at)}
-                    </p>
-                    {payment.notes && (
-                      <p className="text-xs text-muted-foreground mt-1">{payment.notes}</p>
-                    )}
-                  </div>
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <InvoiceLineItems invoice={invoice} />
+        <PaymentHistory payments={invoice.payments} />
 
         {/* Notes */}
         {invoice.customer_notes && (
@@ -651,128 +392,30 @@ export default function InvoiceDetailPage() {
         </div>
       </div>
 
-      {/* Fixed Bottom Actions */}
-      {invoice.status !== 'void' && (
-        <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border p-4">
-          <div className="flex gap-3 max-w-2xl mx-auto">
-            {canSend && (
-              <button
-                onClick={handleSendInvoice}
-                disabled={sending}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-border rounded-lg hover:bg-muted disabled:opacity-50 transition-colors"
-              >
-                {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                {invoice.sent_at ? 'Resend' : 'Send'}
-              </button>
-            )}
-            {canRecordPayment && (
-              <>
-                {!invoice.stripe_payment_link_url && (
-                  <button
-                    onClick={handleGeneratePaymentLink}
-                    disabled={generatingPaymentLink}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-border rounded-lg hover:bg-muted disabled:opacity-50 transition-colors"
-                  >
-                    {generatingPaymentLink ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <CreditCard className="h-5 w-5" />
-                    )}
-                    Payment Link
-                  </button>
-                )}
-                <button
-                  onClick={() => setShowPaymentModal(true)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-                >
-                  <Banknote className="h-5 w-5" />
-                  Record Payment
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      <InvoiceActions
+        invoice={invoice}
+        sending={sending}
+        generatingPaymentLink={generatingPaymentLink}
+        onSend={handleSendInvoice}
+        onGeneratePaymentLink={handleGeneratePaymentLink}
+        onRecordPayment={() => setShowPaymentModal(true)}
+      />
 
       {/* Click outside to close menu */}
-      {showMenu && (
-        <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-      )}
+      {showMenu && <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />}
 
-      {/* Payment Modal */}
-      {showPaymentModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
-          <div className="bg-card w-full sm:max-w-md sm:rounded-xl rounded-t-xl p-6 space-y-4">
-            <h2 className="text-lg font-semibold">Record Payment</h2>
-
-            <div>
-              <label className="text-sm text-muted-foreground mb-1.5 block">Amount</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
-                  className="w-full pl-8 pr-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-sm text-muted-foreground mb-1.5 block">Payment Method</label>
-              <div className="flex gap-2">
-                {(['cash', 'check', 'other'] as const).map((method) => (
-                  <button
-                    key={method}
-                    onClick={() => setPaymentMethod(method)}
-                    className={cn(
-                      'flex-1 py-2 rounded-lg border text-sm font-medium capitalize transition-colors',
-                      paymentMethod === method
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-background border-input hover:bg-muted'
-                    )}
-                  >
-                    {method}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="text-sm text-muted-foreground mb-1.5 block">Notes (optional)</label>
-              <input
-                type="text"
-                value={paymentNotes}
-                onChange={(e) => setPaymentNotes(e.target.value)}
-                className="w-full px-4 py-2 bg-background border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Check #, reference, etc."
-              />
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setShowPaymentModal(false)}
-                className="flex-1 py-3 border border-input rounded-lg hover:bg-muted transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleRecordPayment}
-                disabled={recordingPayment}
-                className="flex-1 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
-              >
-                {recordingPayment ? (
-                  <Loader2 className="h-5 w-5 animate-spin mx-auto" />
-                ) : (
-                  'Record Payment'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        paymentAmount={paymentAmount}
+        setPaymentAmount={setPaymentAmount}
+        paymentMethod={paymentMethod}
+        setPaymentMethod={setPaymentMethod}
+        paymentNotes={paymentNotes}
+        setPaymentNotes={setPaymentNotes}
+        onSubmit={handleRecordPayment}
+        isSubmitting={recordingPayment}
+      />
     </div>
   );
 }

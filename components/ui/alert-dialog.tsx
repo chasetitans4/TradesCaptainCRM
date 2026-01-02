@@ -132,16 +132,18 @@ export function AlertDialogDescription({ children, className }: {
   );
 }
 
-export function AlertDialogAction({ children, onClick, className }: {
+export function AlertDialogAction({ children, onClick, className, disabled }: {
   children: React.ReactNode;
   onClick?: () => void;
   className?: string;
+  disabled?: boolean;
 }) {
   const { onOpenChange } = useAlertDialogContext();
 
   return (
     <Button
       className={className}
+      disabled={disabled}
       onClick={() => {
         onClick?.();
         onOpenChange(false);
@@ -152,9 +154,10 @@ export function AlertDialogAction({ children, onClick, className }: {
   );
 }
 
-export function AlertDialogCancel({ children, className }: {
+export function AlertDialogCancel({ children, className, disabled }: {
   children: React.ReactNode;
   className?: string;
+  disabled?: boolean;
 }) {
   const { onOpenChange } = useAlertDialogContext();
 
@@ -162,6 +165,7 @@ export function AlertDialogCancel({ children, className }: {
     <Button
       variant="outline"
       className={className}
+      disabled={disabled}
       onClick={() => onOpenChange(false)}
     >
       {children}

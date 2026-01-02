@@ -18,13 +18,13 @@ export const PLAN_PRICING: Record<string, { monthly: number; annual: number; use
   blue_pro_teams: { monthly: 199, annual: 1791, users: 10 },
   blue_enterprise_teams: { monthly: 399, annual: 3591, users: 20 },
   // Web Plans
-  web_starter: { monthly: 149, annual: 1341, users: 1 },
-  web_pro: { monthly: 249, annual: 2241, users: 1 },
-  web_enterprise: { monthly: 349, annual: 3141, users: 1 },
+  web_starter: { monthly: 199, annual: 1791, users: 1 },
+  web_pro: { monthly: 299, annual: 2691, users: 1 },
+  web_enterprise: { monthly: 499, annual: 4491, users: 1 },
   // Gold Plans - Individuals
-  gold_starter: { monthly: 199, annual: 1791, users: 1 },
-  gold_pro: { monthly: 349, annual: 3141, users: 1 },
-  gold_enterprise: { monthly: 499, annual: 4491, users: 1 },
+  gold_starter: { monthly: 299, annual: 2691, users: 1 },
+  gold_pro: { monthly: 399, annual: 3591, users: 1 },
+  gold_enterprise: { monthly: 598, annual: 5382, users: 1 },
   // Gold Plans - Teams
   gold_starter_teams: { monthly: 299, annual: 2691, users: 5 },
   gold_pro_teams: { monthly: 449, annual: 4041, users: 10 },

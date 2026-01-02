@@ -7,15 +7,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createAdminClient } from '@/lib/supabase/server';
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'fallback-secret';
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable must be configured');
+  }
+  return secret;
+}
 
 function verifyToken(token: string): { valid: boolean; payload?: any } {
   const crypto = require('crypto');
   const [payloadStr, signature] = token.split('.');
   if (!payloadStr || !signature) return { valid: false };
 
+  const jwtSecret = getJwtSecret();
   const expectedSig = crypto
-    .createHmac('sha256', JWT_SECRET)
+    .createHmac('sha256', jwtSecret)
     .update(payloadStr)
     .digest('base64url');
 

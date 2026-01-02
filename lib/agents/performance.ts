@@ -3,6 +3,7 @@
 // Minimum: 6 sales per calendar quarter (after 30-day ramp-up)
 // =====================================================
 
+import type { AlertRule } from '@/lib/monitoring';
 export type AgentStatus = 'active' | 'warned' | 'terminated';
 export type Quarter = 1 | 2 | 3 | 4;
 
@@ -35,6 +36,18 @@ export interface AgentQuarterlyPerformance {
   warning_date?: string;
   is_prorated: boolean;
   prorated_reason?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgentMonthlyPerformance {
+  id: string;
+  agent_id: string;
+  year: number;
+  month: number;
+  sales_count: number;
+  target: number;
+  met_target: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -75,6 +88,7 @@ export const QUARTERS: Record<Quarter, { start: string; end: string }> = {
 
 const agents: Map<string, Agent> = new Map();
 const quarterlyPerformance: Map<string, AgentQuarterlyPerformance> = new Map();
+const monthlyPerformance: Map<string, AgentMonthlyPerformance> = new Map();
 
 // =====================================================
 // HELPER FUNCTIONS
@@ -92,6 +106,17 @@ export function getCurrentQuarter(): { year: number; quarter: Quarter } {
   else quarter = 4;
 
   return { year, quarter };
+}
+
+export function getCurrentMonth(): { year: number; month: number } {
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() + 1 };
+}
+
+export function getMonthDates(year: number, month: number): { start: Date; end: Date; daysInMonth: number } {
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0);
+  return { start, end, daysInMonth: end.getDate() };
 }
 
 export function getQuarterDates(year: number, quarter: Quarter): { start: Date; end: Date } {
@@ -210,11 +235,12 @@ export async function recordSale(agentId: string): Promise<AgentQuarterlyPerform
   const agent = await getAgent(agentId);
   if (!agent) return null;
 
+  const now = new Date();
   const { year, quarter } = getCurrentQuarter();
   const perfKey = `${agentId}_${year}_Q${quarter}`;
 
   let perf = quarterlyPerformance.get(perfKey);
-  const now = new Date().toISOString();
+  const nowIso = now.toISOString();
 
   if (!perf) {
     const { end: quarterEnd } = getQuarterDates(year, quarter);
@@ -235,16 +261,38 @@ export async function recordSale(agentId: string): Promise<AgentQuarterlyPerform
       warning_issued: false,
       is_prorated: quota !== QUARTERLY_SALES_QUOTA,
       prorated_reason: quota !== QUARTERLY_SALES_QUOTA ? reason : undefined,
-      created_at: now,
-      updated_at: now,
+      created_at: nowIso,
+      updated_at: nowIso,
     };
   }
 
   perf.sales_count++;
   perf.met_quota = perf.sales_count >= perf.quota;
-  perf.updated_at = now;
-
+  perf.updated_at = nowIso;
   quarterlyPerformance.set(perfKey, perf);
+
+  const { month } = getCurrentMonth();
+  const monthKey = `${agentId}_${year}_M${month}`;
+  let m = monthlyPerformance.get(monthKey);
+  if (!m) {
+    const defaultTarget = Math.ceil(perf.quota / 3);
+    m = {
+      id: monthKey,
+      agent_id: agentId,
+      year,
+      month,
+      sales_count: 0,
+      target: defaultTarget,
+      met_target: false,
+      created_at: nowIso,
+      updated_at: nowIso,
+    };
+  }
+  m.sales_count++;
+  m.met_target = m.sales_count >= m.target;
+  m.updated_at = nowIso;
+  monthlyPerformance.set(monthKey, m);
+
   return perf;
 }
 
@@ -264,6 +312,45 @@ export async function getAllQuarterlyPerformance(
   return Array.from(quarterlyPerformance.values()).filter(
     p => p.year === year && p.quarter === quarter
   );
+}
+
+export async function setMonthlyTarget(
+  agentId: string,
+  year: number,
+  month: number,
+  target: number
+): Promise<AgentMonthlyPerformance> {
+  const key = `${agentId}_${year}_M${month}`;
+  const now = new Date().toISOString();
+  let m = monthlyPerformance.get(key);
+  if (!m) {
+    m = {
+      id: key,
+      agent_id: agentId,
+      year,
+      month,
+      sales_count: 0,
+      target,
+      met_target: false,
+      created_at: now,
+      updated_at: now,
+    };
+  } else {
+    m.target = target;
+    m.updated_at = now;
+    m.met_target = m.sales_count >= m.target;
+  }
+  monthlyPerformance.set(key, m);
+  return m;
+}
+
+export async function getAgentMonthlyPerformance(
+  agentId: string,
+  year: number,
+  month: number
+): Promise<AgentMonthlyPerformance | null> {
+  const key = `${agentId}_${year}_M${month}`;
+  return monthlyPerformance.get(key) || null;
 }
 
 // =====================================================
@@ -411,6 +498,59 @@ export async function resetYearlyWarnings(): Promise<number> {
   }
 
   return count;
+}
+
+export async function getMonthlyAlertRules(): Promise<AlertRule[]> {
+  const { year, month } = getCurrentMonth();
+  const { daysInMonth } = getMonthDates(year, month);
+  const activeAgents = await getActiveAgents();
+  const rules: AlertRule[] = [];
+
+  for (const agent of activeAgents) {
+    if (isInRampUp(agent)) {
+      continue;
+    }
+    const key = `${agent.id}_${year}_M${month}`;
+    const m = monthlyPerformance.get(key);
+    const target = m?.target ?? 2;
+    const cooldownMinutes = 720;
+
+    const ruleWarning: AlertRule = {
+      id: `agent-${agent.id}-monthly-behind`,
+      name: `Agent ${agent.name} behind monthly target`,
+      severity: 'warning',
+      cooldownMinutes,
+      condition: async () => {
+        const now = new Date();
+        const daysPassed = now.getDate();
+        const expected = Math.floor((target * daysPassed) / daysInMonth);
+        const current = monthlyPerformance.get(key);
+        const actual = current?.sales_count ?? 0;
+        return actual < expected && daysPassed >= Math.ceil(daysInMonth * 0.25);
+      },
+    };
+
+    const ruleCritical: AlertRule = {
+      id: `agent-${agent.id}-monthly-critical`,
+      name: `Agent ${agent.name} at risk of missing monthly target`,
+      severity: 'critical',
+      cooldownMinutes,
+      condition: async () => {
+        const now = new Date();
+        const daysPassed = now.getDate();
+        const expected = Math.floor((target * daysPassed) / daysInMonth);
+        const current = monthlyPerformance.get(key);
+        const actual = current?.sales_count ?? 0;
+        const remainingDays = daysInMonth - daysPassed;
+        const remainingNeeded = Math.max(0, target - actual);
+        return actual + remainingDays < target || (actual < expected - 1 && daysPassed >= Math.ceil(daysInMonth * 0.5));
+      },
+    };
+
+    rules.push(ruleWarning, ruleCritical);
+  }
+
+  return rules;
 }
 
 // =====================================================

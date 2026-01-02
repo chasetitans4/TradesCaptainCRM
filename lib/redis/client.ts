@@ -42,21 +42,6 @@ export function getRedis(): Redis {
       console.error('Redis connection error:', err.message);
     });
 
-    redis.on('connect', () => {
-      console.log('✅ Redis 8.4 connected');
-    });
-
-    redis.on('ready', () => {
-      console.log('✅ Redis ready to accept commands');
-    });
-
-    redis.on('close', () => {
-      console.log('Redis connection closed');
-    });
-
-    redis.on('reconnecting', () => {
-      console.log('Redis reconnecting...');
-    });
   }
 
   return redis;
@@ -82,7 +67,6 @@ export async function closeRedis(): Promise<void> {
   if (redis) {
     await redis.quit();
     redis = null;
-    console.log('Redis connection closed');
   }
 }
 
@@ -130,5 +114,4 @@ export async function flushRedis(): Promise<void> {
   }
   const redis = getRedis();
   await redis.flushdb();
-  console.log('Redis database flushed');
 }

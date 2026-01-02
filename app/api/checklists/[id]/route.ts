@@ -28,9 +28,8 @@ export async function PATCH(
     }
 
     await updateChecklistItem(id, itemId, profile.id, {
-      isCompleted,
+      completed: isCompleted,
       notes,
-      photoUrl,
     });
 
     return NextResponse.json({ success: true });

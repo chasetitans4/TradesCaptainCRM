@@ -68,8 +68,7 @@ export async function assignJob(
         .eq('id', technicianId)
         .single();
 
-      // Could integrate with notification system here
-      console.log(`[DISPATCH] Would notify technician ${tech?.email} about job ${jobId}`);
+      // TODO: Integrate with notification system
     } catch {
       // Ignore notification errors
     }
@@ -89,10 +88,7 @@ export async function assignJob(
         .eq('id', technicianId)
         .single();
 
-      // Could integrate with SMS system here
-      console.log(
-        `[DISPATCH] Would notify customer ${customer?.name} that ${tech?.name} is assigned`
-      );
+      // TODO: Integrate with SMS system
     } catch {
       // Ignore notification errors
     }
@@ -227,14 +223,7 @@ export async function rescheduleJob(
     scheduled_time: newTime || job.scheduled_time,
   });
 
-  // Send notifications
-  if (options?.notifyCustomer && job.customer_id) {
-    console.log(`[DISPATCH] Would notify customer about reschedule to ${newDate}`);
-  }
-
-  if (options?.notifyTechnician && job.assigned_user_id) {
-    console.log(`[DISPATCH] Would notify technician about reschedule to ${newDate}`);
-  }
+  // TODO: Send notifications for reschedule
 
   return { success: true };
 }

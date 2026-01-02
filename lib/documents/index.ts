@@ -103,8 +103,8 @@ export async function uploadDocument(params: UploadDocumentParams): Promise<Docu
     await logActivity({
       businessId: params.businessId,
       customerId: params.entityId,
-      userId: params.uploadedBy,
-      activityType: 'document_uploaded',
+      createdBy: params.uploadedBy,
+      activityType: 'document_added',
       title: `Document uploaded: ${params.name || params.file.name}`,
       metadata: { documentType: params.documentType, fileName: params.file.name },
     });

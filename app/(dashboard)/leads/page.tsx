@@ -46,6 +46,7 @@ const STATUS_COLORS: Record<LeadStatus, string> = {
   contacted: 'bg-info/10 text-info border-info/20',
   qualified: 'bg-success/10 text-success border-success/20',
   quoted: 'bg-warning/10 text-warning border-warning/20',
+  scheduled: 'bg-info/10 text-info border-info/20',
   won: 'bg-success/10 text-success border-success/20',
   lost: 'bg-danger/10 text-danger border-danger/20',
 };

@@ -66,7 +66,7 @@ export default function RemindersPage() {
           lead:leads (id, service_needed)
         `)
         .eq('user_id', user.id)
-        .order('due_at', { ascending: true });
+        .order('remind_at', { ascending: true });
 
       if (error) throw error;
       setReminders((data as ReminderWithRelations[]) || []);
@@ -95,11 +95,11 @@ export default function RemindersPage() {
     const supabase = createClient();
 
     try {
-      const newStatus = !reminder.is_completed;
+      const newStatus = !reminder.completed;
       const { error } = await supabase
         .from('reminders')
         .update({
-          is_completed: newStatus,
+          completed: newStatus,
           completed_at: newStatus ? new Date().toISOString() : null,
         })
         .eq('id', reminder.id);
@@ -109,7 +109,7 @@ export default function RemindersPage() {
       setReminders((prev) =>
         prev.map((r) =>
           r.id === reminder.id
-            ? { ...r, is_completed: newStatus, completed_at: newStatus ? new Date().toISOString() : null }
+            ? { ...r, completed: newStatus, completed_at: newStatus ? new Date().toISOString() : null }
             : r
         )
       );
@@ -126,21 +126,21 @@ export default function RemindersPage() {
     todayEnd.setDate(todayEnd.getDate() + 1);
 
     return reminders.filter((reminder) => {
-      const dueDate = new Date(reminder.due_at);
+      const dueDate = new Date(reminder.remind_at);
 
       switch (filter) {
         case 'today':
           return (
-            !reminder.is_completed &&
+            !reminder.completed &&
             dueDate >= todayStart &&
             dueDate < todayEnd
           );
         case 'upcoming':
-          return !reminder.is_completed && dueDate >= todayEnd;
+          return !reminder.completed && dueDate >= todayEnd;
         case 'overdue':
-          return !reminder.is_completed && dueDate < todayStart;
+          return !reminder.completed && dueDate < todayStart;
         case 'completed':
-          return reminder.is_completed;
+          return reminder.completed;
         default:
           return true;
       }
@@ -154,10 +154,10 @@ export default function RemindersPage() {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     filteredReminders.forEach((reminder) => {
-      const dueDate = new Date(reminder.due_at);
+      const dueDate = new Date(reminder.remind_at);
       let groupKey: string;
 
-      if (reminder.is_completed) {
+      if (reminder.completed) {
         groupKey = 'Completed';
       } else if (dueDate < todayStart) {
         groupKey = 'Overdue';
@@ -187,17 +187,17 @@ export default function RemindersPage() {
       all: reminders.length,
       today: reminders.filter(
         (r) =>
-          !r.is_completed &&
-          new Date(r.due_at) >= todayStart &&
-          new Date(r.due_at) < todayEnd
+          !r.completed &&
+          new Date(r.remind_at) >= todayStart &&
+          new Date(r.remind_at) < todayEnd
       ).length,
       upcoming: reminders.filter(
-        (r) => !r.is_completed && new Date(r.due_at) >= todayEnd
+        (r) => !r.completed && new Date(r.remind_at) >= todayEnd
       ).length,
       overdue: reminders.filter(
-        (r) => !r.is_completed && new Date(r.due_at) < todayStart
+        (r) => !r.completed && new Date(r.remind_at) < todayStart
       ).length,
-      completed: reminders.filter((r) => r.is_completed).length,
+      completed: reminders.filter((r) => r.completed).length,
     };
   }, [reminders]);
 
@@ -327,14 +327,14 @@ function ReminderCard({
   reminder: ReminderWithRelations;
   onToggleComplete: () => void;
 }) {
-  const urgencyColor = getUrgencyColor(reminder.due_at);
-  const isOverdue = new Date(reminder.due_at) < new Date() && !reminder.is_completed;
+  const urgencyColor = getUrgencyColor(reminder.remind_at);
+  const isOverdue = new Date(reminder.remind_at) < new Date() && !reminder.completed;
 
   return (
     <div
       className={cn(
         'card p-3 flex items-start gap-3',
-        reminder.is_completed && 'opacity-60'
+        reminder.completed && 'opacity-60'
       )}
     >
       {/* Checkbox */}
@@ -345,14 +345,14 @@ function ReminderCard({
         }}
         className={cn(
           'mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors',
-          reminder.is_completed
+          reminder.completed
             ? 'bg-success border-success text-white'
             : isOverdue
             ? 'border-danger hover:bg-danger/10'
             : 'border-border hover:bg-muted'
         )}
       >
-        {reminder.is_completed && <Check className="h-4 w-4" />}
+        {reminder.completed && <Check className="h-4 w-4" />}
       </button>
 
       {/* Content */}
@@ -361,7 +361,7 @@ function ReminderCard({
           <p
             className={cn(
               'font-medium text-text',
-              reminder.is_completed && 'line-through'
+              reminder.completed && 'line-through'
             )}
           >
             {reminder.title}
@@ -374,14 +374,14 @@ function ReminderCard({
           <div
             className={cn(
               'flex items-center gap-1 px-2 py-0.5 rounded-full',
-              reminder.is_completed
+              reminder.completed
                 ? 'bg-muted text-text-muted'
                 : urgencyColor.bg,
-              reminder.is_completed ? '' : urgencyColor.text
+              reminder.completed ? '' : urgencyColor.text
             )}
           >
             <Clock className="h-3 w-3" />
-            {formatRelativeDate(reminder.due_at)}
+            {formatRelativeDate(reminder.remind_at)}
           </div>
         </div>
 

@@ -106,8 +106,8 @@ export default function ClockWidget({
         (pos) => {
           setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         },
-        (err) => {
-          console.log('Location not available:', err.message);
+        () => {
+          // Location not available - silently ignore
         }
       );
     }

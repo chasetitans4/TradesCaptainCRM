@@ -857,3 +857,38 @@ export async function validateImpersonationToken(token: string): Promise<{
     return { valid: false };
   }
 }
+
+// =====================================================
+// RE-EXPORT SUBMODULES
+// =====================================================
+
+export * from './auth';
+export * from './types';
+export {
+  getAllPlanPricing,
+  getPlanPricing,
+  getPlansByTrack,
+  getPlanFeatures,
+  getPlanDetails,
+  comparePlans,
+  getClientUpgradeOptions,
+  getPlanTracksSummary,
+} from './plans';
+export * from './offers';
+export * from './pipeline';
+export * from './onboarding';
+export {
+  getDocumentTemplates,
+  getClientDocuments,
+  uploadDocument,
+  deleteDocument,
+  getDocument,
+  TEMPLATE_CATEGORIES,
+} from './documents';
+export * from './locations';
+export * from './sms-usage';
+export * from './reports';
+export * from './leads-captain-dashboard';
+export * from './commission-tracker';
+export * from './commission-calculator';
+export * from './coupons';

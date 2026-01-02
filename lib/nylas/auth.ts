@@ -3,6 +3,7 @@
 // =====================================================
 
 import { nylas, nylasConfig, type NylasProvider } from './client';
+import { syncLogger } from '@/lib/logger';
 
 /**
  * Generate OAuth URL for calendar connection
@@ -38,7 +39,7 @@ export async function exchangeCodeForGrant(code: string): Promise<{
   return {
     grantId: response.grantId,
     email: response.email,
-    provider: response.provider,
+    provider: response.provider || 'unknown',
   };
 }
 
@@ -49,7 +50,7 @@ export async function revokeGrant(grantId: string): Promise<void> {
   try {
     await nylas.grants.destroy({ grantId });
   } catch (error) {
-    console.error('Error revoking Nylas grant:', error);
+    syncLogger.error({ msg: 'Error revoking Nylas grant', error });
     // Don't throw - we still want to clean up the database record
   }
 }

@@ -17,7 +17,7 @@ import {
   AlertCircle,
   CheckCircle2
 } from 'lucide-react';
-import { createClientSupabaseClient } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/client';
 import type { AISMSSettings } from '@/types';
 
 type AITone = 'professional' | 'friendly' | 'casual';

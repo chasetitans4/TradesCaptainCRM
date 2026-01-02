@@ -33,7 +33,6 @@ export async function sendEmail(params: SendEmailParams) {
 
   const resend = getResend();
   if (!resend) {
-    console.warn('RESEND_API_KEY not set, skipping email send');
     return { success: false, error: 'Email not configured' };
   }
 

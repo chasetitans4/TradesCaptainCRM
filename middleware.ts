@@ -5,18 +5,7 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-
-// In-memory rate limit store (use Redis in production for multi-instance)
-const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
-
-// Rate limit configuration per route type
-const RATE_LIMITS = {
-  api: { requests: 100, windowMs: 60000 }, // 100 requests per minute
-  auth: { requests: 10, windowMs: 900000 }, // 10 requests per 15 minutes
-  search: { requests: 60, windowMs: 60000 }, // 60 requests per minute
-  ai: { requests: 20, windowMs: 3600000 }, // 20 requests per hour
-  default: { requests: 200, windowMs: 60000 }, // 200 requests per minute
-};
+import { rateLimitMiddleware } from '@/lib/rate-limit/middleware';
 
 // Routes that don't require authentication
 const publicRoutes = [
@@ -60,76 +49,6 @@ function matchesPattern(pathname: string, patterns: string[]): boolean {
     pathname.startsWith(pattern + '/') ||
     pathname.startsWith(pattern + '.')
   );
-}
-
-/**
- * Get rate limit config for a path
- */
-function getRateLimitConfig(pathname: string): { requests: number; windowMs: number } {
-  if (pathname.includes('/api/auth') || pathname.includes('/login')) {
-    return RATE_LIMITS.auth;
-  }
-  if (pathname.includes('/api/search')) {
-    return RATE_LIMITS.search;
-  }
-  if (pathname.includes('/api/ai')) {
-    return RATE_LIMITS.ai;
-  }
-  if (pathname.startsWith('/api/')) {
-    return RATE_LIMITS.api;
-  }
-  return RATE_LIMITS.default;
-}
-
-/**
- * Check and update rate limit
- */
-function checkRateLimit(
-  identifier: string,
-  pathname: string
-): { allowed: boolean; remaining: number; resetAt: number } {
-  const config = getRateLimitConfig(pathname);
-  const now = Date.now();
-  const key = `${identifier}:${pathname.split('/').slice(0, 3).join('/')}`;
-
-  let entry = rateLimitStore.get(key);
-
-  // Clean up expired entries periodically
-  if (rateLimitStore.size > 10000) {
-    for (const [k, v] of rateLimitStore.entries()) {
-      if (v.resetAt < now) {
-        rateLimitStore.delete(k);
-      }
-    }
-  }
-
-  // Reset if window expired
-  if (!entry || entry.resetAt < now) {
-    entry = { count: 0, resetAt: now + config.windowMs };
-    rateLimitStore.set(key, entry);
-  }
-
-  entry.count++;
-  const remaining = Math.max(0, config.requests - entry.count);
-  const allowed = entry.count <= config.requests;
-
-  return { allowed, remaining, resetAt: entry.resetAt };
-}
-
-/**
- * Get client identifier for rate limiting
- */
-function getClientIdentifier(request: NextRequest): string {
-  // Try to get real IP from various headers
-  const forwardedFor = request.headers.get('x-forwarded-for');
-  const realIp = request.headers.get('x-real-ip');
-  const cfConnectingIp = request.headers.get('cf-connecting-ip');
-
-  return cfConnectingIp ||
-    realIp ||
-    forwardedFor?.split(',')[0]?.trim() ||
-    request.ip ||
-    'unknown';
 }
 
 /**
@@ -234,8 +153,8 @@ async function updateSession(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
+        setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
+          cookiesToSet.forEach(({ name, value }: { name: string; value: string }) =>
             request.cookies.set(name, value)
           );
           response = NextResponse.next({
@@ -243,7 +162,7 @@ async function updateSession(request: NextRequest) {
               headers: request.headers,
             },
           });
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value, options }: { name: string; value: string; options?: Record<string, unknown> }) =>
             response.cookies.set(name, value, options)
           );
         },
@@ -274,30 +193,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Apply rate limiting for API routes
+  // Apply rate limiting for API routes (Edge-compatible in-memory)
   if (pathname.startsWith('/api/')) {
-    const clientId = getClientIdentifier(request);
-    const rateLimit = checkRateLimit(clientId, pathname);
-
-    if (!rateLimit.allowed) {
-      const retryAfter = Math.ceil((rateLimit.resetAt - Date.now()) / 1000);
-      return NextResponse.json(
-        {
-          error: {
-            message: 'Rate limit exceeded. Please try again later.',
-            code: 'RATE_LIMITED',
-            retryAfter,
-          },
-        },
-        {
-          status: 429,
-          headers: {
-            'Retry-After': retryAfter.toString(),
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': new Date(rateLimit.resetAt).toISOString(),
-          },
-        }
-      );
+    const rateLimitResponse = rateLimitMiddleware(request);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
     }
   }
 
@@ -352,18 +252,65 @@ export async function middleware(request: NextRequest) {
   // CSRF protection for mutations
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
     const origin = request.headers.get('origin');
+    const referer = request.headers.get('referer');
     const host = request.headers.get('host');
 
-    // Skip CSRF for API routes with proper auth headers
-    const hasAuthHeader = request.headers.get('authorization');
+    // Skip CSRF for API routes with proper Bearer auth (API clients)
+    const authHeader = request.headers.get('authorization');
+    const hasValidApiAuth = authHeader?.startsWith('Bearer ');
 
-    if (!hasAuthHeader && origin) {
-      const originHost = new URL(origin).host;
-      if (originHost !== host) {
-        return NextResponse.json(
-          { error: 'CSRF validation failed' },
-          { status: 403 }
-        );
+    // Skip CSRF for webhooks (already validated by signature)
+    const isWebhook = pathname.startsWith('/api/webhooks');
+
+    if (!hasValidApiAuth && !isWebhook) {
+      // Validate Origin header first
+      if (origin) {
+        try {
+          const originHost = new URL(origin).host;
+          if (originHost !== host) {
+            return NextResponse.json(
+              { error: 'CSRF validation failed', message: 'Origin mismatch' },
+              { status: 403 }
+            );
+          }
+        } catch {
+          // Invalid origin URL
+          return NextResponse.json(
+            { error: 'CSRF validation failed', message: 'Invalid origin' },
+            { status: 403 }
+          );
+        }
+      } else if (referer) {
+        // Fallback to Referer header if Origin is missing
+        try {
+          const refererHost = new URL(referer).host;
+          if (refererHost !== host) {
+            return NextResponse.json(
+              { error: 'CSRF validation failed', message: 'Referer mismatch' },
+              { status: 403 }
+            );
+          }
+        } catch {
+          // Invalid referer URL
+          return NextResponse.json(
+            { error: 'CSRF validation failed', message: 'Invalid referer' },
+            { status: 403 }
+          );
+        }
+      } else {
+        // Neither Origin nor Referer present - this is suspicious for browser requests
+        // Allow only for specific non-browser clients (e.g., cURL, Postman with valid auth)
+        // For cookie-based auth, we require Origin/Referer
+        const hasCookieAuth = request.cookies.has('sb-access-token') ||
+                              request.cookies.has('admin-session') ||
+                              request.cookies.has('portal-session');
+
+        if (hasCookieAuth) {
+          return NextResponse.json(
+            { error: 'CSRF validation failed', message: 'Missing origin header' },
+            { status: 403 }
+          );
+        }
       }
     }
   }

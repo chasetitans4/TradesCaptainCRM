@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAvailableSlots, getSlotsForDate, isSlotAvailable, getAvailabilitySummary } from '@/lib/booking/slots';
 import { getBookingSettingsBySlug } from '@/lib/booking/settings';
+import { logApiError } from '@/lib/logger';
 
 // GET /api/booking/slots - Get available booking slots (public)
 export async function GET(request: NextRequest) {
@@ -52,8 +53,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error: any) {
-    console.error('Error fetching booking slots:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    logApiError('GET', '/api/booking/slots', error);
+    return NextResponse.json({ error: 'Failed to fetch booking slots' }, { status: 500 });
   }
 }
 
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error: any) {
-    console.error('Error checking slot availability:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    logApiError('POST', '/api/booking/slots', error);
+    return NextResponse.json({ error: 'Failed to check slot availability' }, { status: 500 });
   }
 }

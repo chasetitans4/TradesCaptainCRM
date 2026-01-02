@@ -15,8 +15,6 @@ export async function POST(request: NextRequest) {
 
     const result = await processScheduledFollowUps();
 
-    console.log(`[Follow-up Processor] Processed: ${result.processed}, Sent: ${result.sent}, Failed: ${result.failed}`);
-
     return NextResponse.json({
       success: true,
       ...result,

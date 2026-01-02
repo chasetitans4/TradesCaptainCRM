@@ -303,7 +303,7 @@ export function PasswordChange({ onSuccess, onCancel }: PasswordChangeProps) {
                 !newPassword ||
                 !confirmPassword ||
                 newPassword !== confirmPassword ||
-                (strength && !strength.valid)
+                strength?.valid === false
               }
             >
               {loading ? 'Changing...' : 'Change Password'}

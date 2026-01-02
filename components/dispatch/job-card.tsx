@@ -12,9 +12,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { Clock, GripVertical, MapPin, MoreVertical, User } from 'lucide-react';
+import { Clock, GripVertical, MoreVertical, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DispatchJob } from './dispatch-board';
+import { AddressLinkCompact } from '@/components/ui/address-link';
 
 interface JobCardProps {
   job: DispatchJob;
@@ -133,10 +134,7 @@ export function JobCard({ job, isDragging, onClick }: JobCardProps) {
                 <span className="truncate">{job.customer.name}</span>
               </div>
               {job.customer.address && (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <MapPin className="h-3 w-3" />
-                  <span className="truncate">{job.customer.address}</span>
-                </div>
+                <AddressLinkCompact address={job.customer.address} />
               )}
             </div>
 

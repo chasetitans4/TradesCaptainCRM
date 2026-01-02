@@ -29,8 +29,10 @@ export async function GET(request: NextRequest) {
       : auth.user.id;
 
     if (pending) {
-      const commissions = await getPendingCommissions(effectiveAgentId);
-      return NextResponse.json({ commissions, total: commissions.length });
+      const commissions = await getPendingCommissions();
+      const filtered =
+        effectiveAgentId ? commissions.filter((c) => c.agent_id === effectiveAgentId) : commissions;
+      return NextResponse.json({ commissions: filtered, total: filtered.length });
     }
 
     const result = await getCommissions({

@@ -1,0 +1,22 @@
+openapi: 3.0.3
+info:
+  title: TradesCaptain CRM API
+  version: 1.0.0
+servers:
+  - url: https://api.tradescaptain.example.com
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+  /api/leads:
+    get:
+      summary: List leads
+      responses:
+        '200': { description: OK }
+    post:
+      summary: Create lead
+      responses:
+        '201': { description: Created }

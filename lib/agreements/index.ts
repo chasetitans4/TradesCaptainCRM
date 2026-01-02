@@ -56,6 +56,9 @@ interface CreateAgreementParams {
   equipmentIds?: string[];
   autoGenerateJobs?: boolean;
   autoNotifyCustomer?: boolean;
+  autoRenew?: boolean;
+  reminderDays?: number;
+  description?: string;
   notes?: string;
 }
 
@@ -71,6 +74,7 @@ export async function createServiceAgreement(params: CreateAgreementParams): Pro
       business_id: params.businessId,
       customer_id: params.customerId,
       name: params.name,
+      description: params.description,
       frequency: params.frequency,
       start_date: params.startDate,
       end_date: params.endDate,
@@ -80,6 +84,8 @@ export async function createServiceAgreement(params: CreateAgreementParams): Pro
       job_template: params.jobTemplate,
       auto_generate_jobs: params.autoGenerateJobs ?? true,
       auto_notify_customer: params.autoNotifyCustomer ?? true,
+      auto_renew: params.autoRenew ?? false,
+      renewal_reminder_days: params.reminderDays ?? 0,
       notes: params.notes,
     })
     .select()

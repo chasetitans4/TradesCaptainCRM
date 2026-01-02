@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { logApiError } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,8 +61,8 @@ export async function GET(request: NextRequest) {
       business,
       serviceTypes: serviceTypes || [],
     });
-  } catch (error) {
-    console.error('Error in GET /api/booking/info:', error);
+  } catch (error: any) {
+    logApiError('GET', '/api/booking/info', error);
     return NextResponse.json(
       { error: 'Failed to load booking info' },
       { status: 500 }

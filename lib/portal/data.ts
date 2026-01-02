@@ -292,7 +292,9 @@ export async function submitServiceRequest(
     preferredDate?: string;
     preferredTimeSlot?: string;
     urgency?: 'normal' | 'urgent' | 'emergency';
+    flexibleScheduling?: boolean;
     equipmentId?: string;
+    notes?: string;
   }
 ) {
   const supabase = await createClient();
@@ -307,7 +309,9 @@ export async function submitServiceRequest(
       preferred_date: data.preferredDate,
       preferred_time_slot: data.preferredTimeSlot,
       urgency: data.urgency || 'normal',
+      flexible_scheduling: data.flexibleScheduling !== false,
       equipment_id: data.equipmentId,
+      customer_notes: data.notes,
       status: 'pending',
     })
     .select()

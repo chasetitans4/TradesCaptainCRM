@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { checkSearchRateLimit } from '@/lib/rate-limit';
 
 interface SearchResult {
   type: 'customer' | 'job' | 'lead' | 'invoice';
@@ -30,12 +31,29 @@ export async function GET(request: NextRequest) {
     // Get user's business
     const { data: profile } = await supabase
       .from('users')
-      .select('business_id')
+      .select('business_id, id')
       .eq('auth_user_id', user.id)
       .single();
 
     if (!profile) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Check rate limit (30 searches per minute per user)
+    const rateLimit = await checkSearchRateLimit(profile.id);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Search rate limit exceeded. Please wait a moment.' },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': '30',
+            'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+            'X-RateLimit-Reset': rateLimit.resetAt.toISOString(),
+            'Retry-After': (rateLimit.retryAfter || 60).toString(),
+          },
+        }
+      );
     }
 
     const { searchParams } = new URL(request.url);

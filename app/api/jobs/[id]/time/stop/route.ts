@@ -50,9 +50,8 @@ export async function POST(
       );
     }
 
-    const body = await request.json().catch(() => ({}));
-
-    const jobTimeEntry = await stopJobTimer(activeTimer.id, body.notes);
+    // stopJobTimer signature: (entryId) - notes not supported yet
+    const jobTimeEntry = await stopJobTimer(activeTimer.id);
 
     return NextResponse.json({ jobTimeEntry });
   } catch (error: any) {

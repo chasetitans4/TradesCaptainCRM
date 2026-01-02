@@ -29,7 +29,7 @@ export const SECONDARY_ROUTES = [
  * Prefetch routes after a delay to not block initial render
  */
 export function prefetchRoutes(
-  router: { prefetch: (url: string) => Promise<void> },
+  router: { prefetch: (url: string) => void },
   routes: readonly string[],
   delay: number = 2000
 ) {
@@ -37,9 +37,11 @@ export function prefetchRoutes(
 
   setTimeout(() => {
     routes.forEach((route) => {
-      router.prefetch(route).catch(() => {
+      try {
+        router.prefetch(route);
+      } catch {
         // Silently fail - prefetch is optional optimization
-      });
+      }
     });
   }, delay);
 }
@@ -101,7 +103,7 @@ export function requestIdleCallback(
   }
 
   // Fallback for Safari
-  return window.setTimeout(callback, options?.timeout || 1);
+  return globalThis.setTimeout(callback, options?.timeout || 1) as unknown as number;
 }
 
 /**
@@ -113,7 +115,7 @@ export function cancelIdleCallback(id: number): void {
   if ('cancelIdleCallback' in window) {
     (window as any).cancelIdleCallback(id);
   } else {
-    window.clearTimeout(id);
+    globalThis.clearTimeout(id);
   }
 }
 

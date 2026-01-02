@@ -5,23 +5,19 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { cn } from '@/lib/utils';
-
-interface CalendarEvent {
-  id: string;
-  title: string;
-  start: Date | string;
+// Local event type compatible with FullCalendar EventInput
+type CalendarEvent = {
+  id?: string;
+  title?: string;
+  start?: Date | string;
   end?: Date | string;
   backgroundColor?: string;
-  extendedProps?: {
-    customer?: string;
-    technician?: string;
-    status?: string;
-  };
-}
+  extendedProps?: Record<string, unknown>;
+};
 
 interface FullCalendarViewProps {
   events: CalendarEvent[];
-  onEventClick?: (event: CalendarEvent) => void;
+  onEventClick?: (event: any) => void;
   onDateSelect?: (start: Date, end: Date) => void;
   className?: string;
 }
@@ -47,10 +43,8 @@ export function FullCalendarView({
         selectable
         selectMirror
         dayMaxEvents={3}
-        eventClick={(info) =>
-          onEventClick?.(info.event as unknown as CalendarEvent)
-        }
-        select={(info) => onDateSelect?.(info.start, info.end)}
+        eventClick={(info: any) => onEventClick?.(info.event)}
+        select={(info: any) => onDateSelect?.(info.start, info.end)}
         height="auto"
       />
     </div>

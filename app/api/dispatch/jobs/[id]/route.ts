@@ -123,7 +123,12 @@ export async function POST(
     }
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error || result.reason }, { status: 400 });
+      const errorMessage = 'error' in result
+        ? result.error
+        : 'reason' in result
+          ? (result as any).reason
+          : 'Dispatch action failed';
+      return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
 
     return NextResponse.json(result);

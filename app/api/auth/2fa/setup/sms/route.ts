@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { setupSMS2FA, verifySMS2FASetup, disableSMS2FA } from '@/lib/auth/sms-2fa';
+import { authLogger } from '@/lib/logger';
 
 // POST - Start SMS 2FA setup or verify
 export async function POST(request: NextRequest) {
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
   } catch (error: any) {
-    console.error('SMS 2FA setup error:', error);
+    authLogger.error({ msg: 'SMS 2FA setup error', error });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -76,7 +77,7 @@ export async function DELETE() {
     await disableSMS2FA(user.id);
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('SMS 2FA disable error:', error);
+    authLogger.error({ msg: 'SMS 2FA disable error', error });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

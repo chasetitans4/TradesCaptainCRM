@@ -169,6 +169,27 @@ export async function checkPasswordResetRateLimit(email: string): Promise<RateLi
 }
 
 /**
+ * 2FA verification rate limit: 5 attempts per 10 minutes per user+IP (sliding window for security)
+ */
+export async function check2FAVerifyRateLimit(userId: string, ip: string): Promise<RateLimitResult> {
+  return checkRateLimit(`2fa:${userId}:${ip}`, 5, 600);
+}
+
+/**
+ * 2FA code send rate limit: 5 sends per 10 minutes per user+IP (prevents SMS/email spam)
+ */
+export async function check2FASendRateLimit(userId: string, ip: string): Promise<RateLimitResult> {
+  return checkRateLimit(`2fa_send:${userId}:${ip}`, 5, 600);
+}
+
+/**
+ * Portal message rate limit: 10 messages per 5 minutes per customer+IP
+ */
+export async function checkPortalMessageRateLimit(customerId: string, ip: string): Promise<RateLimitResult> {
+  return checkSimpleRateLimit(`portal_msg:${customerId}:${ip}`, 10, 300);
+}
+
+/**
  * AI rate limit: 50 AI calls per minute per business
  */
 export async function checkAIRateLimit(businessId: string): Promise<RateLimitResult> {

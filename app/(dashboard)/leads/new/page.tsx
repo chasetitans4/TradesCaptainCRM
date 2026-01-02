@@ -54,7 +54,7 @@ interface FormData {
   address_line1: string;
   city: string;
   state: string;
-  postal_code: string;
+  zip: string;
   service_needed: string;
   urgency: LeadUrgency;
   source: LeadSource;
@@ -87,7 +87,7 @@ export default function NewLeadPage() {
     address_line1: '',
     city: '',
     state: '',
-    postal_code: '',
+    zip: '',
     service_needed: '',
     urgency: 'normal',
     source: 'website',
@@ -131,7 +131,7 @@ export default function NewLeadPage() {
           address_line1: data.address_line1 || '',
           city: data.city || '',
           state: data.state || '',
-          postal_code: data.postal_code || '',
+          zip: data.zip || '',
         }));
       }
     }
@@ -174,7 +174,7 @@ export default function NewLeadPage() {
       address_line1: customer.address_line1 || '',
       city: customer.city || '',
       state: customer.state || '',
-      postal_code: customer.postal_code || '',
+      zip: customer.zip || '',
     }));
     setShowCustomerSearch(false);
     setCustomerSearchQuery('');
@@ -192,7 +192,7 @@ export default function NewLeadPage() {
       address_line1: '',
       city: '',
       state: '',
-      postal_code: '',
+      zip: '',
     }));
   };
 
@@ -246,7 +246,7 @@ export default function NewLeadPage() {
             address_line1: formData.address_line1.trim() || null,
             city: formData.city.trim() || null,
             state: formData.state.trim() || null,
-            postal_code: formData.postal_code.trim() || null,
+            zip: formData.zip.trim() || null,
           })
           .select()
           .single();
@@ -488,8 +488,8 @@ export default function NewLeadPage() {
               />
               <Input
                 type="text"
-                value={formData.postal_code}
-                onChange={(e) => updateField('postal_code', e.target.value)}
+                value={formData.zip}
+                onChange={(e) => updateField('zip', e.target.value)}
                 placeholder="ZIP"
                 className="col-span-1"
               />

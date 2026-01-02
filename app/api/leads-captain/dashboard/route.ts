@@ -1,0 +1,43 @@
+// =====================================================
+// LEADS CAPTAIN DASHBOARD API
+// GET /api/leads-captain/dashboard
+// =====================================================
+
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAgentOrHigher } from '@/lib/admin/auth';
+import {
+  getLeadsCaptainDashboardSummary,
+  getSmsUsageOverview,
+} from '@/lib/admin/leads-captain-dashboard';
+
+export async function GET(request: NextRequest) {
+  try {
+    const admin = await requireAgentOrHigher();
+    if (!admin) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const period = (searchParams.get('period') as 'this_month' | 'last_month') || 'this_month';
+
+    const [summary, usageOverview] = await Promise.all([
+      getLeadsCaptainDashboardSummary(admin.id, period),
+      getSmsUsageOverview(admin.id),
+    ]);
+
+    return NextResponse.json({
+      summary,
+      usage_overview: usageOverview,
+      period: {
+        value: period,
+        label: period === 'this_month' ? 'This Month' : 'Last Month',
+      },
+    });
+  } catch (error: any) {
+    console.error('Leads Captain dashboard error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch dashboard data' },
+      { status: 500 }
+    );
+  }
+}

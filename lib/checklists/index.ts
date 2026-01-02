@@ -90,16 +90,25 @@ export async function createChecklistTemplate(
 
 /**
  * Get all checklist templates for a business
+ * Optionally filter by job type
  */
-export async function getChecklistTemplates(businessId: string): Promise<ChecklistTemplate[]> {
+export async function getChecklistTemplates(
+  businessId: string,
+  jobType?: string
+): Promise<ChecklistTemplate[]> {
   const supabase = await createServerClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('checklist_templates')
     .select('*')
     .eq('business_id', businessId)
-    .eq('is_active', true)
-    .order('name');
+    .eq('is_active', true);
+
+  if (jobType) {
+    query = query.contains('job_types', [jobType]);
+  }
+
+  const { data, error } = await query.order('name');
 
   if (error) throw error;
   return data;

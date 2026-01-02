@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { getPortalSession } from '@/lib/portal/session';
+import { checkPortalMessageRateLimit } from '@/lib/rate-limit';
 
 export async function GET(request: NextRequest) {
   try {
@@ -75,6 +76,30 @@ export async function POST(request: NextRequest) {
     }
 
     const { customerId, businessId } = session;
+
+    // Get client IP for rate limiting
+    const ip = request.headers.get('cf-connecting-ip') ||
+               request.headers.get('x-real-ip') ||
+               request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+               'unknown';
+
+    // Check rate limit (10 messages per 5 minutes per customer+IP)
+    const rateLimit = await checkPortalMessageRateLimit(customerId, ip);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'You are sending messages too quickly. Please wait a moment.' },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': '10',
+            'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+            'X-RateLimit-Reset': rateLimit.resetAt.toISOString(),
+            'Retry-After': (rateLimit.retryAfter || 300).toString(),
+          },
+        }
+      );
+    }
+
     const body = await request.json();
     const { message } = body;
 

@@ -36,7 +36,7 @@ const defaultSteps: OnboardingStep[] = [
     title: 'Set up your business',
     description: 'Add your company name, logo, and contact info',
     icon: Building2,
-    href: '/settings/business',
+    href: '/settings',
     completed: false,
   },
   {
@@ -60,7 +60,7 @@ const defaultSteps: OnboardingStep[] = [
     title: 'Connect payments',
     description: 'Set up Stripe to accept online payments',
     icon: CreditCard,
-    href: '/settings/payments',
+    href: '/settings/billing',
     completed: false,
   },
   {
@@ -68,7 +68,7 @@ const defaultSteps: OnboardingStep[] = [
     title: 'Enable SMS messaging',
     description: 'Connect Twilio to text customers',
     icon: MessageSquare,
-    href: '/settings/messaging',
+    href: '/settings/sms-templates',
     completed: false,
   },
 ];

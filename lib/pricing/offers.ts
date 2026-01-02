@@ -1,6 +1,7 @@
 // =====================================================
-// TRADESCAPTAIN OFFERS / DISCOUNT SYSTEM - v5
+// TRADESCAPTAIN OFFERS / DISCOUNT SYSTEM - v5.9
 // Pre-defined offers only - Agents cannot modify prices
+// Updated for v5.9 pricing: 15% annual discount
 // =====================================================
 
 export type DiscountType =
@@ -72,31 +73,17 @@ export const OFFERS: Offer[] = [
   },
   {
     id: 'offer_002',
-    code: 'ANNUAL25',
-    name: 'Annual 25% Off',
-    description: 'Standard annual discount. Pay for 9 months, get 12 months of service.',
+    code: 'ANNUAL15',
+    name: 'Annual 15% Off',
+    description: 'Standard annual discount. Pay for ~10 months, get 12 months of service.',
     discount_type: 'percent_annual',
-    discount_value: 25,
+    discount_value: 15,
     applies_to: ['all'],
     requires_approval: false,
     approval_role: null,
     is_active: true,
     current_uses: 0,
     commission_impact: 'Agent receives 35% of annual price as one-time commission.',
-  },
-  {
-    id: 'offer_003',
-    code: 'WAIVE99',
-    name: 'Waive GBP Setup Fee',
-    description: 'Waives the $99 one-time GBP setup/optimization fee for Web plans.',
-    discount_type: 'waive_fee',
-    discount_value: 99,
-    applies_to: ['web_starter', 'web_pro', 'web_enterprise', 'web_custom'],
-    requires_approval: false,
-    approval_role: null,
-    is_active: true,
-    current_uses: 0,
-    commission_impact: 'Agent loses $35 GBP add-on commission when applied.',
   },
   {
     id: 'offer_004',
@@ -134,11 +121,10 @@ export const OFFERS: Offer[] = [
 
 export const OFFER_STACKING_RULES: Record<string, string[]> = {
   // Key: offer code, Value: array of incompatible offer codes
-  FIRST50: ['ANNUAL25', 'FREETRIAL14', 'VIP20'],
-  ANNUAL25: ['FIRST50', 'WAIVE99', 'FREETRIAL14', 'VIP20'], // Annual is standalone
-  WAIVE99: ['ANNUAL25'], // Can combine with others except annual
-  FREETRIAL14: ['FIRST50', 'ANNUAL25'],
-  VIP20: ['FIRST50', 'ANNUAL25'],
+  FIRST50: ['ANNUAL15', 'FREETRIAL14', 'VIP20'],
+  ANNUAL15: ['FIRST50', 'FREETRIAL14', 'VIP20'], // Annual is standalone
+  FREETRIAL14: ['FIRST50', 'ANNUAL15'],
+  VIP20: ['FIRST50', 'ANNUAL15'],
 };
 
 export const MAX_OFFERS_PER_SUBSCRIPTION = 2;
@@ -202,8 +188,8 @@ export function validateOfferCombination(offerCodes: string[]): { valid: boolean
     return { valid: false, error: `Maximum ${MAX_OFFERS_PER_SUBSCRIPTION} offers per subscription` };
   }
 
-  // Check for ANNUAL25 - must be standalone
-  if (offerCodes.includes('ANNUAL25') && offerCodes.length > 1) {
+  // Check for ANNUAL15 - must be standalone
+  if (offerCodes.includes('ANNUAL15') && offerCodes.length > 1) {
     return { valid: false, error: 'Annual discount cannot be combined with other offers' };
   }
 
@@ -248,13 +234,13 @@ export function calculatePricing(
   planAnnualPrice: number,
   billingFrequency: 'monthly' | 'annual',
   offerCodes: string[],
-  includeGbpAddon: boolean = false
+  _includeGbpAddon: boolean = false // Deprecated in v5.9 - kept for API compatibility
 ): PricingCalculation {
   let base_monthly_rate = planMonthlyPrice;
   let first_month_rate = planMonthlyPrice;
   let effective_monthly_rate = planMonthlyPrice;
   let annual_rate = planAnnualPrice;
-  let one_time_fees = includeGbpAddon ? 99 : 0;
+  let one_time_fees = 0; // GBP addon removed in v5.9
   let trial_days = 0;
   let first_month_discount_percent = 0;
   let ongoing_discount_percent = 0;
@@ -277,10 +263,7 @@ export function calculatePricing(
         break;
 
       case 'waive_fee':
-        if (offer.code === 'WAIVE99' && includeGbpAddon) {
-          one_time_fees -= 99;
-          fees_waived.push('gbp_setup');
-        }
+        // GBP addon waiver removed in v5.9
         break;
 
       case 'free_trial_days':
@@ -333,27 +316,32 @@ export function calculatePricing(
 
 export interface CommissionCalculation {
   upfront_commission: number;
-  recurring_commission_monthly: number;
+  recurring_10_monthly: number; // 10% for Months 3-5
+  recurring_15_monthly: number; // 15% for Months 6-14
   max_recurring_total: number; // 12 months (M3-14)
-  retention_bonus_max: number;
+  retention_bonus_max: number; // $190 max ($15 + $25 + $50 + $100)
   max_total_commission: number;
-  gbp_addon_commission: number;
   commission_notes: string[];
 }
 
+/**
+ * Calculate commission for v5.9 pricing structure
+ * - Upfront: 50% of monthly price (after customer's 2nd payment)
+ * - Recurring: 10% (Months 3-5), 15% (Months 6-14) - LOCKED
+ * - Retention Bonuses: $15 (M3) + $25 (M4) + $50 (M6) + $100 (M12) = $190 max
+ * - Annual: 35% of annual price, one-time
+ */
 export function calculateCommission(
   planMonthlyPrice: number,
   billingFrequency: 'monthly' | 'annual',
   planAnnualPrice: number,
   offerCodes: string[],
-  includeGbpAddon: boolean = false,
-  gbpFeeWaived: boolean = false
+  _includeGbpAddon: boolean = false, // Deprecated in v5.9
+  _gbpFeeWaived: boolean = false // Deprecated in v5.9
 ): CommissionCalculation {
   const notes: string[] = [];
   let upfrontMultiplier = 1.0; // 50% of monthly price by default
-  let recurringMultiplier = 1.0; // 10% of monthly price by default
   let effectiveMonthlyPrice = planMonthlyPrice;
-  let gbp_addon_commission = includeGbpAddon && !gbpFeeWaived ? 35 : 0;
 
   // Check offer impacts
   for (const code of offerCodes) {
@@ -380,16 +368,14 @@ export function calculateCommission(
         break;
 
       case 'waive_fee':
-        if (offer.code === 'WAIVE99') {
-          gbp_addon_commission = 0;
-          notes.push('WAIVE99: GBP add-on commission waived');
-        }
+        // GBP waiver removed in v5.9
         break;
     }
   }
 
   let upfront_commission: number;
-  let recurring_commission_monthly: number;
+  let recurring_10_monthly: number;
+  let recurring_15_monthly: number;
   let max_recurring_total: number;
   let retention_bonus_max: number;
   let max_total_commission: number;
@@ -397,32 +383,42 @@ export function calculateCommission(
   if (billingFrequency === 'annual') {
     // Annual: 35% of annual price, one-time
     upfront_commission = Math.round(planAnnualPrice * 0.35);
-    recurring_commission_monthly = 0;
+    recurring_10_monthly = 0;
+    recurring_15_monthly = 0;
     max_recurring_total = 0;
     retention_bonus_max = 0;
-    max_total_commission = upfront_commission + gbp_addon_commission;
+    max_total_commission = upfront_commission;
     notes.push('Annual billing: 35% one-time commission');
   } else {
-    // Monthly: 50% upfront (after M2), 10% recurring (M3-14)
+    // Monthly v5.9 structure:
+    // - 50% upfront (after customer's 2nd payment)
+    // - 10% recurring (Months 3-5) = 3 months
+    // - 15% recurring (Months 6-14) = 9 months
     const baseUpfront = effectiveMonthlyPrice * 0.5;
     upfront_commission = Math.round(baseUpfront * upfrontMultiplier);
 
-    recurring_commission_monthly = Math.round(effectiveMonthlyPrice * 0.1 * recurringMultiplier * 100) / 100;
-    max_recurring_total = Math.round(recurring_commission_monthly * 12 * 100) / 100; // M3-14
+    recurring_10_monthly = Math.round(effectiveMonthlyPrice * 0.10 * 100) / 100;
+    recurring_15_monthly = Math.round(effectiveMonthlyPrice * 0.15 * 100) / 100;
 
-    // Retention bonuses (not affected by discounts)
-    retention_bonus_max = Math.round(planMonthlyPrice * 0.1 * 6 + 65); // ~6 months + M14 bonus
+    // Total recurring: 3 months at 10% + 9 months at 15%
+    const recurring_10_total = recurring_10_monthly * 3; // M3, M4, M5
+    const recurring_15_total = recurring_15_monthly * 9; // M6-M14
+    max_recurring_total = Math.round((recurring_10_total + recurring_15_total) * 100) / 100;
 
-    max_total_commission = upfront_commission + max_recurring_total + retention_bonus_max + gbp_addon_commission;
+    // Retention bonuses per v5.9: $15 (M3) + $25 (M4) + $50 (M6) + $100 (M12) = $190
+    retention_bonus_max = 190;
+
+    max_total_commission = upfront_commission + max_recurring_total + retention_bonus_max;
+    notes.push('v5.9: 10% recurring (M3-5), 15% recurring (M6-14), $190 max retention bonuses');
   }
 
   return {
     upfront_commission,
-    recurring_commission_monthly,
+    recurring_10_monthly,
+    recurring_15_monthly,
     max_recurring_total,
     retention_bonus_max,
     max_total_commission,
-    gbp_addon_commission,
     commission_notes: notes,
   };
 }

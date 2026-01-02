@@ -118,7 +118,9 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Error generating invoice PDF:', error);
+    import('@/lib/logger').then(({ logApiError }) => {
+      logApiError('GET', '/api/invoices/[id]/pdf', error as Error);
+    });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

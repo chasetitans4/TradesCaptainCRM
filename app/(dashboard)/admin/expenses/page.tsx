@@ -34,6 +34,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
+import { useAdminOrHigher } from '@/hooks/useAdminAuth';
 
 interface Expense {
   id: string;
@@ -62,6 +63,7 @@ interface Employee {
 }
 
 export default function AdminExpensesPage() {
+  const { loading: authLoading, isAuthorized } = useAdminOrHigher();
   const [loading, setLoading] = useState(true);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -74,9 +76,15 @@ export default function AdminExpensesPage() {
   const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
   const [summary, setSummary] = useState<any>(null);
 
+  // Auth gating handled after hooks
+
   const monthEnd = endOfMonth(monthStart);
 
   const fetchData = useCallback(async () => {
+    if (!isAuthorized) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -117,11 +125,19 @@ export default function AdminExpensesPage() {
     } finally {
       setLoading(false);
     }
-  }, [monthStart, monthEnd, selectedEmployee, selectedStatus]);
+  }, [isAuthorized, monthStart, monthEnd, selectedEmployee, selectedStatus]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  if (authLoading || !isAuthorized) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   function formatCurrency(amount: number): string {
     return new Intl.NumberFormat('en-US', {

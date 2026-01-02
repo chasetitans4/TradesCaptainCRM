@@ -1,5 +1,19 @@
 {
   "root": true,
   "extends": ["next/core-web-vitals"],
-  "rules": {}
+  "rules": {},
+  "ignorePatterns": [
+    "next.config.js",
+    "postcss.config.js",
+    "public/**/*",
+    "scripts/**/*"
+  ],
+  "overrides": [
+    {
+      "files": ["*.js", "**/*.js"],
+      "parserOptions": {
+        "project": null
+      }
+    }
+  ]
 }

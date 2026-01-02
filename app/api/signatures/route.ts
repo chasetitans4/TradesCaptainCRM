@@ -60,11 +60,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { entityType, entityId, signatureData, signerName, signerEmail, agreementText, customerId } = body;
+    const { entityType, entityId, signatureDataUrl, signerName, signerEmail, signerPhone, agreementText, ipAddress } = body;
 
-    if (!entityType || !entityId || !signatureData || !signerName) {
+    if (!entityType || !entityId || !signatureDataUrl || !signerName) {
       return NextResponse.json(
-        { error: 'entityType, entityId, signatureData, and signerName are required' },
+        { error: 'entityType, entityId, signatureDataUrl, and signerName are required' },
         { status: 400 }
       );
     }
@@ -73,11 +73,12 @@ export async function POST(request: NextRequest) {
       businessId: profile.business_id,
       entityType,
       entityId,
-      signatureData,
+      signatureDataUrl,
       signerName,
       signerEmail,
+      signerPhone,
       agreementText,
-      customerId,
+      ipAddress,
     });
 
     return NextResponse.json({ id: signatureId, success: true });

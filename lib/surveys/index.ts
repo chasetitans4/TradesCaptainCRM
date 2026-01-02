@@ -208,13 +208,10 @@ export async function sendSurvey(
   const accessToken = await createSurvey(businessId, customerId, jobId, 'sms');
   const surveyUrl = `${process.env.NEXT_PUBLIC_APP_URL}/survey/${accessToken}`;
 
-  // Send SMS (would use SMS library in production)
+  // TODO: Send SMS via Twilio
   if (customer?.phone) {
-    const message = `Hi ${customer.name}! Thanks for choosing ${business?.name}. We'd love your feedback on today's service. It only takes 30 seconds: ${surveyUrl}`;
-
-    // Import SMS sending function
+    // const message = `Hi ${customer.name}! Thanks for choosing ${business?.name}. We'd love your feedback on today's service. It only takes 30 seconds: ${surveyUrl}`;
     // await sendSMS(customer.phone, message, businessId);
-    console.log('Would send survey SMS:', message);
   }
 
   // Log activity
@@ -324,14 +321,33 @@ export async function processAutoSurveys(): Promise<{ sent: number; errors: stri
     const delayHours = business.survey_delay_hours || 2;
     const cutoffTime = new Date(Date.now() - delayHours * 60 * 60 * 1000);
 
+    // First, get job IDs that already have survey responses for this business
+    const { data: existingSurveys, error: surveyError } = await supabase
+      .from('survey_responses')
+      .select('job_id')
+      .eq('business_id', business.id);
+
+    if (surveyError) {
+      result.errors.push(`Failed to fetch existing surveys for business ${business.id}: ${surveyError.message}`);
+      continue;
+    }
+
+    const surveyedJobIds = (existingSurveys || []).map(s => s.job_id).filter(Boolean);
+
     // Find completed jobs that haven't had surveys sent
-    const { data: jobs, error: jobsError } = await supabase
+    let query = supabase
       .from('jobs')
       .select('id, customer_id')
       .eq('business_id', business.id)
       .eq('status', 'completed')
-      .lt('updated_at', cutoffTime.toISOString())
-      .not('id', 'in', `(SELECT job_id FROM survey_responses WHERE business_id = '${business.id}')`);
+      .lt('updated_at', cutoffTime.toISOString());
+
+    // Exclude jobs that already have surveys (if any exist)
+    if (surveyedJobIds.length > 0) {
+      query = query.not('id', 'in', `(${surveyedJobIds.join(',')})`);
+    }
+
+    const { data: jobs, error: jobsError } = await query;
 
     if (jobsError) {
       result.errors.push(`Failed to fetch jobs for business ${business.id}: ${jobsError.message}`);

@@ -1,5 +1,8 @@
 {
   "compilerOptions": {
+    "types": [
+      "@testing-library/jest-dom"
+    ],
     "lib": [
       "dom",
       "dom.iterable",
@@ -37,9 +40,12 @@
   ],
   "exclude": [
     "node_modules",
+    ".next/**",
+    "docs/requirements/**",
     "lib/supabase/# *.ts",
     "lib/supabase/Advanced Features*.ts",
     "lib/supabase/Untitled*.ts",
-    "lib/supabase/theme toggle.ts"
+    "lib/supabase/theme toggle.ts",
+    "__tests__/**"
   ]
 }

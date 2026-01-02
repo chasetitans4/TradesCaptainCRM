@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
         profile.business_id,
         name,
         items,
-        { jobType, isDefault }
+        { jobTypes: jobType ? [jobType] : undefined }
       );
 
       return NextResponse.json(template);

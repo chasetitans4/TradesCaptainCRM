@@ -21,6 +21,45 @@ export interface APIHandlerOptions {
   };
 }
 
+// In-memory rate limit store (per-process)
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+export function getClientIp(request: NextRequest): string {
+  const xff = request.headers.get('x-forwarded-for');
+  if (xff) {
+    const first = xff.split(',')[0].trim();
+    if (first) return first;
+  }
+  const cfConnectingIp = request.headers.get('cf-connecting-ip');
+  if (cfConnectingIp) return cfConnectingIp;
+  const realIp = request.headers.get('x-real-ip');
+  if (realIp) return realIp;
+  return 'unknown';
+}
+
+export function checkRateLimit(request: NextRequest, options?: APIHandlerOptions) {
+  if (!options?.rateLimit) return null;
+  const ip = getClientIp(request);
+  const key = `${request.method}:${request.nextUrl.pathname}:${ip}`;
+  const now = Date.now();
+  const windowMs = options.rateLimit.windowMs;
+  const existing = rateLimitStore.get(key);
+  if (!existing || existing.resetAt <= now) {
+    rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
+    return null;
+  }
+  existing.count += 1;
+  if (existing.count > options.rateLimit.requests) {
+    const retryAfter = Math.ceil((existing.resetAt - now) / 1000);
+    return APIErrors.rateLimited(retryAfter, {
+      action: 'rateLimit',
+      resource: request.nextUrl.pathname,
+      metadata: { ip, method: request.method },
+    });
+  }
+  return null;
+}
+
 /**
  * Extract user from request (checks Supabase session)
  */
@@ -38,6 +77,22 @@ async function extractUser(request: NextRequest): Promise<{ id: string; role: st
       request.cookies.getAll().find(c => c.name.includes('auth-token'))?.value;
 
     if (!supabaseCookie) {
+      // Try admin session cookie
+      const adminSession = request.cookies.get('admin_session')?.value;
+      if (adminSession) {
+        try {
+          const session = JSON.parse(Buffer.from(adminSession, 'base64').toString()) as {
+            adminId: string;
+            role: string;
+            expires: string;
+          };
+          if (new Date(session.expires) > new Date()) {
+            return { id: session.adminId, role: session.role };
+          }
+        } catch {
+          // ignore malformed cookie
+        }
+      }
       return null;
     }
 
@@ -60,7 +115,7 @@ async function extractUser(request: NextRequest): Promise<{ id: string; role: st
 /**
  * Check if environment is properly configured
  */
-function checkEnvironment(): { configured: boolean; missing: string[] } {
+export function checkEnvironment(): { configured: boolean; missing: string[] } {
   const required = [
     'NEXT_PUBLIC_SUPABASE_URL',
     'NEXT_PUBLIC_SUPABASE_ANON_KEY',
@@ -82,25 +137,30 @@ export function createErrorResponse(
   defaultStatusCode = 500
 ): NextResponse {
   if (error instanceof APIError) {
-    return NextResponse.json(error.toJSON(), {
+    return new NextResponse(JSON.stringify(error.toJSON()), {
       status: error.statusCode,
       headers: {
+        'Content-Type': 'application/json',
         'X-Error-Code': error.code,
       },
     });
   }
 
   // Generic error
-  return NextResponse.json(
-    {
+  return new NextResponse(
+    JSON.stringify({
       error: {
-        message: process.env.NODE_ENV === 'production'
-          ? 'An unexpected error occurred'
-          : error.message,
+        message:
+          process.env.NODE_ENV === 'production'
+            ? 'An unexpected error occurred'
+            : (error as Error).message,
         code: 'INTERNAL_ERROR',
       },
-    },
-    { status: defaultStatusCode }
+    }),
+    {
+      status: defaultStatusCode,
+      headers: { 'Content-Type': 'application/json' },
+    }
   );
 }
 
@@ -117,6 +177,22 @@ export function withAPIHandler(
     const method = request.method;
 
     try {
+      // Rate limiting
+      const rateLimitError = checkRateLimit(request, options);
+      if (rateLimitError) {
+        const retryHeader = Math.max(
+          1,
+          parseInt(rateLimitError.toJSON().error.message.replace(/\D+/g, ''), 10) || 60
+        );
+        return new NextResponse(JSON.stringify(rateLimitError.toJSON()), {
+          status: rateLimitError.statusCode,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': String(retryHeader),
+          },
+        });
+      }
+
       // Check environment configuration
       const envCheck = checkEnvironment();
       if (!envCheck.configured) {
@@ -127,14 +203,17 @@ export function withAPIHandler(
         });
 
         // Return 503 Service Unavailable instead of 500 for config issues
-        return NextResponse.json(
-          {
+        return new NextResponse(
+          JSON.stringify({
             error: {
               message: 'Service temporarily unavailable - configuration pending',
               code: 'SERVICE_UNAVAILABLE',
             },
-          },
-          { status: 503 }
+          }),
+          {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' },
+          }
         );
       }
 
@@ -148,20 +227,20 @@ export function withAPIHandler(
             resource: path,
           });
 
-          return NextResponse.json(
-            {
+          return new NextResponse(
+            JSON.stringify({
               error: {
                 message: 'Authentication required',
                 code: 'UNAUTHORIZED',
               },
-            },
-            { status: 401 }
+            }),
+            { status: 401, headers: { 'Content-Type': 'application/json' } }
           );
         }
 
         // Check admin access
         if (options.requireAdmin) {
-          const adminRoles = ['admin', 'superadmin', 'sales_agent'];
+          const adminRoles = ['admin', 'super_admin'];
           if (!adminRoles.includes(user.role)) {
             logger.warn('Forbidden access attempt', {
               action: 'apiHandler',
@@ -169,14 +248,14 @@ export function withAPIHandler(
               userId: user.id,
             });
 
-            return NextResponse.json(
-              {
+            return new NextResponse(
+              JSON.stringify({
                 error: {
                   message: 'Access denied - insufficient permissions',
                   code: 'FORBIDDEN',
                 },
-              },
-              { status: 403 }
+              }),
+              { status: 403, headers: { 'Content-Type': 'application/json' } }
             );
           }
         }

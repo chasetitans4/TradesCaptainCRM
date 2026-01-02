@@ -140,7 +140,7 @@ export function Header({
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/settings/profile" className="flex items-center gap-2">
+                  <Link href="/settings" className="flex items-center gap-2">
                     <User className="w-4 h-4" />
                     Profile
                   </Link>

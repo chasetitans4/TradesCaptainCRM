@@ -88,8 +88,11 @@ export async function POST(request: NextRequest) {
 
     // Check if any offers require approval
     const offersRequiringApproval = offer_codes
-      .map(code => getOfferByCode(code))
-      .filter(offer => offer?.requires_approval);
+      .map((code: string) => getOfferByCode(code))
+      .filter(
+        (offer: ReturnType<typeof getOfferByCode> | undefined): offer is NonNullable<ReturnType<typeof getOfferByCode>> =>
+          !!offer?.requires_approval
+      );
 
     // Calculate pricing
     const pricing = calculatePricing(
@@ -115,7 +118,7 @@ export async function POST(request: NextRequest) {
       pricing,
       commission,
       requires_approval: offersRequiringApproval.length > 0,
-      approval_required_for: offersRequiringApproval.map(o => o?.code),
+      approval_required_for: offersRequiringApproval.map((o: NonNullable<ReturnType<typeof getOfferByCode>>) => o.code),
       validation: { valid: true },
     });
   } catch (error) {

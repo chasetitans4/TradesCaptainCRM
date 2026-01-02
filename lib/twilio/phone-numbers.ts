@@ -5,6 +5,7 @@
 import { twilioClient, getWebhookUrl } from './client';
 import { createAdminClient } from '@/lib/supabase/server';
 import type { AvailablePhoneNumber } from '@/types';
+import { smsLogger } from '@/lib/logger';
 
 /**
  * Search for available phone numbers in a given area code
@@ -34,7 +35,10 @@ export async function listAvailableNumbers(
       },
     }));
   } catch (error) {
-    console.error('Error listing available numbers:', error);
+    smsLogger.error({
+      msg: 'Error listing available numbers',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: 'Unknown error' },
+    });
     throw error;
   }
 }
@@ -71,9 +75,21 @@ export async function provisionPhoneNumber(
 
     if (error) {
       // Try to release the number if we can't update the database
-      console.error('Failed to update business with phone number:', error);
+      smsLogger.error({
+        msg: 'Failed to update business with phone number',
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: 'Unknown error' },
+        businessId,
+      });
       await twilioClient.incomingPhoneNumbers(purchasedNumber.sid).remove();
-      throw error;
+      const errToThrow =
+        error instanceof Error
+          ? error
+          : new Error(
+              typeof error === 'object' && error && 'message' in (error as any)
+                ? (error as any).message
+                : 'Failed to update business with phone number'
+            );
+      throw errToThrow;
     }
 
     return {
@@ -81,7 +97,11 @@ export async function provisionPhoneNumber(
       phoneSid: purchasedNumber.sid,
     };
   } catch (error) {
-    console.error('Error provisioning phone number:', error);
+    smsLogger.error({
+      msg: 'Error provisioning phone number',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: 'Unknown error' },
+      businessId,
+    });
     throw error;
   }
 }
@@ -107,7 +127,11 @@ export async function releasePhoneNumber(
       })
       .eq('id', businessId);
   } catch (error) {
-    console.error('Error releasing phone number:', error);
+    smsLogger.error({
+      msg: 'Error releasing phone number',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: 'Unknown error' },
+      businessId,
+    });
     throw error;
   }
 }
@@ -126,7 +150,11 @@ export async function updatePhoneWebhooks(phoneSid: string): Promise<void> {
       statusCallbackMethod: 'POST',
     });
   } catch (error) {
-    console.error('Error updating phone webhooks:', error);
+    smsLogger.error({
+      msg: 'Error updating phone webhooks',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: 'Unknown error' },
+      phoneSid,
+    });
     throw error;
   }
 }

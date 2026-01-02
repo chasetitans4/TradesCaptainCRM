@@ -4,6 +4,7 @@
 // =====================================================
 
 import * as Sentry from '@sentry/nextjs';
+import { checkRedisHealth } from '@/lib/redis/client';
 
 /**
  * Health check status
@@ -82,6 +83,13 @@ async function checkDatabaseHealth(): Promise<ServiceHealth> {
 }
 
 /**
+ * Check Redis health (critical for rate limiting)
+ */
+async function checkRedis(): Promise<ServiceHealth> {
+  return checkServiceHealth('redis', checkRedisHealth);
+}
+
+/**
  * Check external API health
  * TODO: Implement when APIs are connected
  */
@@ -106,12 +114,13 @@ async function checkExternalAPIs(): Promise<ServiceHealth[]> {
  * Get complete system health status
  */
 export async function getSystemHealth(): Promise<SystemHealth> {
-  const [dbHealth, ...apiHealths] = await Promise.all([
+  const [dbHealth, redisHealth, ...apiHealths] = await Promise.all([
     checkDatabaseHealth(),
+    checkRedis(),
     ...await checkExternalAPIs(),
   ]);
 
-  const services = [dbHealth, ...apiHealths];
+  const services = [dbHealth, redisHealth, ...apiHealths];
 
   // Overall status is the worst status of all services
   let overallStatus: HealthStatus = 'healthy';
@@ -194,7 +203,6 @@ export const performance = {
 
       // Log slow operations
       if (duration > 1000) {
-        console.warn(`Slow operation: ${name} took ${duration}ms`);
         Sentry.addBreadcrumb({
           category: 'performance',
           message: `Slow operation: ${name}`,
@@ -265,8 +273,6 @@ export async function checkAlertRules(rules: AlertRule[]): Promise<void> {
             alertSeverity: rule.severity,
           },
         });
-
-        console.warn(`Alert triggered: ${rule.name} (severity: ${rule.severity})`);
       }
     } catch (error) {
       console.error(`Error checking alert rule ${rule.id}:`, error);

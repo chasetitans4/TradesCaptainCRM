@@ -1,10 +1,15 @@
 // =====================================================
 // BOOKING SLOT CALCULATION
 // Calculate available appointment slots
+// Includes calendar slot holds (v6.4.2)
 // =====================================================
 
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 import { getBookingSettings, BookingSettings } from './settings';
+
+// Slot hold duration in minutes
+const SLOT_HOLD_DURATION_MINUTES = 5;
 
 export interface TimeSlot {
   start: string; // ISO datetime
@@ -365,4 +370,164 @@ export async function getAvailabilitySummary(
   }
 
   return { totalSlots, availableSlots, nextAvailable };
+}
+
+// =====================================================
+// CALENDAR SLOT HOLDS (v6.4.2)
+// Temporary hold mechanism to prevent double-booking during checkout
+// =====================================================
+
+export interface SlotHold {
+  id: string;
+  businessId: string;
+  conversationId?: string;
+  slotStart: string;
+  slotEnd: string;
+  status: 'held' | 'confirmed' | 'expired' | 'released';
+  expiresAt: string;
+  confirmedAt?: string;
+  releasedAt?: string;
+  createdAt: string;
+}
+
+/**
+ * Create a temporary hold on a time slot (v6.4.2)
+ * Uses ON CONFLICT DO NOTHING to handle race conditions
+ */
+export async function createSlotHold(
+  businessId: string,
+  slotStart: Date,
+  slotEnd: Date,
+  conversationId?: string
+): Promise<{ success: boolean; hold?: SlotHold; reason?: string }> {
+  const supabase = createAdminClient();
+
+  // Step 1: Expire any stale holds for this slot
+  await supabase
+    .from('calendar_slot_holds')
+    .update({
+      status: 'expired',
+      released_at: new Date().toISOString(),
+    })
+    .eq('business_id', businessId)
+    .eq('slot_start', slotStart.toISOString())
+    .eq('status', 'held')
+    .lt('expires_at', new Date().toISOString());
+
+  // Step 2: Try to insert - gracefully handle race condition
+  const expiresAt = new Date(Date.now() + SLOT_HOLD_DURATION_MINUTES * 60 * 1000);
+
+  const { data: hold, error } = await supabase
+    .from('calendar_slot_holds')
+    .insert({
+      business_id: businessId,
+      conversation_id: conversationId,
+      slot_start: slotStart.toISOString(),
+      slot_end: slotEnd.toISOString(),
+      status: 'held',
+      expires_at: expiresAt.toISOString(),
+      held_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  // Step 3: Check if insert succeeded
+  if (error) {
+    // Unique constraint violation means slot is already held
+    if (error.code === '23505') {
+      return { success: false, reason: 'slot_unavailable' };
+    }
+    console.error('Error creating slot hold:', error);
+    return { success: false, reason: error.message };
+  }
+
+  return {
+    success: true,
+    hold: {
+      id: hold.id,
+      businessId: hold.business_id,
+      conversationId: hold.conversation_id,
+      slotStart: hold.slot_start,
+      slotEnd: hold.slot_end,
+      status: hold.status,
+      expiresAt: hold.expires_at,
+      createdAt: hold.created_at,
+    },
+  };
+}
+
+/**
+ * Confirm a slot hold (convert to actual booking)
+ */
+export async function confirmSlotHold(holdId: string): Promise<boolean> {
+  const supabase = createAdminClient();
+
+  const { error } = await supabase
+    .from('calendar_slot_holds')
+    .update({
+      status: 'confirmed',
+      confirmed_at: new Date().toISOString(),
+    })
+    .eq('id', holdId)
+    .eq('status', 'held');
+
+  return !error;
+}
+
+/**
+ * Release a slot hold (cancel)
+ */
+export async function releaseSlotHold(holdId: string): Promise<boolean> {
+  const supabase = createAdminClient();
+
+  const { error } = await supabase
+    .from('calendar_slot_holds')
+    .update({
+      status: 'released',
+      released_at: new Date().toISOString(),
+    })
+    .eq('id', holdId)
+    .eq('status', 'held');
+
+  return !error;
+}
+
+/**
+ * Check if a slot is currently held
+ */
+export async function isSlotHeld(
+  businessId: string,
+  slotStart: Date
+): Promise<boolean> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from('calendar_slot_holds')
+    .select('id')
+    .eq('business_id', businessId)
+    .eq('slot_start', slotStart.toISOString())
+    .eq('status', 'held')
+    .gt('expires_at', new Date().toISOString())
+    .single();
+
+  return !!data;
+}
+
+/**
+ * Expire all stale holds (call periodically via cron)
+ */
+export async function expireStaleHolds(): Promise<number> {
+  const supabase = createAdminClient();
+
+  const { data } = await supabase
+    .from('calendar_slot_holds')
+    .update({
+      status: 'expired',
+      released_at: new Date().toISOString(),
+    })
+    .eq('status', 'held')
+    .lt('expires_at', new Date().toISOString())
+    .select('id');
+
+  return data?.length || 0;
 }

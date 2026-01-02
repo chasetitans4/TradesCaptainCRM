@@ -1735,101 +1735,26 @@ CREATE POLICY "Anyone can read geocoded addresses" ON geocoded_addresses
 -- =====================================================
 
 -- Mileage entries per job/trip
-CREATE TABLE IF NOT EXISTS mileage_entries (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  job_id UUID REFERENCES jobs(id) ON DELETE SET NULL,
-
-  -- Trip details
-  trip_date DATE NOT NULL,
-
-  -- Locations
-  start_address TEXT,
-  start_latitude DECIMAL(10,7),
-  start_longitude DECIMAL(10,7),
-  end_address TEXT,
-  end_latitude DECIMAL(10,7),
-  end_longitude DECIMAL(10,7),
-
-  -- Miles
-  estimated_miles DECIMAL(10,2),
-  confirmed_miles DECIMAL(10,2),
-
-  -- Status
-  status TEXT DEFAULT 'estimated' CHECK (status IN ('estimated', 'confirmed', 'manual')),
-
-  -- Timestamps
-  departed_at TIMESTAMPTZ,
-  arrived_at TIMESTAMPTZ,
-
-  -- Notes
-  notes TEXT,
-
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- Removed
 
 -- Daily mileage summaries per technician
-CREATE TABLE IF NOT EXISTS mileage_daily_summaries (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-
-  summary_date DATE NOT NULL,
-
-  total_estimated_miles DECIMAL(10,2) DEFAULT 0,
-  total_confirmed_miles DECIMAL(10,2) DEFAULT 0,
-  total_trips INTEGER DEFAULT 0,
-
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-
-  UNIQUE(user_id, summary_date)
-);
+-- Removed
 
 -- Add mileage rate and tracking settings to businesses
-ALTER TABLE businesses ADD COLUMN IF NOT EXISTS mileage_rate_per_mile DECIMAL(10,4) DEFAULT 0.67;
-ALTER TABLE businesses ADD COLUMN IF NOT EXISTS track_mileage_enabled BOOLEAN DEFAULT true;
+-- Removed
 
 -- Add arrival tracking to jobs
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS arrived_at TIMESTAMPTZ;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS departed_at TIMESTAMPTZ;
-ALTER TABLE jobs ADD COLUMN IF NOT EXISTS confirmed_miles DECIMAL(10,2);
+-- Removed
 
 -- Mileage indexes
-CREATE INDEX IF NOT EXISTS idx_mileage_entries_user ON mileage_entries(user_id, trip_date);
-CREATE INDEX IF NOT EXISTS idx_mileage_entries_business ON mileage_entries(business_id, trip_date);
-CREATE INDEX IF NOT EXISTS idx_mileage_entries_job ON mileage_entries(job_id) WHERE job_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_mileage_daily_summaries_user ON mileage_daily_summaries(user_id, summary_date);
+-- Removed
 
 -- Mileage RLS
-ALTER TABLE mileage_entries ENABLE ROW LEVEL SECURITY;
-ALTER TABLE mileage_daily_summaries ENABLE ROW LEVEL SECURITY;
+-- Removed
 
-CREATE POLICY "Users can view own mileage entries" ON mileage_entries
-  FOR SELECT USING (
-    business_id = get_user_business_id()
-    AND (user_id = get_user_id() OR get_user_role() IN ('owner', 'admin'))
-  );
-
-CREATE POLICY "Users can create own mileage entries" ON mileage_entries
-  FOR INSERT WITH CHECK (
-    business_id = get_user_business_id()
-    AND user_id = get_user_id()
-  );
-
-CREATE POLICY "Owner/Admin can manage mileage entries" ON mileage_entries
-  FOR ALL USING (
-    business_id = get_user_business_id()
-    AND get_user_role() IN ('owner', 'admin')
-  );
-
-CREATE POLICY "Users can view own mileage summaries" ON mileage_daily_summaries
-  FOR SELECT USING (
-    business_id = get_user_business_id()
-    AND (user_id = get_user_id() OR get_user_role() IN ('owner', 'admin'))
-  );
+-- Removed
 
 -- =====================================================
 -- QUICKBOOKS INTEGRATION TABLES
@@ -3091,12 +3016,25 @@ CREATE INDEX IF NOT EXISTS idx_agent_submissions_agent ON agent_submissions(agen
 CREATE INDEX IF NOT EXISTS idx_agent_submissions_status ON agent_submissions(status);
 CREATE INDEX IF NOT EXISTS idx_admin_activity_admin ON admin_activity_log(admin_user_id, created_at);
 
+CREATE TABLE IF NOT EXISTS processed_webhook_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id TEXT UNIQUE NOT NULL,
+  stripe_event_id TEXT UNIQUE,
+  event_type TEXT NOT NULL,
+  processed_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_webhook_events_event ON processed_webhook_events(event_id);
+CREATE INDEX IF NOT EXISTS idx_webhook_events_stripe ON processed_webhook_events(stripe_event_id);
+
 ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE crm_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE agent_submissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE founders_program ENABLE ROW LEVEL SECURITY;
 ALTER TABLE crm_email_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE admin_activity_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE processed_webhook_events ENABLE ROW LEVEL SECURITY;
 
 CREATE TRIGGER update_admin_users_updated_at
   BEFORE UPDATE ON admin_users

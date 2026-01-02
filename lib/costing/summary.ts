@@ -24,7 +24,15 @@ export interface JobCostSummary {
 /**
  * Update job cost summary (call after any cost changes)
  */
-export async function updateJobCostSummary(jobId: string): Promise<void> {
+export async function updateJobCostSummary(
+  jobId: string,
+  overrides?: {
+    quotedAmount?: number;
+    invoicedAmount?: number;
+    collectedAmount?: number;
+    estimatedHours?: number;
+  }
+): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
 
   // Get labor costs
@@ -65,11 +73,13 @@ export async function updateJobCostSummary(jobId: string): Promise<void> {
     .eq('job_id', jobId)
     .single();
 
-  const quotedAmount = quote?.total || null;
-  const invoicedAmount = invoice?.total || job?.total || 0;
-  const collectedAmount = invoice?.status === 'paid'
+  // Use overrides if provided, otherwise use calculated values
+  const quotedAmount = overrides?.quotedAmount ?? quote?.total ?? null;
+  const invoicedAmount = overrides?.invoicedAmount ?? invoice?.total ?? job?.total ?? 0;
+  const collectedAmount = overrides?.collectedAmount ?? (invoice?.status === 'paid'
     ? invoice.total
-    : (invoice?.amount_paid || 0);
+    : (invoice?.amount_paid || 0));
+  const estimatedHours = overrides?.estimatedHours ?? (job?.estimated_duration ? job.estimated_duration / 60 : null);
 
   const totalCost = laborCost + materialCost;
   const grossProfit = invoicedAmount ? invoicedAmount - totalCost : null;
@@ -77,26 +87,31 @@ export async function updateJobCostSummary(jobId: string): Promise<void> {
     ? (grossProfit! / invoicedAmount) * 100
     : null;
 
-  await supabase
-    .from('job_cost_summary')
-    .upsert(
-      {
-        job_id: jobId,
-        quoted_amount: quotedAmount,
-        invoiced_amount: invoicedAmount,
-        collected_amount: collectedAmount,
-        labor_cost: laborCost,
-        material_cost: materialCost,
-        subcontractor_cost: 0,
-        other_cost: 0,
-        total_cost: totalCost,
-        gross_profit: grossProfit,
-        profit_margin: profitMargin,
-        estimated_hours: job?.estimated_duration ? job.estimated_duration / 60 : null,
-        actual_hours: actualMinutes / 60,
-      },
-      { onConflict: 'job_id' }
-    );
+  try {
+    await supabase
+      .from('job_cost_summary')
+      .upsert(
+        {
+          job_id: jobId,
+          quoted_amount: quotedAmount,
+          invoiced_amount: invoicedAmount,
+          collected_amount: collectedAmount,
+          labor_cost: laborCost,
+          material_cost: materialCost,
+          subcontractor_cost: 0,
+          other_cost: 0,
+          total_cost: totalCost,
+          gross_profit: grossProfit,
+          profit_margin: profitMargin,
+          estimated_hours: estimatedHours,
+          actual_hours: actualMinutes / 60,
+        },
+        { onConflict: 'job_id' }
+      );
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to update summary' };
+  }
 }
 
 /**

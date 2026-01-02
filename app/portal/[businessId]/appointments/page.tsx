@@ -2,18 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import {
-  Calendar,
-  Clock,
-  MapPin,
-  User,
-  Phone,
-  CheckCircle,
-  AlertCircle,
-} from 'lucide-react';
+import { Calendar, Clock, User, Phone, CheckCircle, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AddressLink } from '@/components/ui/address-link';
 
 interface Appointment {
   id: string;
@@ -205,10 +198,10 @@ function AppointmentCard({
               )}
 
               {appointment.address && (
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <MapPin className="h-4 w-4" />
-                  {appointment.address}
-                </div>
+                <AddressLink
+                  address={appointment.address}
+                  className="flex items-center gap-2 text-sm text-gray-600"
+                />
               )}
 
               {appointment.assigned_user && (

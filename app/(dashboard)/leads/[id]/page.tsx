@@ -11,8 +11,9 @@ import {
   formatPhoneNumber,
   formatDate,
   formatAddress,
-  getNavigationUrl,
 } from '@/lib/utils';
+import { getSmartNavigationUrl } from '@/lib/utils/navigation';
+import { AddressLink } from '@/components/ui/address-link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -50,6 +51,7 @@ const STATUS_COLORS: Record<LeadStatus, string> = {
   contacted: 'bg-info/10 text-info border-info/20',
   qualified: 'bg-success/10 text-success border-success/20',
   quoted: 'bg-warning/10 text-warning border-warning/20',
+  scheduled: 'bg-info/10 text-info border-info/20',
   won: 'bg-success/10 text-success border-success/20',
   lost: 'bg-danger/10 text-danger border-danger/20',
 };
@@ -196,7 +198,7 @@ export default function LeadDetailPage() {
     lead.customer?.address_line1,
     lead.customer?.city,
     lead.customer?.state,
-    lead.customer?.postal_code
+    lead.customer?.zip
   );
   const urgency = URGENCY_LABELS[lead.urgency || 'normal'];
 
@@ -325,15 +327,14 @@ export default function LeadDetailPage() {
               </div>
             )}
             {address && (
-              <a
-                href={getNavigationUrl(address)}
-                target="_blank"
-                rel="noopener noreferrer"
+              <AddressLink
+                address={lead.customer?.address_line1 || undefined}
+                city={lead.customer?.city || undefined}
+                state={lead.customer?.state || undefined}
+                zip={lead.customer?.zip || undefined}
                 className="flex items-start gap-3 text-primary"
-              >
-                <MapPin className="h-5 w-5 shrink-0 mt-0.5" />
-                <span>{address}</span>
-              </a>
+                iconClassName="h-5 w-5 shrink-0 mt-0.5"
+              />
             )}
           </div>
         </section>

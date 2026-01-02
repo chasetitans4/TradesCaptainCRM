@@ -16,7 +16,6 @@ export async function syncServerTime(): Promise<void> {
 
     const response = await fetch('/api/time');
     if (!response.ok) {
-      console.warn('Failed to sync server time');
       return;
     }
 

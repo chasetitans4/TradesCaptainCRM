@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exchangeCodeForGrant, listCalendars } from '@/lib/nylas';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { encrypt } from '@/lib/crypto';
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get('code');
@@ -27,6 +28,32 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const supabase = await createServerSupabaseClient();
+
+    // SECURITY: Verify the logged-in user matches the state parameter
+    // This prevents attackers from using their OAuth code to hijack another user's account
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.error('Nylas callback: No authenticated user');
+      return NextResponse.redirect(
+        new URL('/settings/calendar?error=unauthorized', request.url)
+      );
+    }
+
+    // Get the user's profile to verify against state
+    const { data: profile } = await supabase
+      .from('users')
+      .select('id')
+      .eq('auth_user_id', user.id)
+      .single();
+
+    if (!profile || profile.id !== userId) {
+      console.error('Nylas callback: State mismatch - possible CSRF attack');
+      return NextResponse.redirect(
+        new URL('/settings/calendar?error=state_mismatch', request.url)
+      );
+    }
+
     // Exchange authorization code for Nylas grant
     const { grantId, email, provider } = await exchangeCodeForGrant(code);
 
@@ -35,15 +62,16 @@ export async function GET(request: NextRequest) {
     const primaryCalendar =
       calendars.find((c: any) => c.isPrimary) || calendars[0];
 
-    // Save connection to database
-    const supabase = await createServerSupabaseClient();
+    // Encrypt grant ID before storage (grants calendar access)
+    const encryptedGrantId = encrypt(grantId);
 
+    // Save connection to database with encrypted grant ID
     const { error: upsertError } = await supabase
       .from('calendar_connections')
       .upsert(
         {
           user_id: userId,
-          nylas_grant_id: grantId,
+          nylas_grant_id: encryptedGrantId,
           provider,
           email,
           calendar_id: primaryCalendar?.id || null,

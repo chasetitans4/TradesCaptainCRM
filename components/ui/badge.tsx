@@ -8,10 +8,12 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default: 'bg-primary/10 text-primary',
+        primary: 'bg-primary/10 text-primary', // alias for default
         secondary: 'bg-muted text-text-muted',
         success: 'bg-success/10 text-success',
         warning: 'bg-warning/10 text-warning',
         danger: 'bg-danger/10 text-danger',
+        destructive: 'bg-danger/10 text-danger', // alias for danger
         info: 'bg-info/10 text-info',
         outline: 'border border-border text-text',
         // Status-specific badges

@@ -21,6 +21,19 @@ import {
   UserPlus,
   Building2,
   Truck,
+  Shield,
+  PhoneCall,
+  Target,
+  ClipboardList,
+  MessageCircle,
+  FileBarChart,
+  Headphones,
+  DollarSign,
+  Clock,
+  Megaphone,
+  Phone,
+  Send,
+  GitBranch,
 } from 'lucide-react';
 
 const navigation = [
@@ -66,18 +79,63 @@ const navigation = [
   },
   {
     name: 'Quotes & Invoices',
-    href: '/billing',
+    href: '/quotes',
     icon: Receipt,
     children: [
       { name: 'Quotes', href: '/quotes' },
       { name: 'Invoices', href: '/invoices' },
-      { name: 'Payments', href: '/payments' },
     ],
   },
   {
     name: 'Reports',
     href: '/reports',
     icon: BarChart3,
+  },
+  {
+    name: 'Outreach',
+    href: '/outreach',
+    icon: Megaphone,
+    badge: 'NEW',
+    badgeColor: 'bg-secondary',
+    children: [
+      { name: 'Dashboard', href: '/outreach' },
+      { name: 'Calls', href: '/outreach/calls' },
+      { name: 'Contacts', href: '/outreach/contacts' },
+      { name: 'Campaigns', href: '/outreach/campaigns' },
+    ],
+  },
+  {
+    name: 'Leads Captain',
+    href: '/leads-captain',
+    icon: PhoneCall,
+    badge: 'v2',
+    badgeColor: 'bg-primary',
+    children: [
+      { name: 'Dashboard', href: '/leads-captain' },
+      { name: 'Conversations', href: '/leads-captain/conversations' },
+      { name: 'Rules', href: '/leads-captain/rules' },
+      { name: 'Templates', href: '/leads-captain/templates' },
+      { name: 'Approvals', href: '/leads-captain/approvals' },
+      { name: 'Analytics', href: '/leads-captain/analytics' },
+      { name: 'Settings', href: '/leads-captain/settings' },
+    ],
+  },
+];
+
+const adminNavigation = [
+  {
+    name: 'Admin',
+    icon: Shield,
+    children: [
+      { name: 'Leads Captain', href: '/admin/leads-captain', icon: PhoneCall },
+      { name: 'Pipeline', href: '/admin/pipeline', icon: Target },
+      { name: 'Onboarding', href: '/admin/onboarding', icon: ClipboardList },
+      { name: 'SMS Usage', href: '/admin/sms-usage', icon: MessageCircle },
+      { name: 'Reports', href: '/admin/reports', icon: FileBarChart },
+      { name: 'Support', href: '/admin/support', icon: Headphones },
+      { name: 'Expenses', href: '/admin/expenses', icon: DollarSign },
+      { name: 'Timesheets', href: '/admin/timesheets', icon: Clock },
+    ],
   },
 ];
 
@@ -212,6 +270,62 @@ export function Sidebar({ className, businessName = 'Your Business', planName = 
             );
           })}
         </ul>
+
+        {/* Admin Section */}
+        <div className="mt-6 pt-4 border-t border-white/10">
+          <p className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            Administration
+          </p>
+          <ul className="space-y-1">
+            {adminNavigation.map((section) => {
+              const expanded = expandedItems.includes(section.name);
+              const hasActiveChild = section.children.some((child) =>
+                pathname.startsWith(child.href)
+              );
+
+              return (
+                <li key={section.name}>
+                  <button
+                    onClick={() => toggleExpand(section.name)}
+                    className={cn(
+                      'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                      hasActiveChild
+                        ? 'bg-primary/20 text-primary-300'
+                        : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                    )}
+                  >
+                    <section.icon className="w-5 h-5 flex-shrink-0" />
+                    <span className="flex-1 text-left">{section.name}</span>
+                    <ChevronDown
+                      className={cn('w-4 h-4 transition-transform', expanded && 'rotate-180')}
+                    />
+                  </button>
+
+                  {expanded && (
+                    <ul className="mt-1 ml-4 pl-4 border-l border-white/10 space-y-1">
+                      {section.children.map((child) => (
+                        <li key={child.name}>
+                          <Link
+                            href={child.href}
+                            className={cn(
+                              'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors',
+                              pathname.startsWith(child.href)
+                                ? 'bg-white/10 text-white'
+                                : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                            )}
+                          >
+                            <child.icon className="w-4 h-4" />
+                            {child.name}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       </nav>
 
       {/* Bottom Navigation */}

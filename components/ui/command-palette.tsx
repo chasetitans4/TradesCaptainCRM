@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Drawer } from 'vaul';
 import {
   Command,
   CommandInput,
@@ -13,6 +14,7 @@ import {
   CommandSeparator,
 } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   Users,
@@ -30,6 +32,7 @@ import {
   Truck,
   DollarSign,
   Loader2,
+  X,
 } from 'lucide-react';
 
 const navigationItems = [
@@ -100,12 +103,6 @@ const navigationItems = [
     keywords: ['time', 'hours', 'clock'],
   },
   {
-    icon: DollarSign,
-    label: 'Mileage',
-    href: '/mileage',
-    keywords: ['miles', 'travel', 'gas'],
-  },
-  {
     icon: Settings,
     label: 'Settings',
     href: '/settings',
@@ -160,12 +157,29 @@ interface SearchResult {
   href: string;
 }
 
+// Hook to detect mobile viewport
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return isMobile;
+}
+
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const router = useRouter();
+  const isMobile = useIsMobile();
 
   // Listen for Cmd+K / Ctrl+K
   useEffect(() => {
@@ -244,92 +258,134 @@ export function CommandPalette() {
     }
   };
 
+  // Shared command content
+  const commandContent = (
+    <Command className="rounded-lg border-none">
+      <CommandInput
+        placeholder="Search or type a command..."
+        value={search}
+        onValueChange={setSearch}
+        className={cn(isMobile && 'h-12 text-base')}
+      />
+      <CommandList className={cn(isMobile && 'max-h-[calc(100vh-180px)]')}>
+        <CommandEmpty>
+          {searching ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-sm text-muted-foreground">Searching...</span>
+            </div>
+          ) : (
+            'No results found.'
+          )}
+        </CommandEmpty>
+
+        {/* Dynamic Search Results */}
+        {searchResults.length > 0 && (
+          <>
+            <CommandGroup heading="Search Results">
+              {searchResults.map((result) => {
+                const Icon = getResultIcon(result.type);
+                return (
+                  <CommandItem
+                    key={`${result.type}-${result.id}`}
+                    onSelect={() => handleSelect(result.href)}
+                    className={cn('gap-3', isMobile && 'py-3 min-h-[48px]')}
+                  >
+                    <Icon className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate">{result.title}</p>
+                      {result.subtitle && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {result.subtitle}
+                        </p>
+                      )}
+                    </div>
+                    <Badge className={getResultBadgeColor(result.type)}>
+                      {result.type}
+                    </Badge>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+            <CommandSeparator />
+          </>
+        )}
+
+        {/* Quick Actions (show when not searching) */}
+        {!search && (
+          <CommandGroup heading="Quick Actions">
+            {actionItems.map((item) => (
+              <CommandItem
+                key={item.href}
+                onSelect={() => handleSelect(item.href)}
+                className={cn('gap-2', isMobile && 'py-3 min-h-[48px]')}
+              >
+                <item.icon className="w-4 h-4 shrink-0" />
+                {item.label}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        <CommandSeparator />
+
+        {/* Navigation */}
+        <CommandGroup heading="Navigation">
+          {navigationItems.map((item) => (
+            <CommandItem
+              key={item.href}
+              onSelect={() => handleSelect(item.href)}
+              className={cn('gap-2', isMobile && 'py-3 min-h-[48px]')}
+            >
+              <item.icon className="w-4 h-4 shrink-0" />
+              {item.label}
+            </CommandItem>
+          ))}
+        </CommandGroup>
+      </CommandList>
+    </Command>
+  );
+
+  // Mobile: Full-screen drawer from bottom
+  if (isMobile) {
+    return (
+      <Drawer.Root open={open} onOpenChange={setOpen}>
+        <Drawer.Portal>
+          <Drawer.Overlay className="fixed inset-0 bg-black/40 z-50" />
+          <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mt-24 flex h-[85vh] flex-col rounded-t-2xl bg-background safe-area-pb">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <Drawer.Title className="text-lg font-semibold">
+                Search
+              </Drawer.Title>
+              <button
+                onClick={() => setOpen(false)}
+                className="p-2 -mr-2 rounded-lg hover:bg-muted"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-hidden">
+              {commandContent}
+            </div>
+
+            {/* Mobile hint */}
+            <div className="border-t px-4 py-3 text-center text-xs text-muted-foreground">
+              Tap to navigate or search for customers, jobs, and more
+            </div>
+          </Drawer.Content>
+        </Drawer.Portal>
+      </Drawer.Root>
+    );
+  }
+
+  // Desktop: Centered dialog
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="p-0 max-w-xl overflow-hidden">
-        <Command className="rounded-lg border-none">
-          <CommandInput
-            placeholder="Search or type a command..."
-            value={search}
-            onValueChange={setSearch}
-          />
-          <CommandList>
-            <CommandEmpty>
-              {searching ? (
-                <div className="flex items-center justify-center py-6">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                  <span className="ml-2 text-sm text-muted-foreground">Searching...</span>
-                </div>
-              ) : (
-                'No results found.'
-              )}
-            </CommandEmpty>
-
-            {/* Dynamic Search Results */}
-            {searchResults.length > 0 && (
-              <>
-                <CommandGroup heading="Search Results">
-                  {searchResults.map((result) => {
-                    const Icon = getResultIcon(result.type);
-                    return (
-                      <CommandItem
-                        key={`${result.type}-${result.id}`}
-                        onSelect={() => handleSelect(result.href)}
-                        className="gap-3"
-                      >
-                        <Icon className="w-4 h-4 text-muted-foreground" />
-                        <div className="flex-1 min-w-0">
-                          <p className="truncate">{result.title}</p>
-                          {result.subtitle && (
-                            <p className="text-xs text-muted-foreground truncate">
-                              {result.subtitle}
-                            </p>
-                          )}
-                        </div>
-                        <Badge className={getResultBadgeColor(result.type)}>
-                          {result.type}
-                        </Badge>
-                      </CommandItem>
-                    );
-                  })}
-                </CommandGroup>
-                <CommandSeparator />
-              </>
-            )}
-
-            {/* Quick Actions (show when not searching) */}
-            {!search && (
-              <CommandGroup heading="Quick Actions">
-                {actionItems.map((item) => (
-                  <CommandItem
-                    key={item.href}
-                    onSelect={() => handleSelect(item.href)}
-                    className="gap-2"
-                  >
-                    <item.icon className="w-4 h-4" />
-                    {item.label}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-
-            <CommandSeparator />
-
-            {/* Navigation */}
-            <CommandGroup heading="Navigation">
-              {navigationItems.map((item) => (
-                <CommandItem
-                  key={item.href}
-                  onSelect={() => handleSelect(item.href)}
-                  className="gap-2"
-                >
-                  <item.icon className="w-4 h-4" />
-                  {item.label}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
+        {commandContent}
 
         {/* Keyboard shortcut hint */}
         <div className="border-t px-3 py-2 flex items-center justify-between text-xs text-muted-foreground">

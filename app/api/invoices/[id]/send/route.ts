@@ -73,10 +73,10 @@ export async function POST(
           try {
             await sendInvoiceViaEmail(id);
             results.email = true;
-          } catch (error: any) {
-            results.errors.push(`Email: ${error.message}`);
-            if (method === 'email') throw error; // Only throw if email-only
-          }
+      } catch (error: any) {
+        results.errors.push(`Email: ${error.message}`);
+        if (method === 'email') throw error;
+      }
         }
       }
 
@@ -97,14 +97,18 @@ export async function POST(
         errors: results.errors.length > 0 ? results.errors : undefined,
       });
     } catch (error: any) {
-      console.error('Error sending invoice:', error);
+      import('@/lib/logger').then(({ logApiError }) => {
+        logApiError('POST', '/api/invoices/[id]/send', error);
+      });
       return NextResponse.json(
         { error: error.message || 'Failed to send invoice' },
         { status: 500 }
       );
     }
   } catch (error) {
-    console.error('Error in send invoice API:', error);
+    import('@/lib/logger').then(({ logApiError }) => {
+      logApiError('POST', '/api/invoices/[id]/send', error as Error);
+    });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -285,7 +285,8 @@ export async function logLeadContact(
   leadId: string,
   agentId: string,
   activityType: 'called' | 'emailed' | 'texted' | 'met',
-  description?: string
+  description?: string,
+  nextFollowupAt?: string
 ): Promise<void> {
   const supabase = createAdminClient();
 
@@ -294,6 +295,7 @@ export async function logLeadContact(
     .from('tc_leads')
     .update({
       last_contact_at: new Date().toISOString(),
+      next_followup_at: nextFollowupAt || undefined,
       contact_count: supabase.rpc('increment_contact_count', { lead_id: leadId }),
       updated_at: new Date().toISOString(),
     })

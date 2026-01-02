@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { Clock, MapPin, Phone, ChevronRight, Calendar } from 'lucide-react';
+import { Clock, Phone, ChevronRight, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { AddressLinkCompact } from '@/components/ui/address-link';
 
 export interface ScheduledJob {
   id: string;
@@ -125,10 +126,7 @@ export function TodaysSchedule({ jobs = [], loading, estimatedRevenue = 0 }: Tod
                 </div>
 
                 <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-3 h-3" />
-                    {job.customer.address}
-                  </span>
+                  <AddressLinkCompact address={job.customer.address} />
                   <span className="flex items-center gap-1">
                     <Phone className="w-3 h-3" />
                     {job.customer.phone}

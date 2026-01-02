@@ -9,6 +9,7 @@ import OpenAI from 'openai';
 import { searchArticles, ARTICLES } from '@/lib/knowledge-base/articles';
 import { NAVIGATION_MAP, findBestRoute } from '@/lib/knowledge-base/navigation-map';
 import { AVAILABLE_ACTIONS, findAction } from '@/lib/knowledge-base/actions';
+import { checkAIRateLimit } from '@/lib/rate-limit';
 
 // Lazy initialization of OpenAI client to avoid build-time errors
 let openai: OpenAI | null = null;
@@ -103,12 +104,36 @@ Remember: Be helpful, concise, and always provide actionable next steps when pos
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, currentPath, conversationHistory = [] } = body;
+    const { message, currentPath, conversationHistory = [], businessId } = body;
 
     if (!message) {
       return NextResponse.json(
         { error: 'Message is required' },
         { status: 400 }
+      );
+    }
+
+    // Get identifier for rate limiting (businessId or IP)
+    const identifier = businessId ||
+      request.headers.get('cf-connecting-ip') ||
+      request.headers.get('x-real-ip') ||
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      'anonymous';
+
+    // Check Redis-backed rate limit (50 AI calls per minute per business/IP)
+    const rateLimit = await checkAIRateLimit(identifier);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'AI rate limit exceeded. Please try again shortly.' },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': '50',
+            'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+            'X-RateLimit-Reset': rateLimit.resetAt.toISOString(),
+            'Retry-After': (rateLimit.retryAfter || 60).toString(),
+          },
+        }
       );
     }
 

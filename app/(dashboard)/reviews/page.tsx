@@ -43,7 +43,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { AvatarRoot, AvatarFallback } from '@/components/ui/avatar';
 
 interface Review {
   id: string;
@@ -395,7 +395,7 @@ export default function ReviewsPage() {
                 <Card key={review.id}>
                   <CardContent className="pt-6">
                     <div className="flex items-start gap-4">
-                      <Avatar>
+                      <AvatarRoot>
                         <AvatarFallback>
                           {review.reviewer_name
                             .split(' ')
@@ -403,7 +403,7 @@ export default function ReviewsPage() {
                             .join('')
                             .toUpperCase()}
                         </AvatarFallback>
-                      </Avatar>
+                      </AvatarRoot>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-4">
                           <div>
@@ -515,7 +515,7 @@ export default function ReviewsPage() {
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <Avatar>
+                        <AvatarRoot>
                           <AvatarFallback>
                             {request.customer?.name
                               ?.split(' ')
@@ -523,7 +523,7 @@ export default function ReviewsPage() {
                               .join('')
                               .toUpperCase() || 'C'}
                           </AvatarFallback>
-                        </Avatar>
+                        </AvatarRoot>
                         <div>
                           <p className="font-medium">
                             {request.customer?.name || 'Unknown Customer'}

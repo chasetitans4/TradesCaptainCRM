@@ -192,9 +192,10 @@ import { createClient } from '@/lib/supabase/server';
 export interface FeatureSettings {
   timesheets_enabled: boolean;
   expense_tracking_enabled: boolean;
-  mileage_tracking_enabled: boolean;
   reviews_enabled: boolean;
+  auto_review_requests: boolean;
   routes_enabled: boolean;
+  route_optimization_enabled: boolean;
   memberships_enabled: boolean;
   receipts_enabled: boolean;
   costing_enabled: boolean;
@@ -203,9 +204,10 @@ export interface FeatureSettings {
 const DEFAULT_FEATURE_SETTINGS: FeatureSettings = {
   timesheets_enabled: true,
   expense_tracking_enabled: true,
-  mileage_tracking_enabled: true,
   reviews_enabled: true,
+  auto_review_requests: true,
   routes_enabled: true,
+  route_optimization_enabled: true,
   memberships_enabled: true,
   receipts_enabled: true,
   costing_enabled: true,

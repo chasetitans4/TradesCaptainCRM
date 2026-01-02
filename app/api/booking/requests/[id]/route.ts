@@ -8,6 +8,7 @@ import {
   cancelBookingRequest,
   updateBookingNotes,
 } from '@/lib/booking/requests';
+import { logApiError } from '@/lib/logger';
 
 // GET /api/booking/requests/[id] - Get single booking request
 export async function GET(
@@ -44,8 +45,8 @@ export async function GET(
 
     return NextResponse.json({ booking });
   } catch (error: any) {
-    console.error('Error fetching booking:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    logApiError('GET', '/api/booking/requests/[id]', error);
+    return NextResponse.json({ error: 'Failed to fetch booking' }, { status: 500 });
   }
 }
 
@@ -135,14 +136,17 @@ export async function POST(
     // Fetch updated booking
     const updatedBooking = await getBookingRequest(id);
 
-    return NextResponse.json({
+    const response: Record<string, any> = {
       success: true,
       booking: updatedBooking,
-      jobId: result.jobId,
-    });
+    };
+    if ('jobId' in result && result.jobId) {
+      response.jobId = result.jobId;
+    }
+    return NextResponse.json(response);
   } catch (error: any) {
-    console.error('Error updating booking:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    logApiError('POST', '/api/booking/requests/[id]', error);
+    return NextResponse.json({ error: 'Failed to update booking' }, { status: 500 });
   }
 }
 
@@ -186,7 +190,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('Error cancelling booking:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    logApiError('DELETE', '/api/booking/requests/[id]', error);
+    return NextResponse.json({ error: 'Failed to cancel booking' }, { status: 500 });
   }
 }

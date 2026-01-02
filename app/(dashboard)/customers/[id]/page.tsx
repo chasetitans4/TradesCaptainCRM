@@ -12,8 +12,9 @@ import {
   formatDate,
   formatCurrency,
   formatAddress,
-  getNavigationUrl,
 } from '@/lib/utils';
+import { getSmartNavigationUrl } from '@/lib/utils/navigation';
+import { AddressLink } from '@/components/ui/address-link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
@@ -37,7 +38,7 @@ import {
   Plus,
 } from 'lucide-react';
 
-interface CustomerWithStats extends Customer {
+interface CustomerWithStats extends Omit<Customer, 'total_jobs' | 'total_revenue'> {
   total_jobs?: number;
   total_revenue?: number;
 }
@@ -141,7 +142,7 @@ export default function CustomerDetailPage() {
     customer.address_line1,
     customer.city,
     customer.state,
-    customer.postal_code
+    customer.zip
   );
 
   const tabs = [
@@ -273,15 +274,14 @@ export default function CustomerDetailPage() {
               </div>
             )}
             {address && (
-              <a
-                href={getNavigationUrl(address)}
-                target="_blank"
-                rel="noopener noreferrer"
+              <AddressLink
+                address={customer.address_line1}
+                city={customer.city}
+                state={customer.state}
+                zip={customer.zip}
                 className="flex items-start gap-3 text-primary"
-              >
-                <MapPin className="h-5 w-5 shrink-0 mt-0.5" />
-                <span>{address}</span>
-              </a>
+                iconClassName="h-5 w-5 shrink-0 mt-0.5"
+              />
             )}
           </div>
           {customer.notes && (

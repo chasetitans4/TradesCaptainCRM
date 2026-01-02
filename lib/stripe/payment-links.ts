@@ -11,18 +11,20 @@ interface CreatePaymentLinkParams {
   customerEmail?: string;
   customerName: string;
   description: string;
+  currency?: string;
 }
 
 /**
  * Create a Stripe Payment Link for an invoice
  */
 export async function createPaymentLink(params: CreatePaymentLinkParams): Promise<string> {
-  const { invoiceId, businessId, amount, customerEmail, customerName, description } = params;
+  const { invoiceId, businessId, amount, customerEmail, customerName, description, currency } = params;
+  const curr = (currency || 'usd').toLowerCase();
 
   // Create a price for this specific invoice
   const price = await stripe.prices.create({
     unit_amount: amount,
-    currency: 'usd',
+    currency: curr,
     product_data: {
       name: description,
     },
@@ -53,14 +55,15 @@ export async function createPaymentLink(params: CreatePaymentLinkParams): Promis
  * Create a Checkout Session for an invoice (alternative to Payment Links)
  */
 export async function createCheckoutSession(params: CreatePaymentLinkParams): Promise<string> {
-  const { invoiceId, businessId, amount, customerEmail, customerName, description } = params;
+  const { invoiceId, businessId, amount, customerEmail, customerName, description, currency } = params;
+  const curr = (currency || 'usd').toLowerCase();
 
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
     line_items: [
       {
         price_data: {
-          currency: 'usd',
+          currency: curr,
           unit_amount: amount,
           product_data: {
             name: description,

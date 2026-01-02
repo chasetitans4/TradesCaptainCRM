@@ -11,9 +11,10 @@ import { getCallLog, updateCallLog, deleteCallLog } from '@/lib/calls';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
 
     // Get authenticated user
@@ -25,7 +26,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const call = await getCallLog(params.id);
+    const call = await getCallLog(id);
 
     if (!call) {
       return NextResponse.json({ error: 'Call not found' }, { status: 404 });
@@ -43,9 +44,10 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
 
     // Get authenticated user
@@ -59,7 +61,7 @@ export async function PATCH(
 
     const body = await request.json();
 
-    const call = await updateCallLog(params.id, body);
+    const call = await updateCallLog(id, body);
 
     return NextResponse.json(call);
   } catch (error) {
@@ -73,9 +75,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = await createClient();
 
     // Get authenticated user
@@ -101,7 +104,7 @@ export async function DELETE(
       );
     }
 
-    await deleteCallLog(params.id);
+    await deleteCallLog(id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

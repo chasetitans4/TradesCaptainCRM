@@ -4,7 +4,7 @@
 // =====================================================
 
 import { createClient } from '@/lib/supabase/server';
-import { calculateDistance, getOrGeocodeAddress, Coordinates } from './geocoding';
+import { haversineDistance } from '@/lib/utils/navigation';
 import { format, startOfDay, endOfDay } from 'date-fns';
 
 export interface JobWithLocation {
@@ -53,6 +53,11 @@ export interface DailyRoute {
   status: 'draft' | 'confirmed' | 'in_progress' | 'completed';
   created_at: string;
   updated_at: string;
+}
+
+export interface Coordinates {
+  latitude: number;
+  longitude: number;
 }
 
 /**
@@ -154,7 +159,7 @@ export function optimizeRouteNearestNeighbor(
     let nearestDistance = Infinity;
 
     remaining.forEach((job, index) => {
-      const distance = calculateDistance(
+      const distance = haversineDistance(
         currentLocation.latitude,
         currentLocation.longitude,
         job.latitude!,
@@ -216,25 +221,7 @@ export async function createOptimizedRoute(
     return null;
   }
 
-  // Geocode any missing addresses
-  for (const job of jobs) {
-    if (job.latitude === undefined && job.address) {
-      const fullAddress = [job.address, job.city, job.state, job.zip]
-        .filter(Boolean)
-        .join(', ');
-      const geocoded = await getOrGeocodeAddress(businessId, fullAddress);
-      if (geocoded) {
-        job.latitude = geocoded.latitude;
-        job.longitude = geocoded.longitude;
-
-        // Update job with coordinates
-        await supabase
-          .from('jobs')
-          .update({ latitude: geocoded.latitude, longitude: geocoded.longitude })
-          .eq('id', job.id);
-      }
-    }
-  }
+  // Skip geocoding; only use existing coordinates if available
 
   // Optimize the route
   const stops = optimizeRouteNearestNeighbor(jobs, startLocation);
@@ -366,7 +353,7 @@ export async function reorderStops(
     const curr = reorderedStops[i];
 
     if (prev.job.latitude && prev.job.longitude && curr.job.latitude && curr.job.longitude) {
-      const distance = calculateDistance(
+      const distance = haversineDistance(
         prev.job.latitude,
         prev.job.longitude,
         curr.job.latitude,

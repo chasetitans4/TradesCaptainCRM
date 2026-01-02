@@ -97,7 +97,11 @@ export async function POST(request: NextRequest) {
 
       for (const invoice of invoices || []) {
         // Skip if customer has no email
-        if (!invoice.customer?.email) {
+        const customer = (invoice as any).customer;
+        const customerEmail = Array.isArray(customer)
+          ? customer[0]?.email
+          : customer?.email;
+        if (!customerEmail) {
           results.skipped++;
           continue;
         }

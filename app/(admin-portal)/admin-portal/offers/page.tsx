@@ -329,13 +329,13 @@ export default function OfferManagementPage() {
                 </li>
                 <li className="flex items-center gap-2">
                   <X className="h-4 w-4 text-red-500" />
-                  ANNUAL25 + any other offer
+                  ANNUAL15 + any other offer
                 </li>
               </ul>
             </div>
           </div>
           <p className="text-xs text-gray-500 mt-4">
-            Maximum 2 offers per subscription (except ANNUAL25 which is standalone)
+            Maximum 2 offers per subscription (except ANNUAL15 which is standalone)
           </p>
         </div>
       </div>

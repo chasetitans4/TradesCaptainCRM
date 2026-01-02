@@ -102,7 +102,6 @@ export async function updateBillableUserCount(businessId: string): Promise<numbe
  */
 export async function reportUserUsageToStripe(businessId: string): Promise<boolean> {
   if (!isStripeConfigured()) {
-    console.log('Stripe not configured, skipping usage report');
     return false;
   }
 
@@ -116,7 +115,6 @@ export async function reportUserUsageToStripe(businessId: string): Promise<boole
     .single();
 
   if (!business?.stripe_subscription_id) {
-    console.log('No Stripe subscription found');
     return false;
   }
 
@@ -130,7 +128,6 @@ export async function reportUserUsageToStripe(businessId: string): Promise<boole
     );
 
     if (!meteredItem) {
-      console.log('No metered subscription item found');
       return false;
     }
 
@@ -146,10 +143,6 @@ export async function reportUserUsageToStripe(businessId: string): Promise<boole
         timestamp: Math.floor(Date.now() / 1000),
         action: 'set', // Set the total quantity
       });
-
-      console.log(
-        `Reported ${pricingInfo.additionalUsers} additional users for business ${businessId}`
-      );
     }
 
     return true;

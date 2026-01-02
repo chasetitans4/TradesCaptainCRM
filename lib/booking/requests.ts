@@ -6,6 +6,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { getBookingSettings } from './settings';
 import { isSlotAvailable } from './slots';
+import { formatPhoneE164 } from '@/lib/twilio/sms';
+import { apiLogger } from '@/lib/logger';
 
 export interface BookingRequestInput {
   // Customer info
@@ -75,6 +77,7 @@ export async function createBookingRequest(
   input: BookingRequestInput
 ): Promise<{ success: boolean; requestId?: string; error?: string }> {
   const supabase = await createClient();
+  const phoneE164 = formatPhoneE164(input.customerPhone);
 
   // Verify booking is enabled
   const settings = await getBookingSettings(businessId);
@@ -92,7 +95,7 @@ export async function createBookingRequest(
     .from('customers')
     .select('id')
     .eq('business_id', businessId)
-    .or(`email.eq.${input.customerEmail},phone.eq.${input.customerPhone}`)
+    .or(`email.eq.${input.customerEmail},phone.eq.${phoneE164}`)
     .single();
 
   const insertData: Record<string, any> = {
@@ -100,7 +103,7 @@ export async function createBookingRequest(
     customer_id: existingCustomer?.id || null,
     customer_name: input.customerName,
     customer_email: input.customerEmail.toLowerCase(),
-    customer_phone: input.customerPhone,
+    customer_phone: phoneE164,
     service_type: input.serviceType,
     description: input.description || null,
     urgency: input.urgency || 'normal',
@@ -132,7 +135,11 @@ export async function createBookingRequest(
     .single();
 
   if (error) {
-    console.error('Failed to create booking request:', error);
+    apiLogger.error({
+      msg: 'Failed to create booking request',
+      error: { message: error.message, details: error },
+      businessId,
+    });
     return { success: false, error: 'Failed to create booking request' };
   }
 
@@ -350,17 +357,25 @@ export async function convertToJob(
       business_id: request.business_id,
       customer_id: customerId,
       title: `${request.service_type} - ${request.customer_name}`,
-      type: request.service_type,
+      service_type: request.service_type,
       description: request.description,
       status: 'scheduled',
       priority: request.urgency === 'emergency' ? 'high' : request.urgency === 'urgent' ? 'medium' : 'normal',
       scheduled_date: request.confirmed_date,
-      scheduled_time: request.confirmed_time,
+      scheduled_time_start: request.confirmed_time,
+      scheduled_time_end: (() => {
+        const [h, m] = (request.confirmed_time || '00:00').split(':').map(Number);
+        const d = new Date();
+        d.setHours(h, m + (additionalData?.estimatedDuration || 60), 0, 0);
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        return `${hh}:${mm}`;
+      })(),
       estimated_duration: additionalData?.estimatedDuration || 60,
-      address: request.address,
-      city: request.city,
-      state: request.state,
-      zip: request.zip,
+      job_address_line1: request.address,
+      job_address_city: request.city,
+      job_address_state: request.state,
+      job_address_zip: request.zip,
       assigned_to: additionalData?.assignedTo || null,
       notes: additionalData?.notes || null,
       created_by: userId,
@@ -369,7 +384,12 @@ export async function convertToJob(
     .single();
 
   if (jobError) {
-    console.error('Failed to create job:', jobError);
+    apiLogger.error({
+      msg: 'Failed to create job from booking request',
+      error: { message: jobError.message, details: jobError },
+      businessId: request.business_id,
+      requestId,
+    });
     return { success: false, error: 'Failed to create job' };
   }
 

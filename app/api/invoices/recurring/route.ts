@@ -16,7 +16,11 @@ function verifyCronSecret(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 
-  if (!cronSecret) return true;
+  // SECURITY: Require CRON_SECRET to be configured - deny access if not set
+  if (!cronSecret) {
+    console.error('CRON_SECRET not configured - denying cron access');
+    return false;
+  }
   return authHeader === `Bearer ${cronSecret}`;
 }
 

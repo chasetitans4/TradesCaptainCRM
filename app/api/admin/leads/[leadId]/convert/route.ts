@@ -48,7 +48,7 @@ export async function POST(
       );
     }
 
-    const updatedLead = await convertLead(leadId, account_type, account_id);
+    const updatedLead = await convertLead(leadId, auth.user.id, account_id, account_type);
 
     return NextResponse.json({ success: true, lead: updatedLead });
   } catch (error: any) {

@@ -4,6 +4,8 @@
 // =====================================================
 
 import { createClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
+const callLogger = logger.child({ context: 'calls' });
 import type { CallDirection, CallOutcome, CallLog } from '@/types';
 
 export interface CallLogInput {
@@ -79,7 +81,7 @@ export async function recordCall(
     .single();
 
   if (error) {
-    console.error('Error recording call:', error);
+    callLogger.error({ msg: 'Error recording call', error });
     throw new Error('Failed to record call');
   }
 
@@ -153,7 +155,7 @@ export async function getCallLogs(
   const { data, error, count } = await query;
 
   if (error) {
-    console.error('Error fetching call logs:', error);
+    callLogger.error({ msg: 'Error fetching call logs', error });
     throw new Error('Failed to fetch call logs');
   }
 
@@ -184,7 +186,7 @@ export async function getCallLog(callId: string): Promise<CallLogWithRelations |
 
   if (error) {
     if (error.code === 'PGRST116') return null;
-    console.error('Error fetching call log:', error);
+    callLogger.error({ msg: 'Error fetching call log', error });
     throw new Error('Failed to fetch call log');
   }
 
@@ -220,7 +222,7 @@ export async function updateCallLog(
     .single();
 
   if (error) {
-    console.error('Error updating call log:', error);
+    callLogger.error({ msg: 'Error updating call log', error });
     throw new Error('Failed to update call log');
   }
 
@@ -239,7 +241,7 @@ export async function deleteCallLog(callId: string): Promise<void> {
     .eq('id', callId);
 
   if (error) {
-    console.error('Error deleting call log:', error);
+    callLogger.error({ msg: 'Error deleting call log', error });
     throw new Error('Failed to delete call log');
   }
 }
@@ -499,7 +501,7 @@ export async function updateCallOnComplete(
     .single();
 
   if (!call) {
-    console.warn('Call not found for Twilio SID:', twilioCallSid);
+    console.error('Call not found for Twilio SID:', twilioCallSid);
     return null;
   }
 

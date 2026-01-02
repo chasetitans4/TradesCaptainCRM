@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { setupEmail2FA, verifyEmail2FASetup, disableEmail2FA } from '@/lib/auth/email-2fa';
+import { authLogger } from '@/lib/logger';
 
 // POST - Start Email 2FA setup or verify
 export async function POST(request: NextRequest) {
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
   } catch (error: any) {
-    console.error('Email 2FA setup error:', error);
+    authLogger.error({ msg: 'Email 2FA setup error', error });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -85,7 +86,7 @@ export async function DELETE() {
     await disableEmail2FA(user.id);
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('Email 2FA disable error:', error);
+    authLogger.error({ msg: 'Email 2FA disable error', error });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

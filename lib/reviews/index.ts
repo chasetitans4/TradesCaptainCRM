@@ -84,13 +84,11 @@ export async function createReviewRequest(
   // Get the review link
   const reviewLink = business?.review_link_google;
   if (!reviewLink) {
-    console.log('No Google review link configured');
     return null;
   }
 
   // Check if customer has contact info
   if (!customer?.phone && !customer?.email) {
-    console.log('Customer has no contact info');
     return null;
   }
 
@@ -105,7 +103,6 @@ export async function createReviewRequest(
     .single();
 
   if (existing) {
-    console.log('Review request already exists for this job');
     return null;
   }
 
@@ -170,13 +167,11 @@ export async function sendReviewRequest(requestId: string): Promise<boolean> {
 
   try {
     if (request.send_method === 'sms' && customer?.phone) {
-      // Send SMS (would integrate with Twilio/messaging service)
-      console.log('Would send SMS to', customer.phone, ':', message);
-      // In production: await sendSMS(customer.phone, message);
+      // TODO: Send SMS via Twilio
+      // await sendSMS(customer.phone, message);
     } else if (customer?.email) {
-      // Send email (would integrate with email service)
-      console.log('Would send email to', customer.email, ':', message);
-      // In production: await sendEmail(customer.email, 'How was your service?', message);
+      // TODO: Send email via Resend
+      // await sendEmail(customer.email, 'How was your service?', message);
     }
 
     // Update status

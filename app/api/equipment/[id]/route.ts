@@ -9,6 +9,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { getEquipment, updateEquipment, deleteEquipment } from '@/lib/equipment';
 
+function mapEquipmentToUi(row: any) {
+  const statusMap: Record<string, string> = {
+    active: 'active',
+    needs_repair: 'needs_service',
+    replaced: 'replaced',
+    removed: 'inactive',
+  };
+  return {
+    id: row.id,
+    equipment_type: { name: row.equipment_type },
+    model_number: row.model ?? '',
+    serial_number: row.serial_number ?? undefined,
+    install_date: row.install_date ?? undefined,
+    warranty_expiration: row.warranty_expires ?? undefined,
+    location: row.location_in_property ?? undefined,
+    notes: row.notes ?? undefined,
+    status: statusMap[row.status] ?? row.status,
+  };
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -27,7 +47,7 @@ export async function GET(
       return NextResponse.json({ error: 'Equipment not found' }, { status: 404 });
     }
 
-    return NextResponse.json(equipment);
+    return NextResponse.json(mapEquipmentToUi(equipment));
   } catch (error: any) {
     console.error('Error fetching equipment:', error);
     return NextResponse.json(
@@ -52,16 +72,16 @@ export async function PATCH(
     const body = await request.json();
 
     const equipment = await updateEquipment(id, {
-      modelNumber: body.modelNumber,
+      model: body.modelNumber,
       serialNumber: body.serialNumber,
-      location: body.location,
+      locationInProperty: body.location,
       notes: body.notes,
       specifications: body.specifications,
-      warrantyExpiration: body.warrantyExpiration ? new Date(body.warrantyExpiration) : undefined,
+      warrantyExpires: body.warrantyExpiration || undefined,
       status: body.status,
     });
 
-    return NextResponse.json(equipment);
+    return NextResponse.json(mapEquipmentToUi(equipment));
   } catch (error: any) {
     console.error('Error updating equipment:', error);
     return NextResponse.json(

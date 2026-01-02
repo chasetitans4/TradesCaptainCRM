@@ -153,8 +153,7 @@ export async function sendPushNotification(params: SendNotificationParams): Prom
           payload
         );
       } else if (sub.fcm_token) {
-        // FCM for mobile - log for now, would need firebase-admin
-        console.log(`FCM notification queued for ${sub.fcm_token}`);
+        // TODO: FCM for mobile - would need firebase-admin
       }
     } catch (error: any) {
       console.error(`Failed to send push to subscription ${sub.id}:`, error);
@@ -178,7 +177,6 @@ async function sendWebPush(
   payload: string
 ): Promise<void> {
   if (!isWebPushConfigured()) {
-    console.log('Web push not configured, skipping. Set VAPID keys in environment.');
     return;
   }
 
@@ -216,7 +214,7 @@ async function sendWebPush(
  */
 export async function getUserNotifications(
   userId: string,
-  options?: { unreadOnly?: boolean; limit?: number }
+  options?: { unreadOnly?: boolean; limit?: number; offset?: number }
 ): Promise<Notification[]> {
   const supabase = await createServerClient();
 
@@ -230,7 +228,12 @@ export async function getUserNotifications(
     query = query.is('read_at', null);
   }
 
-  if (options?.limit) {
+  if (typeof options?.offset === 'number') {
+    const limit = options?.limit || 20;
+    const start = options.offset;
+    const end = start + limit - 1;
+    query = query.range(start, end);
+  } else if (options?.limit) {
     query = query.limit(options.limit);
   }
 

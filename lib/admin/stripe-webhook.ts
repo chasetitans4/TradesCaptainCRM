@@ -1,18 +1,23 @@
 // =====================================================
 // ADMIN STRIPE WEBHOOK HANDLERS
 // Commission tracking for CRM and Web plan subscriptions
+// v5.9: Added payout scheduling with 1st/15th rule
 // =====================================================
 
 import Stripe from 'stripe';
 import { createAdminClient } from '@/lib/supabase/server';
+import { logApiError } from '@/lib/logger';
+import { PaymentTracking } from './types';
 import {
   createUpfrontCommission,
   createRecurringCommission,
   createAnnualCommission,
+  markCommissionEligible,
   forfeitSubscriptionCommissions,
   getCommissionRules,
   upsertRetentionTracking,
 } from './commissions';
+import { getNextPayoutDate } from './payout-scheduler';
 
 /**
  * Check if webhook event has already been processed
@@ -22,9 +27,15 @@ async function isEventProcessed(eventId: string): Promise<boolean> {
   const { data } = await supabase
     .from('processed_webhook_events')
     .select('id')
+    .eq('stripe_event_id', eventId)
+    .single();
+  if (data) return true;
+  const { data: alt } = await supabase
+    .from('processed_webhook_events')
+    .select('id')
     .eq('event_id', eventId)
     .single();
-  return !!data;
+  return !!alt;
 }
 
 /**
@@ -33,7 +44,7 @@ async function isEventProcessed(eventId: string): Promise<boolean> {
 async function markEventProcessed(eventId: string, eventType: string): Promise<void> {
   const supabase = createAdminClient();
   await supabase.from('processed_webhook_events').insert({
-    event_id: eventId,
+    stripe_event_id: eventId,
     event_type: eventType,
     processed_at: new Date().toISOString(),
   });
@@ -42,14 +53,14 @@ async function markEventProcessed(eventId: string, eventType: string): Promise<v
 /**
  * Get payment tracking for a subscription
  */
-async function getPaymentTracking(subscriptionId: string) {
+async function getPaymentTracking(subscriptionId: string): Promise<PaymentTracking | null> {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from('payment_tracking')
     .select('*')
     .eq('stripe_subscription_id', subscriptionId)
     .single();
-  return data;
+  return (data as PaymentTracking) || null;
 }
 
 /**
@@ -61,7 +72,7 @@ async function upsertPaymentTracking(data: {
   web_customer_id?: string;
   agent_id?: string;
   plan_type?: string;
-}) {
+}): Promise<PaymentTracking> {
   const existing = await getPaymentTracking(data.stripe_subscription_id);
 
   if (existing) {
@@ -82,7 +93,7 @@ async function upsertPaymentTracking(data: {
     .single();
 
   if (error) throw error;
-  return tracking;
+  return tracking as PaymentTracking;
 }
 
 /**
@@ -94,7 +105,6 @@ export async function handleAdminInvoicePaid(
 ): Promise<void> {
   // Check idempotency
   if (await isEventProcessed(eventId)) {
-    console.log(`Event ${eventId} already processed, skipping`);
     return;
   }
 
@@ -119,18 +129,16 @@ export async function handleAdminInvoicePaid(
   const accountType = crmAccount ? 'crm' : 'web';
 
   if (!account) {
-    console.log(`No account found for subscription ${subscriptionId}`);
     return;
   }
 
   if (!account.agent_id) {
-    console.log(`No agent assigned to account ${account.id}`);
     await markEventProcessed(eventId, 'invoice.paid');
     return;
   }
 
   // Get or create payment tracking
-  let tracking = await upsertPaymentTracking({
+  let tracking: PaymentTracking = await upsertPaymentTracking({
     stripe_subscription_id: subscriptionId,
     crm_account_id: crmAccount?.id,
     web_customer_id: webCustomer?.id,
@@ -143,7 +151,7 @@ export async function handleAdminInvoicePaid(
   const now = new Date().toISOString();
 
   // Update tracking record
-  const updateData: Record<string, any> = {
+  const updateData: Partial<PaymentTracking> & Record<string, any> = {
     successful_payments: paymentNumber,
     updated_at: now,
   };
@@ -155,12 +163,11 @@ export async function handleAdminInvoicePaid(
   // Get commission rules
   const rules = await getCommissionRules(
     account.plan_type,
-    account.plan_tier || 'individual',
-    account.billing_interval || 'month'
+    account.billing_interval || 'month',
+    account.plan_tier || undefined
   );
 
   if (!rules) {
-    console.log(`No commission rules found for ${account.plan_type}`);
     await supabase
       .from('payment_tracking')
       .update(updateData)
@@ -170,25 +177,50 @@ export async function handleAdminInvoicePaid(
   }
 
   const saleAmount = (invoice.amount_paid || 0) / 100;
+  const accountId = crmAccount?.id || webCustomer?.id;
 
-  // === UPFRONT COMMISSION ===
-  // Paid after N successful payments (usually 2)
-  if (paymentNumber === rules.upfront_delay_payments && rules.upfront_amount && rules.upfront_amount > 0) {
-    updateData.upfront_eligible = true;
+  // v5.9: Calculate payout date using 1st/15th schedule
+  const paymentDate = new Date(now);
+  const scheduledPayoutDate = getNextPayoutDate(paymentDate);
 
-    await createUpfrontCommission({
-      agentId: account.agent_id,
-      crmAccountId: crmAccount?.id,
-      webCustomerId: webCustomer?.id,
-      subscriptionId,
-      saleType: accountType,
-      planType: account.plan_type,
-      planTier: account.plan_tier,
-      billingInterval: account.billing_interval,
-      saleAmount,
-      upfrontAmount: rules.upfront_amount,
-      paymentNumber,
-    });
+  if (rules.upfront_amount && rules.upfront_amount > 0 && account.billing_interval !== 'year') {
+    if (paymentNumber === 1) {
+      try {
+        await createUpfrontCommission(
+          account.agent_id,
+          accountId as string,
+          accountType,
+          subscriptionId,
+          rules,
+          saleAmount,
+          new Date(now),
+          paymentDate,
+          scheduledPayoutDate
+        );
+      } catch (error) {
+        logApiError('POST', '/api/webhooks/stripe', error as Error);
+        throw error;
+      }
+    }
+    if (paymentNumber === rules.upfront_delay_payments) {
+      updateData.upfront_eligible = true;
+      try {
+        const { data: pending } = await supabase
+          .from('commissions')
+          .select('id')
+          .eq('stripe_subscription_id', subscriptionId)
+          .eq('commission_type', 'upfront')
+          .eq('status', 'pending')
+          .limit(1);
+        const commissionId = pending?.[0]?.id;
+        if (commissionId) {
+          await markCommissionEligible(commissionId);
+        }
+      } catch (error) {
+        logApiError('POST', '/api/webhooks/stripe', error as Error);
+        throw error;
+      }
+    }
   }
 
   // === RECURRING COMMISSION ===
@@ -202,19 +234,23 @@ export async function handleAdminInvoicePaid(
       updateData.recurring_end_payment = rules.recurring_end_payment;
     }
 
-    await createRecurringCommission({
-      agentId: account.agent_id,
-      crmAccountId: crmAccount?.id,
-      webCustomerId: webCustomer?.id,
-      subscriptionId,
-      saleType: accountType,
-      planType: account.plan_type,
-      planTier: account.plan_tier,
-      billingInterval: account.billing_interval,
-      saleAmount,
-      recurringRate: rules.recurring_rate,
-      paymentNumber,
-    });
+    try {
+      await createRecurringCommission(
+        account.agent_id,
+        accountId as string,
+        accountType,
+        subscriptionId,
+        rules,
+        saleAmount,
+        paymentNumber,
+        tracking.first_payment_at ? new Date(tracking.first_payment_at) : new Date(now),
+        paymentDate,
+        scheduledPayoutDate
+      );
+    } catch (error) {
+      logApiError('POST', '/api/webhooks/stripe', error as Error);
+      throw error;
+    }
   }
 
   // === ANNUAL ONE-TIME COMMISSION ===
@@ -223,28 +259,32 @@ export async function handleAdminInvoicePaid(
       paymentNumber === rules.upfront_delay_payments &&
       rules.annual_rate > 0) {
 
-    await createAnnualCommission({
-      agentId: account.agent_id,
-      crmAccountId: crmAccount?.id,
-      webCustomerId: webCustomer?.id,
-      subscriptionId,
-      saleType: accountType,
-      planType: account.plan_type,
-      planTier: account.plan_tier,
-      billingInterval: account.billing_interval,
-      saleAmount,
-      annualRate: rules.annual_rate,
-    });
+    try {
+      await createAnnualCommission(
+        account.agent_id,
+        accountId as string,
+        accountType,
+        subscriptionId,
+        rules,
+        saleAmount,
+        new Date(now),
+        paymentDate,
+        scheduledPayoutDate
+      );
+    } catch (error) {
+      logApiError('POST', '/api/webhooks/stripe', error as Error);
+      throw error;
+    }
   }
 
   // === RETENTION TRACKING ===
   // Create retention tracking after first payment
   if (paymentNumber === 1 && rules.retention_enabled) {
-    await upsertRetentionTracking({
-      crmAccountId: crmAccount?.id,
-      webCustomerId: webCustomer?.id,
-      agentId: account.agent_id,
-    });
+    if (crmAccount?.id) {
+      await upsertRetentionTracking(crmAccount.id, 'crm', account.agent_id, {});
+    } else if (webCustomer?.id) {
+      await upsertRetentionTracking(webCustomer.id, 'web', account.agent_id, {});
+    }
   }
 
   // Update tracking
@@ -254,7 +294,6 @@ export async function handleAdminInvoicePaid(
     .eq('id', tracking.id);
 
   await markEventProcessed(eventId, 'invoice.paid');
-  console.log(`Processed payment ${paymentNumber} for ${accountType} account ${account.id}`);
 }
 
 /**
@@ -266,7 +305,6 @@ export async function handleAdminSubscriptionDeleted(
 ): Promise<void> {
   // Check idempotency
   if (await isEventProcessed(eventId)) {
-    console.log(`Event ${eventId} already processed, skipping`);
     return;
   }
 
@@ -309,11 +347,10 @@ export async function handleAdminSubscriptionDeleted(
     }
 
     // Forfeit any pending commissions
-    await forfeitSubscriptionCommissions(subscriptionId, 'subscription_cancelled');
+    await forfeitSubscriptionCommissions(subscriptionId, 'customer_cancelled');
   }
 
   await markEventProcessed(eventId, 'customer.subscription.deleted');
-  console.log(`Processed subscription deletion: ${subscriptionId}`);
 }
 
 /**
@@ -325,7 +362,6 @@ export async function handleAdminSubscriptionUpdated(
 ): Promise<void> {
   // Check idempotency
   if (await isEventProcessed(eventId)) {
-    console.log(`Event ${eventId} already processed, skipping`);
     return;
   }
 
@@ -380,11 +416,11 @@ export async function handleAdminSubscriptionUpdated(
 
   // If subscription becomes past_due or canceled, forfeit pending commissions
   if (['past_due', 'canceled', 'unpaid'].includes(status)) {
-    await forfeitSubscriptionCommissions(subscriptionId, `subscription_${status}`);
+    const reason = status === 'canceled' ? 'customer_cancelled' : 'clawback';
+    await forfeitSubscriptionCommissions(subscriptionId, reason);
   }
 
   await markEventProcessed(eventId, 'customer.subscription.updated');
-  console.log(`Processed subscription update: ${subscriptionId} -> ${newStatus}`);
 }
 
 /**
@@ -396,7 +432,6 @@ export async function handleAdminInvoicePaymentFailed(
 ): Promise<void> {
   // Check idempotency
   if (await isEventProcessed(eventId)) {
-    console.log(`Event ${eventId} already processed, skipping`);
     return;
   }
 
@@ -430,7 +465,6 @@ export async function handleAdminInvoicePaymentFailed(
   }
 
   await markEventProcessed(eventId, 'invoice.payment_failed');
-  console.log(`Processed payment failure for subscription: ${subscriptionId}`);
 }
 
 /**
@@ -442,7 +476,6 @@ export async function handleAdminCheckoutCompleted(
 ): Promise<void> {
   // Check idempotency
   if (await isEventProcessed(eventId)) {
-    console.log(`Event ${eventId} already processed, skipping`);
     return;
   }
 
@@ -485,5 +518,4 @@ export async function handleAdminCheckoutCompleted(
   }
 
   await markEventProcessed(eventId, 'checkout.session.completed');
-  console.log(`Processed checkout completion: ${session.id}`);
 }

@@ -68,7 +68,9 @@ export async function POST(request: NextRequest) {
       twilio_sid: result.twilioSid,
     });
   } catch (error) {
-    console.error('Error sending SMS:', error);
+    import('@/lib/logger').then(({ logApiError }) => {
+      logApiError('POST', '/api/sms/send', error as Error);
+    });
     return NextResponse.json(
       { error: 'Failed to send SMS' },
       { status: 500 }

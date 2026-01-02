@@ -9,6 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { UserWithBusiness, Customer, Lead, User, JobStatus } from '@/types';
+
+// Partial user type for team member selection
+type TeamMember = Pick<User, 'id' | 'name' | 'role'>;
 import {
   ArrowLeft,
   User as UserIcon,
@@ -53,7 +56,7 @@ export default function NewJobPage() {
   const [searchingCustomers, setSearchingCustomers] = useState(false);
 
   // Team members for assignment
-  const [teamMembers, setTeamMembers] = useState<User[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
 
   // Lead data (if converting from lead)
   const [lead, setLead] = useState<Lead | null>(null);

@@ -1,3 +1,4 @@
+import 'openai/shims/node';
 // =====================================================
 // AI SMS AUTO-RESPONDER (OpenAI GPT-4)
 // =====================================================
@@ -5,6 +6,7 @@
 import OpenAI from 'openai';
 import { createAdminClient } from '@/lib/supabase/server';
 import { sendSMS, flagForHumanAttention, formatPhoneDisplay } from './sms';
+import { aiLogger } from '@/lib/logger';
 
 let _openai: OpenAI | null = null;
 
@@ -306,7 +308,12 @@ export async function handleIncomingWithAI(
 
     return { responded: true, response };
   } catch (error) {
-    console.error('Error generating AI response:', error);
+    aiLogger.error({
+      msg: 'Error generating AI response',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: 'Unknown error' },
+      conversationId,
+      businessId,
+    });
     return { responded: false, reason: 'ai_error' };
   }
 }

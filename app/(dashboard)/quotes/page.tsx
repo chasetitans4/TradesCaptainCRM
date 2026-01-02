@@ -32,7 +32,16 @@ interface Quote {
   customer: {
     id: string;
     name: string;
-  } | null;
+  } | { id: string; name: string }[] | null;
+}
+
+// Helper to get customer name from possibly array or object
+function getCustomerName(customer: Quote['customer']): string | undefined {
+  if (!customer) return undefined;
+  if (Array.isArray(customer)) {
+    return customer[0]?.name;
+  }
+  return customer.name;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string }> = {
@@ -108,7 +117,7 @@ export default function QuotesPage() {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       const matchesNumber = quote.quote_number?.toLowerCase().includes(query);
-      const matchesCustomer = quote.customer?.name?.toLowerCase().includes(query);
+      const matchesCustomer = getCustomerName(quote.customer)?.toLowerCase().includes(query);
       if (!matchesNumber && !matchesCustomer) {
         return false;
       }
@@ -240,7 +249,7 @@ export default function QuotesPage() {
                     )}
                   </div>
                   <p className="text-sm text-muted-foreground truncate">
-                    {quote.customer?.name || 'No customer'}
+                    {getCustomerName(quote.customer) || 'No customer'}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {formatRelativeDate(quote.sent_at || quote.created_at)}

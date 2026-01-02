@@ -178,15 +178,6 @@ export const NAVIGATION_MAP: NavigationRoute[] = [
     category: 'team',
   },
 
-  // Mileage
-  {
-    path: '/mileage',
-    label: 'Mileage',
-    description: 'Track vehicle mileage for jobs',
-    keywords: ['mileage', 'driving', 'vehicle', 'distance', 'travel'],
-    category: 'tracking',
-  },
-
   // Reports
   {
     path: '/reports',

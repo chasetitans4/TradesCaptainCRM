@@ -62,7 +62,7 @@ function sendToSentry(entry: LogEntry): void {
   if (entry.level === 'error' || entry.level === 'fatal') {
     Sentry.withScope((scope) => {
       if (entry.context) {
-        scope.setContext('log', entry.context);
+        scope.setContext('log', entry.context as Record<string, any>);
         if (entry.context.userId) {
           scope.setUser({ id: entry.context.userId });
         }

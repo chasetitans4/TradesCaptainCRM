@@ -2,9 +2,6 @@
 // NAVIGATION UTILITIES - Address Links & Maps
 // =====================================================
 
-/**
- * Get Google Maps navigation URL
- */
 export function getNavigationUrl(
   address: string,
   latitude?: number,
@@ -12,12 +9,12 @@ export function getNavigationUrl(
 ): string {
   // If we have coordinates, use them (more accurate)
   if (latitude && longitude) {
-    return `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+    return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&to=${latitude},${longitude}`;
   }
 
   // Fallback to address string
   const encoded = encodeURIComponent(address);
-  return `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
+  return `https://www.openstreetmap.org/search?query=${encoded}`;
 }
 
 /**
@@ -38,8 +35,20 @@ export function getAppleMapsUrl(
  * Detect if running on iOS
  */
 export function isIOS(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const candidates: any[] = [];
+  if (typeof globalThis !== 'undefined') candidates.push((globalThis as any).navigator);
+  // Node global for tests
+  // @ts-ignore
+  if (typeof global !== 'undefined') candidates.push((global as any).navigator);
+  if (typeof window !== 'undefined') candidates.push((window as any).navigator);
+  if (typeof navigator !== 'undefined') candidates.push(navigator as any);
+  for (const nav of candidates) {
+    const ua = nav?.userAgent;
+    if (typeof ua === 'string' && /iPad|iPhone|iPod/i.test(ua)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -50,7 +59,11 @@ export function getSmartNavigationUrl(
   latitude?: number,
   longitude?: number
 ): string {
-  if (isIOS()) {
+  const ua: string =
+    (typeof global !== 'undefined' && (global as any).navigator?.userAgent) ||
+    (typeof globalThis !== 'undefined' && (globalThis as any).navigator?.userAgent) ||
+    (typeof navigator !== 'undefined' ? (navigator as any).userAgent : '');
+  if (typeof ua === 'string' && /iPad|iPhone|iPod/i.test(ua)) {
     return getAppleMapsUrl(address, latitude, longitude);
   }
   return getNavigationUrl(address, latitude, longitude);

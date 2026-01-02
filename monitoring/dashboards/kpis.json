@@ -1,0 +1,11 @@
+{
+  "title": "CRM KPIs",
+  "panels": [
+    { "type": "stat", "title": "Leads Captured", "query": "kpi_leads_captured" },
+    { "type": "stat", "title": "Conversion Rate", "query": "kpi_conversion_rate" },
+    { "type": "stat", "title": "MRR", "query": "kpi_mrr" },
+    { "type": "stat", "title": "Churn Rate", "query": "kpi_churn_rate" },
+    { "type": "graph", "title": "p95 Latency", "query": "apm_latency_p95" },
+    { "type": "graph", "title": "Error Rate", "query": "apm_error_rate" }
+  ]
+}

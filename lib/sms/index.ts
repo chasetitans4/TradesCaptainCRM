@@ -20,7 +20,6 @@ export interface SendSmsResult {
 
 export async function sendSms({ to, body }: SendSmsParams): Promise<SendSmsResult> {
   if (!client || !fromNumber) {
-    console.warn('Twilio not configured - SMS not sent');
     return {
       success: false,
       error: 'Twilio not configured'

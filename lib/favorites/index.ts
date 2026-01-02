@@ -216,7 +216,9 @@ async function enrichFavorites(favorites: Favorite[]): Promise<Favorite[]> {
       .select(`id, ${nameField}`)
       .in('id', ids);
 
-    const entityMap = new Map(entities?.map((e) => [e.id, e]) || []);
+    const entityMap = new Map<string, Record<string, any>>(
+      (entities as Array<Record<string, any>> | undefined)?.map((e) => [String(e.id), e]) || []
+    );
 
     for (const item of items) {
       const entity = entityMap.get(item.entity_id);
@@ -224,8 +226,8 @@ async function enrichFavorites(favorites: Favorite[]): Promise<Favorite[]> {
         ...item,
         entity: entity
           ? {
-              id: entity.id,
-              name: entity[nameField],
+              id: String(entity.id),
+              name: entity[nameField] as string | undefined,
             }
           : undefined,
       });
@@ -338,7 +340,9 @@ async function enrichRecentlyViewed(
       .select(`id, ${nameField}`)
       .in('id', ids);
 
-    const entityMap = new Map(entities?.map((e) => [e.id, e]) || []);
+    const entityMap = new Map<string, Record<string, any>>(
+      (entities as Array<Record<string, any>> | undefined)?.map((e) => [String(e.id), e]) || []
+    );
 
     for (const item of typeItems) {
       const entity = entityMap.get(item.entity_id);
@@ -346,8 +350,8 @@ async function enrichRecentlyViewed(
         ...item,
         entity: entity
           ? {
-              id: entity.id,
-              name: entity[nameField],
+              id: String(entity.id),
+              name: entity[nameField] as string | undefined,
             }
           : undefined,
       });

@@ -19,6 +19,7 @@ import {
   User,
   FileText,
   ExternalLink,
+  Phone,
 } from 'lucide-react';
 import {
   getChecklistForPlan,
@@ -73,16 +74,20 @@ const DEMO_CLIENTS = [
 ];
 
 const TRACK_ICONS: Record<PlanTrack, React.ElementType> = {
+  leads_captain: Phone,
   blue: Building2,
   web: Globe,
   seo: Search,
+  silver: Layers,
   gold: Layers,
 };
 
 const TRACK_COLORS: Record<PlanTrack, string> = {
+  leads_captain: 'text-cyan-600 bg-cyan-50',
   blue: 'text-blue-600 bg-blue-50',
   web: 'text-purple-600 bg-purple-50',
   seo: 'text-green-600 bg-green-50',
+  silver: 'text-gray-600 bg-gray-50',
   gold: 'text-yellow-600 bg-yellow-50',
 };
 

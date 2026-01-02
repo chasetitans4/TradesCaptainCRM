@@ -12,6 +12,7 @@ const alertVariants = cva(
         success: 'bg-success/10 text-success border-success/20 [&>svg]:text-success',
         warning: 'bg-warning/10 text-warning border-warning/20 [&>svg]:text-warning',
         danger: 'bg-danger/10 text-danger border-danger/20 [&>svg]:text-danger',
+        destructive: 'bg-danger/10 text-danger border-danger/20 [&>svg]:text-danger',
         info: 'bg-info/10 text-info border-info/20 [&>svg]:text-info',
       },
     },
@@ -30,6 +31,7 @@ const Alert = React.forwardRef<
     success: CheckCircle2,
     warning: AlertCircle,
     danger: XCircle,
+    destructive: XCircle,
     info: Info,
   }[variant || 'default'];
 

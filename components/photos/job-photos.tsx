@@ -185,7 +185,7 @@ export function JobPhotos({ jobId, initialPhotos, readOnly = false }: JobPhotosP
                 </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {photoList.map((photo) => (
+                  {photoList.map((photo: JobPhoto) => (
                     <div
                       key={photo.id}
                       className="relative group cursor-pointer"

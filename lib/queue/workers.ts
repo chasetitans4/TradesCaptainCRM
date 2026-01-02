@@ -3,12 +3,12 @@
 // Background job processors
 // =====================================================
 
-import { Worker, Job } from 'bullmq';
+import { Worker, Job, type ConnectionOptions } from 'bullmq';
 
 // Get connection config
-const getConnection = () => {
+const getConnection = (): ConnectionOptions => {
   if (process.env.REDIS_URL) {
-    return process.env.REDIS_URL;
+    return { url: process.env.REDIS_URL };
   }
 
   return {
@@ -36,10 +36,12 @@ export const emailWorker = new Worker(
       text,
     });
 
-    // Log the email send
-    console.log(`Email sent to ${to}: ${subject}`);
-
-    return { sent: true, to, messageId: result?.id };
+    return {
+      sent: result.success,
+      to,
+      messageId: result.success ? (result.data as any)?.id : undefined,
+      error: result.success ? undefined : (result.error as any)?.message || result.error,
+    };
   },
   {
     connection: getConnection(),
@@ -65,11 +67,9 @@ export const smsWorker = new Worker(
     // Regular SMS
     const { sendSMS } = await import('@/lib/twilio');
 
-    const result = await sendSMS(to, message, businessId, customerId);
+    const result = await sendSMS({ to, body: message, businessId });
 
-    console.log(`SMS sent to ${to}`);
-
-    return { sent: true, sid: result.sid };
+    return { sent: true, twilioSid: result.twilioSid };
   },
   {
     connection: getConnection(),
@@ -142,20 +142,28 @@ export const syncWorker = new Worker(
     const { businessId, entityType, entityId, userId, action, jobId: relatedJobId } = job.data;
 
     if (job.name === 'sync_quickbooks') {
-      const { syncEntityToQuickBooks } = await import('@/lib/quickbooks/sync');
-      await syncEntityToQuickBooks(businessId, entityType, entityId);
+      const qbSync = await import('@/lib/quickbooks/sync');
+      // Sync based on entity type
+      if (entityType === 'customer') {
+        await qbSync.syncCustomerToQuickBooks(businessId, entityId);
+      } else if (entityType === 'invoice') {
+        await qbSync.syncInvoiceToQuickBooks(businessId, entityId);
+      } else if (entityType === 'payment') {
+        await qbSync.syncPaymentToQuickBooks(businessId, entityId);
+      } else if (entityType === 'expense') {
+        await qbSync.syncReceiptToQuickBooks(businessId, entityId);
+      }
       return { synced: true, type: 'quickbooks', entityType, entityId };
     }
 
     if (job.name === 'full_quickbooks_sync') {
-      const { performFullSync } = await import('@/lib/quickbooks/sync');
-      const result = await performFullSync(businessId);
+      const qbSync = await import('@/lib/quickbooks/sync');
+      const result = await qbSync.syncAllToQuickBooks(businessId);
       return { synced: true, type: 'full_quickbooks', ...result };
     }
 
     if (job.name === 'sync_calendar') {
       // Calendar sync logic would go here
-      console.log(`Calendar sync: ${action} for job ${relatedJobId}`);
       return { synced: true, type: 'calendar', action };
     }
 
@@ -177,10 +185,9 @@ export const reminderWorker = new Worker(
       const { to, message, businessId, customerId, jobId } = job.data;
 
       const { sendSMS } = await import('@/lib/twilio');
-      const result = await sendSMS(to, message, businessId, customerId);
+      const result = await sendSMS({ to, body: message, businessId });
 
-      console.log(`Appointment reminder sent for job ${jobId}`);
-      return { sent: true, type: 'appointment', sid: result.sid };
+      return { sent: true, type: 'appointment', twilioSid: result.twilioSid };
     }
 
     if (job.name === 'lead_follow_up') {
@@ -214,9 +221,6 @@ export const reportWorker = new Worker(
   'report',
   async (job: Job) => {
     const { businessId, reportType, params, userId, schedule } = job.data;
-
-    // Report generation logic would go here
-    console.log(`Generating ${reportType} report for business ${businessId}`);
 
     // Example: Generate and store report
     // const report = await generateReport(businessId, reportType, params);
@@ -290,21 +294,12 @@ const workers = [
 ];
 
 workers.forEach(worker => {
-  worker.on('completed', (job) => {
-    console.log(`✅ Job ${job.id} (${job.name}) completed`);
+  worker.on('failed', (job: Job | undefined, err: Error) => {
+    console.error(`Job ${job?.id} (${job?.name}) failed:`, err.message);
   });
 
-  worker.on('failed', (job, err) => {
-    console.error(`❌ Job ${job?.id} (${job?.name}) failed:`, err.message);
-    // Could send to Sentry here
-  });
-
-  worker.on('error', (err) => {
+  worker.on('error', (err: Error) => {
     console.error('Worker error:', err);
-  });
-
-  worker.on('stalled', (jobId) => {
-    console.warn(`⚠️ Job ${jobId} stalled`);
   });
 });
 
@@ -313,7 +308,6 @@ workers.forEach(worker => {
 // =====================================================
 export async function closeWorkers(): Promise<void> {
   await Promise.all(workers.map(w => w.close()));
-  console.log('All workers closed');
 }
 
 // Export workers for direct access if needed

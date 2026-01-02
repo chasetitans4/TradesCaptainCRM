@@ -18,8 +18,13 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const stats = searchParams.get('stats') === 'true';
-    const days = parseInt(searchParams.get('days') || '30');
-    const limit = parseInt(searchParams.get('limit') || '20');
+
+    // Validate and bound query parameters to prevent DoS
+    const daysParam = parseInt(searchParams.get('days') || '30', 10);
+    const days = Math.min(Math.max(isNaN(daysParam) ? 30 : daysParam, 1), 365);
+
+    const limitParam = parseInt(searchParams.get('limit') || '20', 10);
+    const limit = Math.min(Math.max(isNaN(limitParam) ? 20 : limitParam, 1), 100);
 
     if (stats) {
       const surveyStats = await getSurveyStats(profile.business_id, days);

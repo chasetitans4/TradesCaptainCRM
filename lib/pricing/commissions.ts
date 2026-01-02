@@ -1,251 +1,248 @@
 // =====================================================
-// TRADESCAPTAIN COMMISSION TRACKING - v5
+// TRADESCAPTAIN COMMISSION TRACKING - v5.9
 // Complete commission rates for all plans
 // =====================================================
+//
+// Commission Structure:
+// - Upfront: 50% of monthly price (after 2nd payment clears)
+// - Recurring (Months 3-5): 10% of monthly price
+// - Recurring (Months 6-14): 15% of monthly price (LOCKED)
+// - Annual: 35% of annual price
+//
+// Retention Bonuses:
+// - Month 3 Check-In: $15 (call logged + satisfaction audit sent)
+// - Month 4 Retained: $25 (customer's 4th payment processed)
+// - Month 6 Retained: $50 (customer still active + rate bumps to 15%)
+// - Month 12 Retained: $100 (customer still active)
+// - Total Possible: $190 per customer (monthly plans only)
+//
+// Payout Schedule: 1st and 15th of every month
+// Same-Day Rule: Commission cannot be paid same day as client payment
+// =====================================================
 
-import type { PlanTrack, PlanTier, PlanType } from './plans';
+import type { PlanTrack } from './plans';
 
 export interface CommissionRate {
   plan_id: string;
   monthly_price: number;
-  upfront_commission: number; // Paid after Month 2
-  recurring_commission: number; // Per month, Months 3-14
-  max_recurring_total: number; // 12 months of recurring
-  max_with_retention: number; // Including retention bonuses
+  upfront_commission: number; // 50% - Paid after Month 2
+  recurring_10_commission: number; // 10% per month (Months 3-5)
+  recurring_15_commission: number; // 15% per month (Months 6-14)
   annual_price: number;
   annual_commission: number; // 35% of annual price
 }
 
 // =====================================================
-// BLUE PLAN COMMISSIONS (Monthly)
+// LEADS CAPTAIN COMMISSIONS - v5.9
+// =====================================================
+
+export const LEADS_CAPTAIN_COMMISSIONS: CommissionRate[] = [
+  {
+    plan_id: 'leads_captain',
+    monthly_price: 39,
+    upfront_commission: 19.50, // 50%
+    recurring_10_commission: 3.90, // 10% (Months 3-5)
+    recurring_15_commission: 5.85, // 15% (Months 6-14)
+    annual_price: 398,
+    annual_commission: 139, // 35%
+  },
+];
+
+// =====================================================
+// BLUE CRM COMMISSIONS - v5.9
 // =====================================================
 
 export const BLUE_COMMISSIONS: CommissionRate[] = [
   {
     plan_id: 'blue_starter',
     monthly_price: 49,
-    upfront_commission: 25, // 50% rounded
-    recurring_commission: 4.90, // 10%
-    max_recurring_total: 58.80, // 12 months
-    max_with_retention: 273.80,
-    annual_price: 441,
-    annual_commission: 154, // 35%
+    upfront_commission: 24.50, // 50%
+    recurring_10_commission: 4.90, // 10%
+    recurring_15_commission: 7.35, // 15%
+    annual_price: 500,
+    annual_commission: 175, // 35%
   },
   {
     plan_id: 'blue_pro',
     monthly_price: 99,
-    upfront_commission: 50,
-    recurring_commission: 9.90,
-    max_recurring_total: 118.80,
-    max_with_retention: 358.80,
-    annual_price: 891,
-    annual_commission: 312,
+    upfront_commission: 49.50, // 50%
+    recurring_10_commission: 9.90, // 10%
+    recurring_15_commission: 14.85, // 15%
+    annual_price: 1010,
+    annual_commission: 354, // 35%
   },
   {
     plan_id: 'blue_enterprise',
     monthly_price: 199,
-    upfront_commission: 100,
-    recurring_commission: 19.90,
-    max_recurring_total: 238.80,
-    max_with_retention: 528.80,
-    annual_price: 1791,
-    annual_commission: 627,
-  },
-  {
-    plan_id: 'blue_starter_teams',
-    monthly_price: 149,
-    upfront_commission: 75,
-    recurring_commission: 14.90,
-    max_recurring_total: 178.80,
-    max_with_retention: 443.80,
-    annual_price: 1341,
-    annual_commission: 469,
-  },
-  {
-    plan_id: 'blue_pro_teams',
-    monthly_price: 199,
-    upfront_commission: 100,
-    recurring_commission: 19.90,
-    max_recurring_total: 238.80,
-    max_with_retention: 528.80,
-    annual_price: 1791,
-    annual_commission: 627,
-  },
-  {
-    plan_id: 'blue_enterprise_teams',
-    monthly_price: 399,
-    upfront_commission: 200,
-    recurring_commission: 39.90,
-    max_recurring_total: 478.80,
-    max_with_retention: 868.80,
-    annual_price: 3591,
-    annual_commission: 1257,
+    upfront_commission: 99.50, // 50%
+    recurring_10_commission: 19.90, // 10%
+    recurring_15_commission: 29.85, // 15%
+    annual_price: 2030,
+    annual_commission: 711, // 35%
   },
 ];
 
 // =====================================================
-// WEB PLAN COMMISSIONS (Monthly)
+// WEB COMMISSIONS - v5.9
 // =====================================================
 
 export const WEB_COMMISSIONS: CommissionRate[] = [
   {
     plan_id: 'web_starter',
-    monthly_price: 149,
-    upfront_commission: 75,
-    recurring_commission: 14.90,
-    max_recurring_total: 178.80,
-    max_with_retention: 443.80,
-    annual_price: 1341,
-    annual_commission: 469,
+    monthly_price: 199,
+    upfront_commission: 99.50, // 50%
+    recurring_10_commission: 19.90, // 10%
+    recurring_15_commission: 29.85, // 15%
+    annual_price: 2030,
+    annual_commission: 711, // 35%
   },
   {
     plan_id: 'web_pro',
-    monthly_price: 249,
-    upfront_commission: 125,
-    recurring_commission: 24.90,
-    max_recurring_total: 298.80,
-    max_with_retention: 613.80,
-    annual_price: 2241,
-    annual_commission: 784,
+    monthly_price: 299,
+    upfront_commission: 149.50, // 50%
+    recurring_10_commission: 29.90, // 10%
+    recurring_15_commission: 44.85, // 15%
+    annual_price: 3050,
+    annual_commission: 1068, // 35%
   },
   {
     plan_id: 'web_enterprise',
-    monthly_price: 349,
-    upfront_commission: 175,
-    recurring_commission: 34.90,
-    max_recurring_total: 418.80,
-    max_with_retention: 783.80,
-    annual_price: 3141,
-    annual_commission: 1099,
+    monthly_price: 499,
+    upfront_commission: 249.50, // 50%
+    recurring_10_commission: 49.90, // 10%
+    recurring_15_commission: 74.85, // 15%
+    annual_price: 5090,
+    annual_commission: 1782, // 35%
   },
 ];
 
 // =====================================================
-// LOCAL SEO PLAN COMMISSIONS (Monthly) - NEW
+// LOCAL SEO COMMISSIONS - v5.9
 // =====================================================
 
 export const SEO_COMMISSIONS: CommissionRate[] = [
   {
     plan_id: 'seo_starter',
     monthly_price: 99,
-    upfront_commission: 50,
-    recurring_commission: 9.90,
-    max_recurring_total: 118.80,
-    max_with_retention: 358.80,
-    annual_price: 891,
-    annual_commission: 312,
+    upfront_commission: 49.50, // 50%
+    recurring_10_commission: 9.90, // 10%
+    recurring_15_commission: 14.85, // 15%
+    annual_price: 1010,
+    annual_commission: 354, // 35%
   },
   {
     plan_id: 'seo_pro',
-    monthly_price: 149,
-    upfront_commission: 75,
-    recurring_commission: 14.90,
-    max_recurring_total: 178.80,
-    max_with_retention: 443.80,
-    annual_price: 1341,
-    annual_commission: 469,
+    monthly_price: 199,
+    upfront_commission: 99.50, // 50%
+    recurring_10_commission: 19.90, // 10%
+    recurring_15_commission: 29.85, // 15%
+    annual_price: 2030,
+    annual_commission: 711, // 35%
   },
   {
     plan_id: 'seo_enterprise',
-    monthly_price: 199,
-    upfront_commission: 100,
-    recurring_commission: 19.90,
-    max_recurring_total: 238.80,
-    max_with_retention: 528.80,
-    annual_price: 1791,
-    annual_commission: 627,
+    monthly_price: 249,
+    upfront_commission: 124.50, // 50%
+    recurring_10_commission: 24.90, // 10%
+    recurring_15_commission: 37.35, // 15%
+    annual_price: 2540,
+    annual_commission: 889, // 35%
   },
 ];
 
 // =====================================================
-// GOLD PLAN COMMISSIONS (Monthly) - UPDATED PRICING
+// SILVER BUNDLE COMMISSIONS - v5.9
+// =====================================================
+
+export const SILVER_COMMISSIONS: CommissionRate[] = [
+  {
+    plan_id: 'silver_starter',
+    monthly_price: 249,
+    upfront_commission: 124.50, // 50%
+    recurring_10_commission: 24.90, // 10%
+    recurring_15_commission: 37.35, // 15%
+    annual_price: 2540,
+    annual_commission: 889, // 35%
+  },
+  {
+    plan_id: 'silver_pro',
+    monthly_price: 349,
+    upfront_commission: 174.50, // 50%
+    recurring_10_commission: 34.90, // 10%
+    recurring_15_commission: 52.35, // 15%
+    annual_price: 3560,
+    annual_commission: 1246, // 35%
+  },
+  {
+    plan_id: 'silver_enterprise',
+    monthly_price: 499,
+    upfront_commission: 249.50, // 50%
+    recurring_10_commission: 49.90, // 10%
+    recurring_15_commission: 74.85, // 15%
+    annual_price: 5090,
+    annual_commission: 1782, // 35%
+  },
+];
+
+// =====================================================
+// GOLD BUNDLE COMMISSIONS - v5.9
 // =====================================================
 
 export const GOLD_COMMISSIONS: CommissionRate[] = [
   {
     plan_id: 'gold_starter',
-    monthly_price: 249, // Updated from $199
-    upfront_commission: 125, // 50% of new price
-    recurring_commission: 24.90, // 10% of new price
-    max_recurring_total: 298.80,
-    max_with_retention: 613.80,
-    annual_price: 2241,
-    annual_commission: 784, // 35%
+    monthly_price: 299,
+    upfront_commission: 149.50, // 50%
+    recurring_10_commission: 29.90, // 10%
+    recurring_15_commission: 44.85, // 15%
+    annual_price: 3050,
+    annual_commission: 1068, // 35%
   },
   {
     plan_id: 'gold_pro',
-    monthly_price: 399, // Updated from $349
-    upfront_commission: 200,
-    recurring_commission: 39.90,
-    max_recurring_total: 478.80,
-    max_with_retention: 868.80,
-    annual_price: 3591,
-    annual_commission: 1257,
+    monthly_price: 399,
+    upfront_commission: 199.50, // 50%
+    recurring_10_commission: 39.90, // 10%
+    recurring_15_commission: 59.85, // 15%
+    annual_price: 4070,
+    annual_commission: 1425, // 35%
   },
   {
     plan_id: 'gold_enterprise',
-    monthly_price: 549, // Updated from $499
-    upfront_commission: 275,
-    recurring_commission: 54.90,
-    max_recurring_total: 658.80,
-    max_with_retention: 1123.80,
-    annual_price: 4941,
-    annual_commission: 1729,
-  },
-  {
-    plan_id: 'gold_starter_teams',
-    monthly_price: 349, // Updated from $299
-    upfront_commission: 175,
-    recurring_commission: 34.90,
-    max_recurring_total: 418.80,
-    max_with_retention: 783.80,
-    annual_price: 3141,
-    annual_commission: 1099,
-  },
-  {
-    plan_id: 'gold_pro_teams',
-    monthly_price: 499, // Updated from $449
-    upfront_commission: 250,
-    recurring_commission: 49.90,
-    max_recurring_total: 598.80,
-    max_with_retention: 1038.80,
-    annual_price: 4491,
-    annual_commission: 1572,
-  },
-  {
-    plan_id: 'gold_enterprise_teams',
-    monthly_price: 799, // Updated from $749
-    upfront_commission: 400,
-    recurring_commission: 79.90,
-    max_recurring_total: 958.80,
-    max_with_retention: 1548.80,
-    annual_price: 7191,
-    annual_commission: 2517,
+    monthly_price: 598,
+    upfront_commission: 299.00, // 50%
+    recurring_10_commission: 59.80, // 10%
+    recurring_15_commission: 89.70, // 15%
+    annual_price: 6100,
+    annual_commission: 2135, // 35%
   },
 ];
 
 // =====================================================
-// ADD-ON COMMISSIONS
+// ADD-ON COMMISSIONS - v5.9
 // =====================================================
 
 export const ADDON_COMMISSIONS = {
-  gbp_setup: {
-    addon_id: 'gbp_setup',
+  background_video: {
+    addon_id: 'background_video',
     price: 99,
     commission: 35, // Flat rate
     billing_type: 'one_time' as const,
-    notes: 'Paid when customer payment clears. Only available with Web plans.',
+    notes: 'Paid when customer payment clears.',
   },
-  extra_location: {
-    addon_id: 'extra_location',
-    monthly_price: 199,
-    upfront_commission: 100,
-    recurring_commission: 19.90,
-    max_recurring_total: 238.80,
-    max_with_retention: 528.80,
-    annual_price: 1791,
-    annual_commission: 627, // 35%
-    notes: 'Same commission structure as plans. Credited to original agent if sold within 12 months.',
+  textual_page_update: {
+    addon_id: 'textual_page_update',
+    price: 29,
+    commission: 10, // Flat rate
+    billing_type: 'one_time' as const,
+    notes: 'Per-page basis.',
+  },
+  design_page_update: {
+    addon_id: 'design_page_update',
+    price: 69,
+    commission: 24, // Flat rate
+    billing_type: 'one_time' as const,
+    notes: 'Per-page basis.',
   },
 };
 
@@ -264,32 +261,35 @@ export const REFERRAL_BONUS = {
 };
 
 // =====================================================
-// RETENTION BONUSES (for monthly billing)
+// RETENTION BONUSES - v5.9
+// (For monthly billing only)
 // =====================================================
 
 export interface RetentionBonus {
   month: number;
-  bonus_percent: number;
-  description: string;
+  bonus_amount: number;
+  requirement: string;
 }
 
 export const RETENTION_BONUSES: RetentionBonus[] = [
-  { month: 6, bonus_percent: 5, description: '5% of monthly rate at 6-month retention' },
-  { month: 9, bonus_percent: 5, description: '5% of monthly rate at 9-month retention' },
-  { month: 12, bonus_percent: 5, description: '5% of monthly rate at 12-month retention' },
-  { month: 14, bonus_percent: 0, description: '$65 flat bonus at 14-month mark (end of commission period)' },
+  { month: 3, bonus_amount: 15, requirement: 'Call logged + satisfaction audit sent' },
+  { month: 4, bonus_amount: 25, requirement: "Customer's 4th payment processed" },
+  { month: 6, bonus_amount: 50, requirement: 'Customer still active + rate bumps to 15%' },
+  { month: 12, bonus_amount: 100, requirement: 'Customer still active at Month 12' },
 ];
 
-export const RETENTION_BONUS_M14_FLAT = 65;
+export const RETENTION_BONUS_TOTAL = 190; // Max possible per customer
 
 // =====================================================
 // HELPER FUNCTIONS
 // =====================================================
 
 export const ALL_COMMISSIONS: CommissionRate[] = [
+  ...LEADS_CAPTAIN_COMMISSIONS,
   ...BLUE_COMMISSIONS,
   ...WEB_COMMISSIONS,
   ...SEO_COMMISSIONS,
+  ...SILVER_COMMISSIONS,
   ...GOLD_COMMISSIONS,
 ];
 
@@ -299,12 +299,25 @@ export function getCommissionRate(planId: string): CommissionRate | undefined {
 
 export function getCommissionsByTrack(track: PlanTrack): CommissionRate[] {
   switch (track) {
+    case 'leads_captain': return LEADS_CAPTAIN_COMMISSIONS;
     case 'blue': return BLUE_COMMISSIONS;
     case 'web': return WEB_COMMISSIONS;
     case 'seo': return SEO_COMMISSIONS;
+    case 'silver': return SILVER_COMMISSIONS;
     case 'gold': return GOLD_COMMISSIONS;
     default: return [];
   }
+}
+
+/**
+ * Calculate recurring commission based on month number
+ * Months 3-5: 10%
+ * Months 6-14: 15% (LOCKED)
+ */
+export function getRecurringCommissionForMonth(rate: CommissionRate, month: number): number {
+  if (month < 3 || month > 14) return 0;
+  if (month <= 5) return rate.recurring_10_commission;
+  return rate.recurring_15_commission;
 }
 
 export function calculateUpgradeCommission(
@@ -321,27 +334,26 @@ export function calculateUpgradeCommission(
   const priceDifference = newRate.monthly_price - oldRate.monthly_price;
 
   // Upfront on difference: 50%
-  const upfront = Math.round(priceDifference * 0.5);
+  const upfront = Math.round(priceDifference * 0.5 * 100) / 100;
 
-  // Recurring on difference: 10% for remaining months (up to Month 14)
-  const remainingMonths = Math.max(0, 14 - monthsSinceOriginalSale);
-  const remainingRecurring = Math.round(priceDifference * 0.1 * remainingMonths * 100) / 100;
+  // Calculate remaining recurring based on where we are in the commission period
+  let remainingRecurring = 0;
+  for (let m = monthsSinceOriginalSale + 1; m <= 14; m++) {
+    const recurringRate = m <= 5 ? 0.10 : 0.15;
+    remainingRecurring += priceDifference * recurringRate;
+  }
+  remainingRecurring = Math.round(remainingRecurring * 100) / 100;
 
   return {
     upfront,
     remainingRecurring,
-    total: upfront + remainingRecurring,
+    total: Math.round((upfront + remainingRecurring) * 100) / 100,
   };
 }
 
-export function calculateRetentionBonus(monthlyPrice: number, monthNumber: number): number {
-  if (monthNumber === 6 || monthNumber === 9 || monthNumber === 12) {
-    return Math.round(monthlyPrice * 0.05 * 100) / 100;
-  }
-  if (monthNumber === 14) {
-    return RETENTION_BONUS_M14_FLAT;
-  }
-  return 0;
+export function calculateRetentionBonus(monthNumber: number): number {
+  const bonus = RETENTION_BONUSES.find(b => b.month === monthNumber);
+  return bonus?.bonus_amount || 0;
 }
 
 export function calculateTotalPotentialCommission(
@@ -356,20 +368,26 @@ export function calculateTotalPotentialCommission(
     return rate.annual_commission;
   }
 
+  // Monthly: upfront + 3 months at 10% + 9 months at 15%
+  const upfront = rate.upfront_commission;
+  const recurring10 = rate.recurring_10_commission * 3; // Months 3-5
+  const recurring15 = rate.recurring_15_commission * 9; // Months 6-14
+  const recurringTotal = recurring10 + recurring15;
+
   if (includeRetention) {
-    return rate.max_with_retention;
+    return Math.round((upfront + recurringTotal + RETENTION_BONUS_TOTAL) * 100) / 100;
   }
 
-  return rate.upfront_commission + rate.max_recurring_total;
+  return Math.round((upfront + recurringTotal) * 100) / 100;
 }
 
 // =====================================================
-// COMMISSION PAYMENT SCHEDULE
+// COMMISSION PAYMENT SCHEDULE - v5.9
 // =====================================================
 
 export interface CommissionScheduleEntry {
   month: number;
-  type: 'upfront' | 'recurring' | 'retention' | 'annual';
+  type: 'upfront' | 'recurring_10' | 'recurring_15' | 'retention' | 'annual';
   amount: number;
   description: string;
   condition: string;
@@ -396,6 +414,7 @@ export function generateCommissionSchedule(
   }
 
   // Monthly schedule
+  // Upfront (after Month 2)
   schedule.push({
     month: 2,
     type: 'upfront',
@@ -404,36 +423,75 @@ export function generateCommissionSchedule(
     condition: 'After Month 2 payment clears',
   });
 
-  // Recurring Months 3-14
-  for (let m = 3; m <= 14; m++) {
+  // Recurring Months 3-5 at 10%
+  for (let m = 3; m <= 5; m++) {
     schedule.push({
       month: m,
-      type: 'recurring',
-      amount: rate.recurring_commission,
+      type: 'recurring_10',
+      amount: rate.recurring_10_commission,
       description: `Recurring commission (10% of $${rate.monthly_price})`,
       condition: `Month ${m} payment clears`,
     });
   }
 
-  // Retention bonuses
-  [6, 9, 12].forEach(m => {
-    const bonus = Math.round(rate.monthly_price * 0.05 * 100) / 100;
+  // Recurring Months 6-14 at 15% (LOCKED)
+  for (let m = 6; m <= 14; m++) {
     schedule.push({
       month: m,
-      type: 'retention',
-      amount: bonus,
-      description: `Retention bonus (5% of $${rate.monthly_price})`,
-      condition: `Customer active at Month ${m}`,
+      type: 'recurring_15',
+      amount: rate.recurring_15_commission,
+      description: `Recurring commission (15% of $${rate.monthly_price}) - LOCKED`,
+      condition: `Month ${m} payment clears`,
     });
-  });
+  }
 
-  schedule.push({
-    month: 14,
-    type: 'retention',
-    amount: RETENTION_BONUS_M14_FLAT,
-    description: 'Final retention bonus ($65 flat)',
-    condition: 'Customer active at Month 14',
-  });
+  // Retention bonuses
+  for (const bonus of RETENTION_BONUSES) {
+    schedule.push({
+      month: bonus.month,
+      type: 'retention',
+      amount: bonus.bonus_amount,
+      description: `Retention bonus ($${bonus.bonus_amount})`,
+      condition: bonus.requirement,
+    });
+  }
 
   return schedule.sort((a, b) => a.month - b.month);
+}
+
+// =====================================================
+// MULTI-LOCATION PRICING - v5.9
+// =====================================================
+
+export const MULTI_LOCATION_DISCOUNTS = {
+  '2-4': 0.10, // 10% off additional locations
+  '5-9': 0.15, // 15% off additional locations
+  '10+': 'custom', // Custom pricing - contact sales
+};
+
+export function calculateMultiLocationPrice(
+  basePrice: number,
+  locationCount: number
+): { perLocation: number; total: number; discount: number } {
+  if (locationCount <= 1) {
+    return { perLocation: basePrice, total: basePrice, discount: 0 };
+  }
+
+  let discountRate = 0;
+  if (locationCount >= 2 && locationCount <= 4) {
+    discountRate = 0.10;
+  } else if (locationCount >= 5 && locationCount <= 9) {
+    discountRate = 0.15;
+  }
+  // 10+ requires custom pricing
+
+  const additionalLocations = locationCount - 1;
+  const discountedPrice = basePrice * (1 - discountRate);
+  const total = basePrice + discountedPrice * additionalLocations;
+
+  return {
+    perLocation: Math.round(discountedPrice * 100) / 100,
+    total: Math.round(total * 100) / 100,
+    discount: discountRate,
+  };
 }

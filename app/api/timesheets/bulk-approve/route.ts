@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      approved: result.count,
+      approved: result,
     });
   } catch (error: any) {
     console.error('Error in POST /api/timesheets/bulk-approve:', error);

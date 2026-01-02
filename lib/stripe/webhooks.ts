@@ -2,11 +2,10 @@
 // STRIPE WEBHOOK HANDLERS
 // =====================================================
 
-import { stripe } from './client';
+import { stripe } from '@/lib/stripe/client';
 import { createClient } from '@/lib/supabase/server';
 import Stripe from 'stripe';
-
-const STRIPE_PRICE_GROWTH_MONTHLY = process.env.STRIPE_PRICE_GROWTH_MONTHLY;
+import { syncLogger } from '@/lib/logger';
 
 /**
  * Handle subscription created/updated
@@ -18,7 +17,10 @@ export async function handleSubscriptionUpdated(
   const businessId = subscription.metadata.business_id;
 
   if (!businessId) {
-    console.error('No business_id in subscription metadata');
+    syncLogger.warn({
+      msg: 'Missing business_id in subscription metadata',
+      subscriptionId: subscription.id,
+    });
     return;
   }
 
@@ -27,7 +29,7 @@ export async function handleSubscriptionUpdated(
   let planTier = 'pro';
   let leadsLimit = 300;
 
-  if (priceId === STRIPE_PRICE_GROWTH_MONTHLY) {
+  if (priceId === process.env.STRIPE_PRICE_GROWTH_MONTHLY) {
     planTier = 'growth';
     leadsLimit = 200;
   }
@@ -62,7 +64,10 @@ export async function handleSubscriptionDeleted(
   const businessId = subscription.metadata.business_id;
 
   if (!businessId) {
-    console.error('No business_id in subscription metadata');
+    syncLogger.warn({
+      msg: 'Missing business_id in subscription metadata',
+      subscriptionId: subscription.id,
+    });
     return;
   }
 
@@ -170,7 +175,6 @@ export async function handleTrialWillEnd(
   }
 
   // TODO: Send trial ending notification email
-  console.log(`Trial ending soon for business: ${businessId}`);
 }
 
 /**
@@ -220,6 +224,6 @@ export async function processWebhookEvent(event: Stripe.Event): Promise<void> {
       break;
 
     default:
-      console.log(`Unhandled event type: ${event.type}`);
+      // Unhandled event type - ignore silently
   }
 }

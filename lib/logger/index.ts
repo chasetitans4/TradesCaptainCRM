@@ -1,77 +1,140 @@
 // =====================================================
-// STRUCTURED LOGGING WITH PINO
-// Production-ready logging with JSON output
+// STRUCTURED LOGGING
+// Edge-compatible logging with JSON output
 // =====================================================
-
-import pino from 'pino';
 
 const isProduction = process.env.NODE_ENV === 'production';
 const logLevel = process.env.LOG_LEVEL || (isProduction ? 'info' : 'debug');
 
-// Base logger configuration
-const baseConfig: pino.LoggerOptions = {
-  level: logLevel,
-
-  // Redact sensitive fields
-  redact: {
-    paths: [
-      'password',
-      'token',
-      'authorization',
-      'apiKey',
-      'secret',
-      '*.password',
-      '*.token',
-      '*.apiKey',
-      'req.headers.authorization',
-      'req.headers.cookie',
-    ],
-    censor: '[REDACTED]',
-  },
-
-  // Custom serializers
-  serializers: {
-    err: pino.stdSerializers.err,
-    req: (req) => ({
-      method: req.method,
-      url: req.url,
-      path: req.path,
-      query: req.query,
-      headers: {
-        host: req.headers?.host,
-        'user-agent': req.headers?.['user-agent'],
-        'content-type': req.headers?.['content-type'],
-      },
-    }),
-    res: (res) => ({
-      statusCode: res.statusCode,
-    }),
-  },
-
-  // Timestamp format
-  timestamp: pino.stdTimeFunctions.isoTime,
-
-  // Base fields for all logs
-  base: {
-    service: 'trades-captain-crm',
-    version: process.env.NEXT_PUBLIC_APP_VERSION || 'development',
-  },
+// Log level priorities
+const LOG_LEVELS: Record<string, number> = {
+  debug: 10,
+  info: 20,
+  warn: 30,
+  error: 40,
+  fatal: 50,
 };
 
-// Create logger with pretty printing in development
-export const logger = isProduction
-  ? pino(baseConfig)
-  : pino({
-      ...baseConfig,
-      transport: {
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'SYS:standard',
-          ignore: 'pid,hostname',
-        },
-      },
-    });
+// Sensitive fields to redact
+const REDACT_FIELDS = [
+  'password',
+  'token',
+  'authorization',
+  'apiKey',
+  'secret',
+  'cookie',
+];
+
+function shouldLog(level: string): boolean {
+  return (LOG_LEVELS[level] || 0) >= (LOG_LEVELS[logLevel] || 0);
+}
+
+function redactSensitive(obj: unknown): unknown {
+  if (typeof obj !== 'object' || obj === null) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(redactSensitive);
+  }
+
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (REDACT_FIELDS.some((field) => key.toLowerCase().includes(field.toLowerCase()))) {
+      result[key] = '[REDACTED]';
+    } else if (typeof value === 'object' && value !== null) {
+      result[key] = redactSensitive(value);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+interface LogEntry {
+  level: string;
+  time: string;
+  context?: string;
+  msg: string;
+  [key: string]: unknown;
+}
+
+function formatLog(level: string, context: string | undefined, msg: string, data?: Record<string, unknown>): string {
+  const redactedData = (data ? (redactSensitive(data) as Record<string, unknown>) : {}) as Record<string, unknown>;
+  const entry: LogEntry = {
+    level,
+    time: new Date().toISOString(),
+    ...(context && { context }),
+    msg,
+    ...redactedData,
+  };
+
+  if (isProduction) {
+    return JSON.stringify(entry);
+  }
+
+  // Pretty print in development
+  const prefix = context ? `[${context}]` : '';
+  const dataStr = data ? ` ${JSON.stringify(redactedData)}` : '';
+  return `${entry.time} ${level.toUpperCase()} ${prefix} ${msg}${dataStr}`;
+}
+
+class Logger {
+  private context?: string;
+  private baseData: Record<string, unknown>;
+
+  constructor(context?: string, baseData: Record<string, unknown> = {}) {
+    this.context = context;
+    this.baseData = baseData;
+  }
+
+  child(data: Record<string, unknown>): Logger {
+    return new Logger(data.context as string || this.context, { ...this.baseData, ...data });
+  }
+
+  debug(data: Record<string, unknown> | string, msg?: string): void {
+    if (!shouldLog('debug')) return;
+    const { message, logData } = this.parseArgs(data, msg);
+    console.debug(formatLog('debug', this.context, message, { ...this.baseData, ...logData }));
+  }
+
+  info(data: Record<string, unknown> | string, msg?: string): void {
+    if (!shouldLog('info')) return;
+    const { message, logData } = this.parseArgs(data, msg);
+    console.info(formatLog('info', this.context, message, { ...this.baseData, ...logData }));
+  }
+
+  warn(data: Record<string, unknown> | string, msg?: string): void {
+    if (!shouldLog('warn')) return;
+    const { message, logData } = this.parseArgs(data, msg);
+    console.warn(formatLog('warn', this.context, message, { ...this.baseData, ...logData }));
+  }
+
+  error(data: Record<string, unknown> | string, msg?: string): void {
+    if (!shouldLog('error')) return;
+    const { message, logData } = this.parseArgs(data, msg);
+    console.error(formatLog('error', this.context, message, { ...this.baseData, ...logData }));
+  }
+
+  fatal(data: Record<string, unknown> | string, msg?: string): void {
+    const { message, logData } = this.parseArgs(data, msg);
+    console.error(formatLog('fatal', this.context, message, { ...this.baseData, ...logData }));
+  }
+
+  private parseArgs(data: Record<string, unknown> | string, msg?: string): { message: string; logData: Record<string, unknown> } {
+    if (typeof data === 'string') {
+      return { message: data, logData: {} };
+    }
+    const { msg: dataMsg, ...rest } = data;
+    return { message: (msg || dataMsg || '') as string, logData: rest };
+  }
+}
+
+// Create main logger
+export const logger = new Logger(undefined, {
+  service: 'trades-captain-crm',
+  version: process.env.NEXT_PUBLIC_APP_VERSION || 'development',
+});
 
 // Create child loggers for different contexts
 export const apiLogger = logger.child({ context: 'api' });
@@ -87,7 +150,7 @@ export const syncLogger = logger.child({ context: 'sync' });
 /**
  * Create a request-scoped logger
  */
-export function createRequestLogger(requestId: string, userId?: string, businessId?: string) {
+export function createRequestLogger(requestId: string, userId?: string, businessId?: string): Logger {
   return logger.child({
     requestId,
     ...(userId && { userId }),
@@ -105,7 +168,7 @@ export function logApiRequest(
   durationMs: number,
   userId?: string,
   businessId?: string
-) {
+): void {
   apiLogger.info({
     msg: `${method} ${path} ${statusCode}`,
     method,
@@ -126,7 +189,7 @@ export function logApiError(
   error: Error,
   statusCode: number = 500,
   userId?: string
-) {
+): void {
   apiLogger.error({
     msg: `API Error: ${method} ${path}`,
     method,
@@ -149,7 +212,7 @@ export function logAuthEvent(
   userId?: string,
   email?: string,
   ip?: string
-) {
+): void {
   const level = event === 'failed_login' ? 'warn' : 'info';
   authLogger[level]({
     msg: `Auth event: ${event}`,
@@ -169,7 +232,7 @@ export function logQueueJob(
   status: 'started' | 'completed' | 'failed',
   durationMs?: number,
   error?: Error
-) {
+): void {
   if (status === 'failed') {
     queueLogger.error({
       msg: `Queue job failed: ${queue}/${jobId}`,
@@ -200,7 +263,7 @@ export function logCacheOperation(
   operation: 'get' | 'set' | 'delete' | 'hit' | 'miss',
   key: string,
   durationMs?: number
-) {
+): void {
   cacheLogger.debug({
     msg: `Cache ${operation}: ${key}`,
     operation,
@@ -218,7 +281,7 @@ export function logSms(
   businessId: string,
   customerId?: string,
   error?: string
-) {
+): void {
   if (status === 'failed') {
     smsLogger.error({
       msg: `SMS failed to ${to}`,
@@ -248,7 +311,7 @@ export function logAiRequest(
   durationMs: number,
   cached: boolean,
   businessId: string
-) {
+): void {
   aiLogger.info({
     msg: `AI request: ${model}`,
     model,
@@ -270,7 +333,7 @@ export function logSync(
   entityType?: string,
   entityId?: string,
   error?: string
-) {
+): void {
   if (status === 'failed') {
     syncLogger.error({
       msg: `Sync failed: ${service} ${operation}`,
@@ -301,7 +364,7 @@ export function logSync(
 export function measureTime<T>(
   label: string,
   fn: () => T | Promise<T>,
-  loggerInstance: pino.Logger = logger
+  loggerInstance: Logger = logger
 ): T | Promise<T> {
   const start = performance.now();
 
@@ -325,4 +388,4 @@ export function measureTime<T>(
 }
 
 // Export types
-export type Logger = pino.Logger;
+export type { Logger };

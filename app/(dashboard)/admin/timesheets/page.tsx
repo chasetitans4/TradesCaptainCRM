@@ -33,6 +33,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
+import { useAdminOrHigher } from '@/hooks/useAdminAuth';
 
 interface TimeEntry {
   id: string;
@@ -63,11 +64,13 @@ interface WeeklySummary {
 }
 
 export default function AdminTimesheetsPage() {
+  const { loading: authLoading, isAuthorized } = useAdminOrHigher();
   const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [selectedEmployee, setSelectedEmployee] = useState<string>('all');
+
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [error, setError] = useState<string | null>(null);
   const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set());
@@ -121,6 +124,14 @@ export default function AdminTimesheetsPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  if (authLoading || !isAuthorized) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   function formatHours(hours: number): string {
     const h = Math.floor(hours);

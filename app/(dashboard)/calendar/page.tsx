@@ -8,6 +8,7 @@ import { cn, formatTime } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { UserWithBusiness, CalendarDisplayEvent } from '@/types';
+import { AddressLink } from '@/components/ui/address-link';
 import {
   Plus,
   ChevronLeft,
@@ -512,6 +513,17 @@ function EventCard({ event }: { event: CalendarDisplayEvent }) {
               <Phone className="h-4 w-4" />
               Call
             </a>
+          )}
+          {(event.address || event.city) && (
+            <AddressLink
+              address={event.address || undefined}
+              city={event.city || undefined}
+              state={event.state || undefined}
+              zip={event.zip || undefined}
+              className="flex items-center gap-1.5 text-sm text-primary"
+              iconClassName="h-4 w-4"
+              onClick={(e) => e.stopPropagation()}
+            />
           )}
         </div>
       )}

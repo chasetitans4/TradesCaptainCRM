@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
-import type { UserWithBusiness, Customer, SmsConversation, SmsMessage } from '@/types';
+import type { UserWithBusiness, Customer, SMSConversation, SMSMessage } from '@/types';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import {
   MessageSquare,
@@ -26,9 +26,13 @@ import {
   Plus,
 } from 'lucide-react';
 
-interface ConversationWithDetails extends SmsConversation {
+interface ConversationWithDetails extends SMSConversation {
   customer?: Pick<Customer, 'id' | 'name' | 'phone'> | null;
-  last_message?: Pick<SmsMessage, 'id' | 'content' | 'direction' | 'created_at'> | null;
+  last_message?: Pick<SMSMessage, 'id' | 'body' | 'direction' | 'created_at'> | null;
+  last_message_at?: string | null;
+  unread_count?: number;
+  phone_number?: string;
+  is_ai_enabled?: boolean;
 }
 
 export default function MessagesPage() {
@@ -78,7 +82,7 @@ export default function MessagesPage() {
         (convos || []).map(async (convo) => {
           const { data: messages } = await supabase
             .from('sms_messages')
-            .select('id, content, direction, created_at')
+            .select('id, body, direction, created_at')
             .eq('conversation_id', convo.id)
             .order('created_at', { ascending: false })
             .limit(1);
@@ -165,7 +169,7 @@ export default function MessagesPage() {
                   ...convo,
                   last_message: {
                     id: payload.new.id,
-                    content: payload.new.content,
+                    body: payload.new.body,
                     direction: payload.new.direction,
                     created_at: payload.new.created_at,
                   },
@@ -209,9 +213,9 @@ export default function MessagesPage() {
     const query = searchQuery.toLowerCase();
     const name = (convo.customer?.name || '').toLowerCase();
     const phone = convo.phone_number || '';
-    const content = (convo.last_message?.content || '').toLowerCase();
+    const body = (convo.last_message?.body || '').toLowerCase();
 
-    return name.includes(query) || phone.includes(query) || content.includes(query);
+    return name.includes(query) || phone.includes(query) || body.includes(query);
   });
 
   // Count unread
@@ -328,7 +332,7 @@ export default function MessagesPage() {
 }
 
 function ConversationItem({ conversation }: { conversation: ConversationWithDetails }) {
-  const name = conversation.customer?.name || formatPhoneNumber(conversation.phone_number);
+  const name = conversation.customer?.name || formatPhoneNumber(conversation.phone_number || '');
   const hasUnread = conversation.unread_count && conversation.unread_count > 0;
   const lastMessage = conversation.last_message;
 
@@ -379,7 +383,7 @@ function ConversationItem({ conversation }: { conversation: ConversationWithDeta
                 hasUnread ? 'text-text font-medium' : 'text-text-muted'
               )}
             >
-              {lastMessage.content}
+              {lastMessage.body}
             </p>
           </div>
         )}
@@ -389,7 +393,7 @@ function ConversationItem({ conversation }: { conversation: ConversationWithDeta
           conversation.customer.phone !== conversation.phone_number && (
             <div className="flex items-center gap-1 mt-1 text-xs text-text-muted">
               <Phone className="h-3 w-3" />
-              {formatPhoneNumber(conversation.phone_number)}
+              {formatPhoneNumber(conversation.phone_number || '')}
             </div>
           )}
       </div>

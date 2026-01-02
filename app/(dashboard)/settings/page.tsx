@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient, getCurrentUserProfile, signOut } from '@/lib/supabase/client';
-import { hasPermission } from '@/lib/permissions';
+import { hasPermission, type Permission } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,7 +40,7 @@ interface SettingSection {
   label: string;
   description?: string;
   icon: React.ElementType;
-  permission?: string;
+  permission?: Permission;
   badge?: string;
   external?: boolean;
 }
@@ -206,7 +206,7 @@ export default function SettingsPage() {
   const filteredSections = SETTING_SECTIONS.map((section) => ({
     ...section,
     items: section.items.filter(
-      (item) => !item.permission || hasPermission(user.role, item.permission)
+      (item) => (item.permission ? hasPermission(user.role, item.permission) : true)
     ),
   })).filter((section) => section.items.length > 0);
 
@@ -364,9 +364,10 @@ export default function SettingsPage() {
               {section.items.map((item) => {
                 const Icon = item.icon;
                 const Component = item.external ? 'a' : Link;
+                const href = item.href ?? '#';
                 const props = item.external
-                  ? { href: item.href, target: '_blank', rel: 'noopener noreferrer' }
-                  : { href: item.href || '#' };
+                  ? { href, target: '_blank', rel: 'noopener noreferrer' }
+                  : { href };
 
                 return (
                   <Component

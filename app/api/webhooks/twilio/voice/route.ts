@@ -8,6 +8,7 @@ import { headers } from 'next/headers';
 import { validateTwilioSignature, formatPhoneE164 } from '@/lib/twilio';
 import { createAdminClient } from '@/lib/supabase/server';
 import twilio from 'twilio';
+import { smsLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
       const url = request.url;
 
       if (!validateTwilioSignature(signature, url, params)) {
-        console.error('Invalid Twilio signature');
+        smsLogger.warn({ msg: 'Invalid Twilio voice signature', url });
         return new NextResponse('Forbidden', { status: 403 });
       }
     }
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (!business) {
-      console.error('No business found for phone number:', to);
+      smsLogger.warn({ msg: 'No business found for voice number', to });
       return twimlVoicemail('Sorry, this number is not configured properly.');
     }
 
@@ -116,7 +117,10 @@ export async function POST(request: NextRequest) {
         return twimlVoicemail(`Thank you for calling ${business.name}. Please leave a message after the beep.`, greetingUrl);
     }
   } catch (error) {
-    console.error('Error processing voice webhook:', error);
+    smsLogger.error({
+      msg: 'Error processing voice webhook',
+      error: error instanceof Error ? { name: error.name, message: error.message } : { message: 'Unknown error' },
+    });
     return twimlVoicemail('Sorry, an error occurred. Please try again later.');
   }
 }

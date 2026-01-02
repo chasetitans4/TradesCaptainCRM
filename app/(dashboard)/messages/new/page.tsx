@@ -16,14 +16,17 @@ import { createClient, getCurrentUserProfile } from '@/lib/supabase/client';
 import { formatPhoneNumber } from '@/lib/utils';
 import type { UserWithBusiness, Customer } from '@/types';
 
+// Partial customer type for search results
+type CustomerSearchResult = Pick<Customer, 'id' | 'name' | 'phone' | 'email'>;
+
 export default function NewMessagePage() {
   const router = useRouter();
   const [user, setUser] = useState<UserWithBusiness | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customers, setCustomers] = useState<CustomerSearchResult[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerSearchResult | null>(null);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [message, setMessage] = useState('');
   const [showCustomerSearch, setShowCustomerSearch] = useState(true);
@@ -64,7 +67,7 @@ export default function NewMessagePage() {
     return () => clearTimeout(debounce);
   }, [user, searchQuery]);
 
-  const handleSelectCustomer = (customer: Customer) => {
+  const handleSelectCustomer = (customer: CustomerSearchResult) => {
     setSelectedCustomer(customer);
     setPhoneNumber(customer.phone || '');
     setShowCustomerSearch(false);

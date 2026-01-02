@@ -2,6 +2,9 @@
 // TRADES CAPTAIN MICRO CRM - TYPE DEFINITIONS
 // =====================================================
 
+// Re-export outreach module types
+export * from './outreach';
+
 // =====================================================
 // ENUMS & CONSTANTS
 // =====================================================
@@ -10,9 +13,26 @@ export type PlanTier = 'starter' | 'growth' | 'pro';
 export type UserRole = 'owner' | 'admin' | 'technician';
 export type UserStatus = 'pending' | 'active' | 'deactivated';
 
-export type LeadStatus = 'new' | 'contacted' | 'quoted' | 'scheduled' | 'won' | 'lost';
+export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'quoted' | 'scheduled' | 'won' | 'lost';
 export type LeadUrgency = 'low' | 'normal' | 'high' | 'emergency';
-export type LeadSource = 'website_chat' | 'phone' | 'ai_sms' | 'manual' | 'missed_call' | 'referral';
+export type LeadSource =
+  | 'website_chat'
+  | 'website'
+  | 'phone'
+  | 'ai_sms'
+  | 'manual'
+  | 'missed_call'
+  | 'referral'
+  | 'google'
+  | 'repeat'
+  | 'facebook'
+  | 'instagram'
+  | 'yelp'
+  | 'thumbtack'
+  | 'homeadvisor'
+  | 'angies_list'
+  | 'nextdoor'
+  | 'other';
 
 export type JobStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
 export type PhotoLabel = 'before' | 'after' | 'issue' | 'other';
@@ -99,16 +119,17 @@ export interface UserNotificationSettings {
 
 export interface Business extends Timestamps {
   id: string;
-  
+
   // Account
   name: string;
   owner_name: string;
   email: string;
   phone: string;
   owner_phone: string | null;
-  
+
   // Plan
   plan_tier: PlanTier;
+  subscription_tier?: string; // Alias for plan_tier
   leads_limit: number | null;
   leads_used: number;
   leads_reset_date: string | null;
@@ -153,33 +174,35 @@ export interface Business extends Timestamps {
 
 export interface User extends Timestamps {
   id: string;
-  
+
   // Auth
   email: string;
   auth_user_id: string | null;
-  
+
   // Profile
   name: string;
+  full_name?: string; // Alias for name
   phone: string | null;
   avatar_url: string | null;
-  
+
   // Business relationship
   business_id: string;
   role: UserRole;
-  
+
   // Invitation
   invited_by: string | null;
   invited_at: string | null;
   invite_token: string | null;
   accepted_at: string | null;
   status: UserStatus;
-  
+
   // Notification preferences
   notification_settings: UserNotificationSettings;
 }
 
 export interface UserWithBusiness extends User {
   business: Business;
+  full_name?: string; // Override to ensure it's available
 }
 
 // =====================================================
@@ -249,19 +272,20 @@ export interface Lead extends Timestamps {
   id: string;
   business_id: string;
   customer_id: string | null;
-  
+
   name: string;
   phone: string;
   email: string | null;
-  
+
   service_needed: string | null;
   description: string | null;
+  notes?: string | null;
   urgency: LeadUrgency | null;
-  
+
   status: LeadStatus;
   lost_reason: string | null;
   source: LeadSource;
-  
+
   assigned_to: string | null;
   estimated_value: number | null;
 }
@@ -282,31 +306,45 @@ export interface Job extends Timestamps {
   business_id: string;
   customer_id: string | null;
   lead_id: string | null;
-  
+
+  // Job title - uses service_type as the display title
+  title?: string;
+  service_type: string;
+  description: string | null;
+
+  // Scheduling
   scheduled_date: string;
   scheduled_time_start: string | null;
   scheduled_time_end: string | null;
-  
-  service_type: string;
-  description: string | null;
+  scheduled_time?: string | null; // Alias for scheduled_time_start
+
+  // Pricing and duration
+  price?: number | null;
+  estimated_duration?: number | null;
+
   status: JobStatus;
-  
+
   tech_notes: string | null;
-  
+
+  // Address
   job_address_line1: string | null;
   job_address_city: string | null;
   job_address_state: string | null;
   job_address_zip: string | null;
-  
+
+  // Assignment
   assigned_to: string | null;
-  
+  assigned_user_id?: string | null; // Alias for assigned_to
+
+  // Completion
   completed_at: string | null;
   completion_notes: string | null;
-  
+
+  // Reminders
   customer_reminders_enabled: boolean;
   customer_confirmed: boolean;
   customer_confirmed_at: string | null;
-  
+
   google_calendar_event_id: string | null;
 }
 
@@ -467,20 +505,21 @@ export interface Reminder {
   business_id: string;
   user_id: string | null;
   created_at: string;
-  
+
   title: string;
   notes: string | null;
-  
+
   remind_at: string;
-  
+  due_at?: string; // Alias for remind_at
+
   job_id: string | null;
   customer_id: string | null;
   lead_id: string | null;
-  
+
   completed: boolean;
   completed_at: string | null;
   snoozed_until: string | null;
-  
+
   retention: ReminderRetention;
 }
 
@@ -585,11 +624,12 @@ export interface CallLog {
   lead_id: string | null;
   user_id: string | null;
   created_at: string;
-  
+
   phone: string;
   direction: CallDirection;
   duration_seconds: number | null;
-  
+  duration?: number | null; // Alias for duration_seconds
+
   outcome: CallOutcome | null;
   notes: string | null;
 }
@@ -890,6 +930,10 @@ export interface CalendarDisplayEvent {
     phone?: string;
   };
   source?: 'external';
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
 }
 
 // Input types for calendar operations

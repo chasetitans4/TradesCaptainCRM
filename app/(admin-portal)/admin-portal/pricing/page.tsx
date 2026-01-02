@@ -23,6 +23,12 @@ import type { Plan, PlanTrack, AddOn } from '@/lib/pricing/plans';
 import type { Offer } from '@/lib/pricing/offers';
 
 const TRACK_CONFIG: Record<PlanTrack, { label: string; description: string; icon: React.ElementType; color: string }> = {
+  leads_captain: {
+    label: 'Leads Captain',
+    description: 'AI Missed Call Text-Back - standalone product',
+    icon: DollarSign,
+    color: 'bg-cyan-100 text-cyan-700',
+  },
   blue: {
     label: 'Blue (CRM)',
     description: 'CRM-only plans for businesses with existing websites',
@@ -31,19 +37,25 @@ const TRACK_CONFIG: Record<PlanTrack, { label: string; description: string; icon
   },
   web: {
     label: 'Web (Website)',
-    description: 'Professional website plans with optional GBP add-on',
+    description: 'Professional website plans',
     icon: Globe,
     color: 'bg-purple-100 text-purple-700',
   },
   seo: {
     label: 'Local SEO',
-    description: 'SEO services for existing websites - GBP included',
+    description: 'SEO services for existing websites',
     icon: MapPin,
     color: 'bg-green-100 text-green-700',
   },
+  silver: {
+    label: 'Silver',
+    description: 'Website + CRM + Leads Captain bundle',
+    icon: Sparkles,
+    color: 'bg-gray-100 text-gray-700',
+  },
   gold: {
     label: 'Gold (All-in-One)',
-    description: 'Website + CRM + Local SEO - Everything included',
+    description: 'Website + CRM + Leads Captain + Local SEO',
     icon: Sparkles,
     color: 'bg-yellow-100 text-yellow-700',
   },

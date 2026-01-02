@@ -46,12 +46,14 @@ export async function GET(
     }
 
     const entries = await getJobTimeEntries(id);
-    const totalMinutes = await getJobTotalTime(id);
+    const timeStats = await getJobTotalTime(id);
 
     return NextResponse.json({
       entries,
-      totalMinutes,
-      totalHours: Math.round((totalMinutes / 60) * 100) / 100,
+      totalMinutes: timeStats.totalMinutes,
+      travelMinutes: timeStats.travelMinutes,
+      workMinutes: timeStats.workMinutes,
+      totalHours: Math.round((timeStats.totalMinutes / 60) * 100) / 100,
     });
   } catch (error: any) {
     console.error('Error in GET /api/jobs/[id]/time:', error);

@@ -7,6 +7,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCalendarEvents } from '@/lib/nylas';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
 import type { CalendarDisplayEvent, ScheduleBlock } from '@/types';
+import { z } from 'zod';
+import { formatZodErrors } from '@/lib/validation';
+import { logApiError } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,25 +22,30 @@ export async function GET(request: NextRequest) {
     const start = request.nextUrl.searchParams.get('start');
     const end = request.nextUrl.searchParams.get('end');
 
-    if (!start || !end) {
-      return NextResponse.json(
-        { error: 'Missing start/end params' },
-        { status: 400 }
-      );
+    const querySchema = z.object({
+      start: z.string().datetime(),
+      end: z.string().datetime(),
+    }).refine((data) => new Date(data.start) <= new Date(data.end), {
+      message: 'End must be after start',
+    });
+
+    const parsed = querySchema.safeParse({ start, end });
+    if (!parsed.success) {
+      return NextResponse.json({ error: formatZodErrors(parsed.error) }, { status: 400 });
     }
 
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+    const startDate = new Date(parsed.data.start);
+    const endDate = new Date(parsed.data.end);
 
     const supabase = await createServerSupabaseClient();
 
     // Get jobs from database
     const { data: jobs } = await supabase
       .from('jobs')
-      .select('*, customer:customers(name, phone)')
+      .select('id, scheduled_date, scheduled_time_start, scheduled_time_end, status, service_type, job_address_line1, job_address_city, job_address_state, job_address_zip, customer:customers(name, phone)')
       .eq('assigned_to', profile.id)
-      .gte('scheduled_date', start.split('T')[0])
-      .lte('scheduled_date', end.split('T')[0])
+      .gte('scheduled_date', parsed.data.start.split('T')[0])
+      .lte('scheduled_date', parsed.data.end.split('T')[0])
       .in('status', ['scheduled', 'in_progress']);
 
     // Get schedule blocks
@@ -56,6 +64,7 @@ export async function GET(request: NextRequest) {
     // Jobs
     if (jobs) {
       jobs.forEach((job) => {
+        const jobCustomer = Array.isArray(job.customer) ? job.customer[0] : job.customer;
         const startTime = combineDateAndTime(
           job.scheduled_date,
           job.scheduled_time_start || '09:00'
@@ -67,18 +76,22 @@ export async function GET(request: NextRequest) {
         events.push({
           id: job.id,
           type: 'job',
-          title: `${job.service_type} - ${job.customer?.name || 'Customer'}`,
+          title: `${job.service_type} - ${jobCustomer?.name || 'Customer'}`,
           start: startTime.toISOString(),
           end: endTime.toISOString(),
-          color: '#3b82f6', // Blue
+          color: '#3b82f6',
           editable: true,
           job_id: job.id,
-          customer: job.customer
+          customer: jobCustomer
             ? {
-                name: job.customer.name,
-                phone: job.customer.phone || undefined,
+                name: jobCustomer.name,
+                phone: jobCustomer.phone || undefined,
               }
             : undefined,
+          address: job.job_address_line1 || null,
+          city: job.job_address_city || null,
+          state: job.job_address_state || null,
+          zip: job.job_address_zip || null,
         });
       });
     }
@@ -134,11 +147,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(events);
   } catch (error) {
-    console.error('Error fetching calendar events:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch events' },
-      { status: 500 }
-    );
+    logApiError('GET', '/api/calendar/events', error as Error);
+    return NextResponse.json({ error: 'Failed to fetch events' }, { status: 500 });
   }
 }
 

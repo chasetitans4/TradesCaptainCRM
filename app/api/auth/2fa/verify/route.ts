@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { verify2FA, send2FACode, getTwoFactorStatus } from '@/lib/auth/two-factor';
 import { cookies } from 'next/headers';
+import { check2FAVerifyRateLimit, check2FASendRateLimit } from '@/lib/rate-limit';
 
 // GET - Get 2FA status
 export async function GET() {
@@ -32,6 +33,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
+      );
+    }
+
+    // Get client IP for rate limiting
+    const ip = request.headers.get('cf-connecting-ip') ||
+               request.headers.get('x-real-ip') ||
+               request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+               'unknown';
+
+    // Check Redis-backed rate limit (5 attempts per 10 minutes per user+IP)
+    const rateLimit = await check2FAVerifyRateLimit(userId, ip);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many verification attempts. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': '5',
+            'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+            'X-RateLimit-Reset': rateLimit.resetAt.toISOString(),
+            'Retry-After': (rateLimit.retryAfter || 600).toString(),
+          },
+        }
       );
     }
 
@@ -83,6 +107,29 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(
         { error: 'Method must be "sms" or "email"' },
         { status: 400 }
+      );
+    }
+
+    // Get client IP for rate limiting
+    const ip = request.headers.get('cf-connecting-ip') ||
+               request.headers.get('x-real-ip') ||
+               request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+               'unknown';
+
+    // Check Redis-backed rate limit (5 sends per 10 minutes per user+IP)
+    const rateLimit = await check2FASendRateLimit(userId, ip);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many code requests. Please wait before requesting another code.' },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': '5',
+            'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+            'X-RateLimit-Reset': rateLimit.resetAt.toISOString(),
+            'Retry-After': (rateLimit.retryAfter || 600).toString(),
+          },
+        }
       );
     }
 

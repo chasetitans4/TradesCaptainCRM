@@ -4,6 +4,20 @@
 
 import { twilioClient, messagingServiceSid, getWebhookUrl } from './client';
 import { createAdminClient } from '@/lib/supabase/server';
+import { smsLogger, logSms } from '@/lib/logger';
+
+/**
+ * SMS Status Priority (v6.4.2)
+ * Higher number = higher priority
+ * delivered is highest - once delivered, never overwrite
+ */
+export const STATUS_PRIORITY: Record<string, number> = {
+  'queued': 1,
+  'sent': 2,
+  'undelivered': 3,
+  'failed': 3,
+  'delivered': 4,  // Highest - delivered is the best terminal state
+};
 
 /**
  * Format phone number to E.164 format (+1XXXXXXXXXX)
@@ -65,6 +79,7 @@ export async function sendSMS(options: SendSMSOptions): Promise<{
   success: boolean;
   messageId?: string;
   twilioSid?: string;
+  fromNumber?: string;  // Actual from number from Twilio response (v6.4.2)
   error?: string;
 }> {
   const { to, body, businessId, conversationId, senderId, isAIResponse = false } = options;
@@ -97,12 +112,14 @@ export async function sendSMS(options: SendSMSOptions): Promise<{
 
     // Get or create conversation
     let convId = conversationId;
+    let customerIdForLog: string | undefined;
     if (!convId) {
       const conversation = await getOrCreateConversation(toFormatted, businessId);
       convId = conversation.id;
+      customerIdForLog = conversation.customer_id || undefined;
     }
 
-    // Log to database
+    // Log to database with actual from number from Twilio response (v6.4.2)
     const { data: message, error: insertError } = await supabase
       .from('sms_messages')
       .insert({
@@ -111,15 +128,21 @@ export async function sendSMS(options: SendSMSOptions): Promise<{
         sender: isAIResponse ? 'ai' : 'staff',
         sender_user_id: senderId || null,
         body,
-        status: 'sent',
+        status: 'queued',  // Start as queued, webhook will update to sent/delivered
         twilio_sid: twilioMessage.sid,
         is_ai_response: isAIResponse,
+        from_number: twilioMessage.from,  // Actual from number from Twilio (v6.4.2)
+        to_number: toFormatted,            // Also track to number (v6.4.2)
       })
       .select()
       .single();
 
     if (insertError) {
-      console.error('Error logging SMS to database:', insertError);
+      smsLogger.error({
+        msg: 'Error logging SMS to database',
+        error: { message: insertError.message, details: insertError },
+        businessId,
+      });
     }
 
     // Update AI response count if it's an AI response
@@ -127,13 +150,20 @@ export async function sendSMS(options: SendSMSOptions): Promise<{
       await supabase.rpc('increment_ai_response_count', { conv_id: convId });
     }
 
+    logSms(toFormatted, 'sent', businessId, customerIdForLog);
+
     return {
       success: true,
       messageId: message?.id,
       twilioSid: twilioMessage.sid,
+      fromNumber: twilioMessage.from,  // Return actual from number (v6.4.2)
     };
   } catch (error) {
-    console.error('Error sending SMS:', error);
+    smsLogger.error({
+      msg: 'Error sending SMS',
+      error: error instanceof Error ? { name: error.name, message: error.message } : { message: 'Unknown error' },
+      businessId,
+    });
 
     // Log the failure
     if (conversationId) {
@@ -150,6 +180,8 @@ export async function sendSMS(options: SendSMSOptions): Promise<{
           error_message: error instanceof Error ? error.message : 'Unknown error',
         });
     }
+
+    logSms(formatPhoneE164(to), 'failed', businessId, undefined, error instanceof Error ? error.message : 'Unknown error');
 
     return {
       success: false,
@@ -284,22 +316,58 @@ export async function saveIncomingMessage(
 }
 
 /**
- * Update message status from Twilio callback
+ * Update message status from Twilio callback (v6.4.2 priority-based)
+ *
+ * Uses STATUS_PRIORITY to ensure:
+ * - delivered can never be overwritten by failed/undelivered
+ * - failed CAN be overwritten by delivered (late delivery success)
+ * - Only strictly higher priority statuses update the message
  */
 export async function updateMessageStatus(
   twilioSid: string,
-  status: 'queued' | 'sent' | 'delivered' | 'failed',
+  newStatus: 'queued' | 'sent' | 'delivered' | 'failed',
   errorMessage?: string
-): Promise<void> {
+): Promise<{ applied: boolean; reason?: string }> {
   const supabase = createAdminClient();
 
-  const updates: Record<string, any> = { status };
-  if (errorMessage) {
-    updates.error_message = errorMessage;
+  // Get current message status
+  const { data: message } = await supabase
+    .from('sms_messages')
+    .select('id, status')
+    .eq('twilio_sid', twilioSid)
+    .single();
+
+  if (!message) {
+    return { applied: false, reason: 'message_not_found' };
   }
 
-  await supabase
-    .from('sms_messages')
-    .update(updates)
-    .eq('twilio_sid', twilioSid);
+  const currentPriority = STATUS_PRIORITY[message.status] || 0;
+  const newPriority = STATUS_PRIORITY[newStatus] || 0;
+
+  // Only update if new status is STRICTLY higher priority
+  // This ensures: delivered can never be overwritten
+  if (newPriority > currentPriority) {
+    const updates: Record<string, any> = {
+      status: newStatus,
+      status_updated_at: new Date().toISOString(),
+    };
+
+    if (errorMessage) {
+      updates.error_message = errorMessage;
+    }
+
+    if (newStatus === 'delivered') {
+      updates.delivered_at = new Date().toISOString();
+    }
+
+    await supabase
+      .from('sms_messages')
+      .update(updates)
+      .eq('twilio_sid', twilioSid);
+
+    return { applied: true };
+  }
+
+  // Status not applied due to priority
+  return { applied: false, reason: 'not_higher_priority' };
 }

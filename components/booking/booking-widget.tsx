@@ -345,7 +345,7 @@ export function BookingWidget({ slug, embedded = false, onComplete }: BookingWid
                         !day.hasAvailability && 'opacity-50 cursor-not-allowed',
                         isSelected && 'ring-2'
                       )}
-                      style={isSelected ? { ringColor: primaryColor } : undefined}
+                      style={isSelected ? ({ ['--tw-ring-color']: primaryColor } as React.CSSProperties) : undefined}
                       onClick={() => {
                         setFormData({
                           ...formData,
@@ -384,7 +384,7 @@ export function BookingWidget({ slug, embedded = false, onComplete }: BookingWid
                           variant="outline"
                           size="sm"
                           className={cn(isSelected && 'ring-2')}
-                          style={isSelected ? { ringColor: primaryColor } : undefined}
+                          style={isSelected ? ({ ['--tw-ring-color']: primaryColor } as React.CSSProperties) : undefined}
                           onClick={() =>
                             setFormData({ ...formData, selectedTime: time })
                           }

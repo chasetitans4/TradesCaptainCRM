@@ -35,7 +35,7 @@ interface Invoice {
   customer: {
     id: string;
     name: string;
-  } | null;
+  } | { id: string; name: string }[] | null;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string }> = {
@@ -55,6 +55,15 @@ const FILTER_TABS = [
   { value: 'paid', label: 'Paid' },
   { value: 'overdue', label: 'Overdue' },
 ];
+
+// Helper to get customer name from possibly array or object
+function getCustomerName(customer: Invoice['customer']): string | undefined {
+  if (!customer) return undefined;
+  if (Array.isArray(customer)) {
+    return customer[0]?.name;
+  }
+  return customer.name;
+}
 
 export default function InvoicesPage() {
   const router = useRouter();
@@ -131,7 +140,7 @@ export default function InvoicesPage() {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       const matchesNumber = invoice.invoice_number?.toLowerCase().includes(query);
-      const matchesCustomer = invoice.customer?.name?.toLowerCase().includes(query);
+      const matchesCustomer = getCustomerName(invoice.customer)?.toLowerCase().includes(query);
       if (!matchesNumber && !matchesCustomer) {
         return false;
       }
@@ -289,7 +298,7 @@ export default function InvoicesPage() {
                     )}
                   </div>
                   <p className="text-sm text-muted-foreground truncate">
-                    {invoice.customer?.name || 'No customer'}
+                    {getCustomerName(invoice.customer) || 'No customer'}
                   </p>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                     {invoice.due_date && (

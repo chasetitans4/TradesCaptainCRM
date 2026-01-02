@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
-import { getCustomerTimeline, addNote, logActivity } from '@/lib/activity';
+import { getCustomerTimeline, addNote, logActivity, type ActivityType } from '@/lib/activity';
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const activities = await getCustomerTimeline(customerId, {
       limit,
       offset,
-      activityType: activityType || undefined,
+      activityTypes: activityType ? [activityType as ActivityType] : undefined,
     });
 
     return NextResponse.json(activities);
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     await logActivity({
       businessId: profile.business_id,
       customerId,
-      userId: profile.id,
+      createdBy: profile.id,
       activityType,
       title,
       description,

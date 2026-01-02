@@ -83,7 +83,7 @@ export async function createEquipment(params: CreateEquipmentParams): Promise<Cu
     .single();
 
   if (error) throw error;
-  return data;
+  return data as CustomerEquipment;
 }
 
 /**
@@ -94,18 +94,13 @@ export async function getCustomerEquipment(customerId: string): Promise<Customer
 
   const { data, error } = await supabase
     .from('customer_equipment')
-    .select(`
-      *,
-      jobs:job_equipment(
-        job:jobs(id, title, status, scheduled_date)
-      )
-    `)
+    .select('*')
     .eq('customer_id', customerId)
     .eq('status', 'active')
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data;
+  return (data || []) as CustomerEquipment[];
 }
 
 /**
@@ -164,7 +159,7 @@ export async function updateEquipment(
     .single();
 
   if (error) throw error;
-  return data;
+  return data as CustomerEquipment;
 }
 
 /**
@@ -233,7 +228,8 @@ export async function getJobEquipment(jobId: string): Promise<CustomerEquipment[
     .eq('job_id', jobId);
 
   if (error) throw error;
-  return data.map(row => row.equipment);
+  const rows = (data || []) as any[];
+  return rows.map((row) => (Array.isArray(row.equipment) ? row.equipment[0] : row.equipment)) as CustomerEquipment[];
 }
 
 /**
@@ -313,13 +309,15 @@ export async function deleteEquipment(equipmentId: string): Promise<void> {
 /**
  * Get equipment service history
  */
-export async function getEquipmentServiceHistory(equipmentId: string): Promise<{
+export interface EquipmentServiceHistoryEntry {
   job_id: string;
   job: { id: string; title: string; status: string; scheduled_date: string; completed_at?: string };
   service_performed?: string;
   notes?: string;
   created_at: string;
-}[]> {
+}
+
+export async function getEquipmentServiceHistory(equipmentId: string): Promise<EquipmentServiceHistoryEntry[]> {
   const supabase = await createServerClient();
 
   const { data, error } = await supabase
@@ -335,5 +333,21 @@ export async function getEquipmentServiceHistory(equipmentId: string): Promise<{
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data;
+  const rows = (data || []) as any[];
+  return rows.map((row) => {
+    const jobRel = Array.isArray(row.job) ? row.job[0] : row.job;
+    return {
+      job_id: String(row.job_id),
+      job: {
+        id: String(jobRel?.id),
+        title: String(jobRel?.title),
+        status: String(jobRel?.status),
+        scheduled_date: String(jobRel?.scheduled_date),
+        completed_at: jobRel?.completed_at ? String(jobRel.completed_at) : undefined,
+      },
+      service_performed: row.service_performed ?? undefined,
+      notes: row.notes ?? undefined,
+      created_at: String(row.created_at),
+    };
+  });
 }

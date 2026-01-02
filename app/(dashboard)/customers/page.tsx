@@ -26,7 +26,7 @@ import {
   DollarSign,
 } from 'lucide-react';
 
-interface CustomerWithStats extends Customer {
+interface CustomerWithStats extends Omit<Customer, 'total_jobs' | 'total_revenue'> {
   total_jobs?: number;
   total_revenue?: number;
 }

@@ -6,25 +6,37 @@
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
 import { getAdminUser, AdminUser, AdminRole } from './index';
+import { jwtVerify } from 'jose';
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'fallback-secret';
+/**
+ * Get JWT secret key - throws if not configured
+ */
+function getJwtSecret(): Uint8Array {
+  const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable must be configured');
+  }
+  if (secret.length < 32) {
+    throw new Error('JWT_SECRET must be at least 32 characters');
+  }
+  return new TextEncoder().encode(secret);
+}
 
-function verifyToken(token: string): { valid: boolean; payload?: any } {
-  const crypto = require('crypto');
-  const [payloadStr, signature] = token.split('.');
-  if (!payloadStr || !signature) return { valid: false };
-
-  const expectedSig = crypto
-    .createHmac('sha256', JWT_SECRET)
-    .update(payloadStr)
-    .digest('base64url');
-
-  if (signature !== expectedSig) return { valid: false };
-
+/**
+ * Verify JWT token using jose library
+ */
+async function verifyToken(token: string): Promise<{ valid: boolean; payload?: Record<string, unknown> }> {
   try {
-    const payload = JSON.parse(Buffer.from(payloadStr, 'base64url').toString());
-    if (payload.exp && payload.exp < Date.now()) return { valid: false };
-    return { valid: true, payload };
+    const secret = getJwtSecret();
+    const options: Record<string, unknown> = { algorithms: ['HS256'] };
+    if (process.env.JWT_ISSUER) {
+      options['issuer'] = process.env.JWT_ISSUER;
+    }
+    if (process.env.JWT_AUDIENCE) {
+      options['audience'] = process.env.JWT_AUDIENCE;
+    }
+    const { payload } = await jwtVerify(token, secret, options as any);
+    return { valid: true, payload: payload as Record<string, unknown> };
   } catch {
     return { valid: false };
   }
@@ -56,17 +68,17 @@ export async function verifyAdminAuth(request: NextRequest): Promise<{
       return { valid: false, error: 'No token provided' };
     }
 
-    const { valid, payload } = verifyToken(token);
+    const { valid, payload } = await verifyToken(token);
     if (!valid || !payload) {
       return { valid: false, error: 'Invalid or expired token' };
     }
 
-    const user = await getAdminUser(payload.userId);
+    const user = await getAdminUser(payload.userId as string);
     if (!user) {
       return { valid: false, error: 'User not found' };
     }
 
-    if (user.status !== 'active') {
+    if (!user.is_active) {
       return { valid: false, error: 'User account is not active' };
     }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendMagicLink, verifyMagicLink, verifyPassword } from '@/lib/portal/auth';
 import { createPortalSession, destroyPortalSession, getPortalSession } from '@/lib/portal/session';
+import { checkLoginRateLimit, checkSimpleRateLimit } from '@/lib/rate-limit';
 
 // POST /api/portal/auth - Handle portal authentication
 export async function POST(request: NextRequest) {
@@ -8,12 +9,39 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { action, businessId, email, password, token } = body;
 
+    // Get client IP for rate limiting
+    const ip = request.headers.get('cf-connecting-ip') ||
+               request.headers.get('x-real-ip') ||
+               request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+               'unknown';
+
     switch (action) {
       case 'magic-link': {
         if (!businessId || !email) {
           return NextResponse.json(
             { error: 'Business ID and email are required' },
             { status: 400 }
+          );
+        }
+
+        // Rate limit magic link requests (3 per hour per email+business)
+        const magicLinkLimit = await checkSimpleRateLimit(
+          `portal_magic:${businessId}:${email.toLowerCase()}`,
+          3,
+          3600
+        );
+        if (!magicLinkLimit.allowed) {
+          return NextResponse.json(
+            { error: 'Too many login requests. Please try again later.' },
+            {
+              status: 429,
+              headers: {
+                'X-RateLimit-Limit': '3',
+                'X-RateLimit-Remaining': magicLinkLimit.remaining.toString(),
+                'X-RateLimit-Reset': magicLinkLimit.resetAt.toISOString(),
+                'Retry-After': (magicLinkLimit.retryAfter || 3600).toString(),
+              },
+            }
           );
         }
 
@@ -57,6 +85,23 @@ export async function POST(request: NextRequest) {
           return NextResponse.json(
             { error: 'Business ID, email, and password are required' },
             { status: 400 }
+          );
+        }
+
+        // Rate limit password login attempts (5 per 15 minutes per IP)
+        const loginLimit = await checkLoginRateLimit(ip);
+        if (!loginLimit.allowed) {
+          return NextResponse.json(
+            { error: 'Too many login attempts. Please try again later.' },
+            {
+              status: 429,
+              headers: {
+                'X-RateLimit-Limit': '5',
+                'X-RateLimit-Remaining': loginLimit.remaining.toString(),
+                'X-RateLimit-Reset': loginLimit.resetAt.toISOString(),
+                'Retry-After': (loginLimit.retryAfter || 900).toString(),
+              },
+            }
           );
         }
 

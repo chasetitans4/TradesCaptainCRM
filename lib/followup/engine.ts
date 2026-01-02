@@ -450,8 +450,8 @@ async function sendSmsFollowUp(
 
   try {
     const { sendSms } = await import('@/lib/sms');
-    const result = await sendSms(customer.phone, message);
-    return { success: true, messageId: result.sid };
+    const result = await sendSms({ to: customer.phone, body: message });
+    return { success: result.success, messageId: result.messageId, error: result.error };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -523,8 +523,7 @@ async function sendNotificationFollowUp(
   instance: any,
   entity: any
 ): Promise<{ success: boolean; error?: string }> {
-  // For now, just log - could integrate with push notifications
-  console.log(`[NOTIFICATION] Follow-up for ${instance.entity_type} ${instance.entity_id}`);
+  // TODO: Integrate with push notifications
   return { success: true };
 }
 

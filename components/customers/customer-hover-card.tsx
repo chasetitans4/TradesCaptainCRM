@@ -4,7 +4,8 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from '@/components/ui/hover-card';
-import { Phone, Mail, MapPin, Briefcase, DollarSign } from 'lucide-react';
+import { Phone, Mail, Briefcase, DollarSign } from 'lucide-react';
+import { AddressLinkCompact } from '@/components/ui/address-link';
 
 interface CustomerHoverCardProps {
   customer: {
@@ -61,10 +62,7 @@ export function CustomerHoverCard({ customer, children }: CustomerHoverCardProps
                   <span className="truncate">{customer.email}</span>
                 </div>
               )}
-              <div className="flex items-center gap-2">
-                <MapPin className="w-3 h-3" />
-                <span className="truncate">{customer.address}</span>
-              </div>
+              <AddressLinkCompact address={customer.address} />
             </div>
           </div>
         </div>

@@ -1527,13 +1527,15 @@ async function handleChargeback(dispute: Stripe.Dispute, tx: any) {
 -- Track processed webhook events to prevent duplicate processing
 CREATE TABLE processed_webhook_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  stripe_event_id TEXT UNIQUE NOT NULL,
+  event_id TEXT UNIQUE NOT NULL,
+  stripe_event_id TEXT UNIQUE,
   event_type TEXT NOT NULL,
   processed_at TIMESTAMPTZ DEFAULT NOW(),
   
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE INDEX idx_webhook_events_event ON processed_webhook_events(event_id);
 CREATE INDEX idx_webhook_events_stripe ON processed_webhook_events(stripe_event_id);
 
 -- Auto-cleanup old events (keep 90 days)

@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient, getCurrentUserProfile } from '@/lib/supabase/client';
 import { hasPermission } from '@/lib/permissions';
-import { cn, formatRelativeDate, formatPhoneNumber, formatDate, formatTime } from '@/lib/utils';
+import { cn, formatRelativeDate, formatPhoneNumber, formatDate, formatTime, formatAddress } from '@/lib/utils';
+import { getSmartNavigationUrl } from '@/lib/utils/navigation';
+import { AddressLink } from '@/components/ui/address-link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -48,6 +50,7 @@ const STATUS_COLORS: Record<JobStatus, string> = {
   in_progress: 'bg-warning/10 text-warning border-warning/20',
   completed: 'bg-success/10 text-success border-success/20',
   cancelled: 'bg-danger/10 text-danger border-danger/20',
+  no_show: 'bg-muted/10 text-muted-foreground border-muted/20',
 };
 
 export default function JobsPage() {
@@ -550,18 +553,13 @@ function JobCard({ job, showDate = false }: { job: JobWithDetails; showDate?: bo
           </a>
         )}
         {job.customer?.address_line1 && (
-          <a
-            href={`https://maps.google.com/?q=${encodeURIComponent(
-              `${job.customer.address_line1}, ${job.customer.city || ''}`
-            )}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
+          <AddressLink
+            address={job.customer.address_line1}
+            city={job.customer.city}
             className="flex items-center gap-1.5 text-sm text-primary"
-          >
-            <MapPin className="h-4 w-4" />
-            Directions
-          </a>
+            iconClassName="h-4 w-4"
+            onClick={(e) => e.stopPropagation()}
+          />
         )}
       </div>
     </Link>

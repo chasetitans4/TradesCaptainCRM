@@ -4,6 +4,7 @@
 // =====================================================
 
 import { createClient } from '@/lib/supabase/server';
+import { encrypt, decrypt } from '@/lib/crypto';
 
 // QuickBooks API base URLs
 const SANDBOX_BASE_URL = 'https://sandbox-quickbooks.api.intuit.com';
@@ -77,11 +78,15 @@ export async function exchangeCodeForTokens(
 
   const supabase = await createClient();
 
-  // Save tokens to database
+  // Encrypt tokens before storage
+  const encryptedAccessToken = encrypt(tokens.access_token);
+  const encryptedRefreshToken = encrypt(tokens.refresh_token);
+
+  // Save encrypted tokens to database
   await supabase.from('quickbooks_connections').upsert({
     business_id: businessId,
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token,
+    access_token: encryptedAccessToken,
+    refresh_token: encryptedRefreshToken,
     token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
     realm_id: realmId,
     updated_at: new Date().toISOString(),
@@ -90,6 +95,7 @@ export async function exchangeCodeForTokens(
 
 /**
  * Refresh access token using refresh token
+ * Note: refreshToken param is already decrypted by caller
  */
 async function refreshTokens(businessId: string, refreshToken: string): Promise<QuickBooksTokens> {
   const clientId = process.env.QUICKBOOKS_CLIENT_ID!;
@@ -118,12 +124,16 @@ async function refreshTokens(businessId: string, refreshToken: string): Promise<
 
   const supabase = await createClient();
 
-  // Update tokens in database
+  // Encrypt new tokens before storage
+  const encryptedAccessToken = encrypt(tokens.access_token);
+  const encryptedRefreshToken = encrypt(tokens.refresh_token);
+
+  // Update encrypted tokens in database
   await supabase
     .from('quickbooks_connections')
     .update({
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
+      access_token: encryptedAccessToken,
+      refresh_token: encryptedRefreshToken,
       token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
       updated_at: new Date().toISOString(),
     })
@@ -139,6 +149,7 @@ async function refreshTokens(businessId: string, refreshToken: string): Promise<
 
 /**
  * Get QuickBooks client credentials for a business
+ * Decrypts tokens from database storage
  */
 export async function getQuickBooksClient(businessId: string): Promise<{
   accessToken: string;
@@ -156,12 +167,17 @@ export async function getQuickBooksClient(businessId: string): Promise<{
     throw new Error('QuickBooks not connected');
   }
 
+  // Decrypt tokens from storage
+  const decryptedAccessToken = decrypt(connection.access_token);
+  const decryptedRefreshToken = decrypt(connection.refresh_token);
+
   // Check if token needs refresh (5 minute buffer)
   const expiresAt = new Date(connection.token_expires_at);
   const bufferTime = 5 * 60 * 1000; // 5 minutes
 
   if (expiresAt.getTime() - Date.now() <= bufferTime) {
-    const refreshedTokens = await refreshTokens(businessId, connection.refresh_token);
+    // Pass decrypted refresh token for API call
+    const refreshedTokens = await refreshTokens(businessId, decryptedRefreshToken);
     return {
       accessToken: refreshedTokens.accessToken,
       realmId: connection.realm_id,
@@ -169,7 +185,7 @@ export async function getQuickBooksClient(businessId: string): Promise<{
   }
 
   return {
-    accessToken: connection.access_token,
+    accessToken: decryptedAccessToken,
     realmId: connection.realm_id,
   };
 }

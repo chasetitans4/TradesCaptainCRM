@@ -26,7 +26,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await subscribeToPush(profile.id, profile.business_id, subscription, deviceName);
+    const sub = { ...subscription, deviceName };
+    await subscribeToPush(profile.id, sub);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

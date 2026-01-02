@@ -4,10 +4,12 @@
 
 import { nylas } from './client';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { decrypt } from '@/lib/crypto';
 import type { CalendarEvent } from '@/types';
+import { syncLogger } from '@/lib/logger';
 
 /**
- * Get user's Nylas grant ID from the database
+ * Get user's Nylas grant ID from the database (decrypted)
  */
 async function getGrantId(userId: string): Promise<string | null> {
   const supabase = await createServerSupabaseClient();
@@ -17,7 +19,10 @@ async function getGrantId(userId: string): Promise<string | null> {
     .eq('user_id', userId)
     .single();
 
-  return data?.nylas_grant_id || null;
+  if (!data?.nylas_grant_id) return null;
+
+  // Decrypt the grant ID
+  return decrypt(data.nylas_grant_id);
 }
 
 /**
@@ -32,7 +37,7 @@ export async function getCalendarConnection(userId: string) {
     .single();
 
   if (error && error.code !== 'PGRST116') {
-    console.error('Error fetching calendar connection:', error);
+    syncLogger.error({ msg: 'Error fetching calendar connection', error });
   }
 
   return data;
@@ -46,7 +51,7 @@ export async function listCalendars(grantId: string) {
     const calendars = await nylas.calendars.list({ identifier: grantId });
     return calendars.data;
   } catch (error) {
-    console.error('Error listing calendars:', error);
+    syncLogger.error({ msg: 'Error listing calendars', error });
     return [];
   }
 }
@@ -61,13 +66,16 @@ export async function getCalendarEvents(
 ): Promise<CalendarEvent[]> {
   const grantId = await getGrantId(userId);
   if (!grantId) return [];
+  const connection = await getCalendarConnection(userId);
+  if (!connection?.calendar_id) return [];
 
   try {
     const events = await nylas.events.list({
       identifier: grantId,
       queryParams: {
-        start: Math.floor(startDate.getTime() / 1000),
-        end: Math.floor(endDate.getTime() / 1000),
+        calendarId: connection.calendar_id,
+        start: Math.floor(startDate.getTime() / 1000).toString(),
+        end: Math.floor(endDate.getTime() / 1000).toString(),
         expandRecurring: true,
       },
     });
@@ -83,7 +91,7 @@ export async function getCalendarEvents(
       source: 'personal' as const,
     }));
   } catch (error) {
-    console.error('Error fetching calendar events:', error);
+    syncLogger.error({ msg: 'Error fetching calendar events', error });
     return [];
   }
 }
@@ -122,6 +130,9 @@ export async function createCalendarEvent(
     return null;
   }
 
+  // Decrypt grant ID for API call
+  const decryptedGrantId = decrypt(connection.nylas_grant_id);
+
   const startTime = combineDateAndTime(
     job.scheduled_date,
     job.scheduled_time_start || '09:00'
@@ -130,9 +141,11 @@ export async function createCalendarEvent(
 
   try {
     const event = await nylas.events.create({
-      identifier: connection.nylas_grant_id,
-      requestBody: {
+      identifier: decryptedGrantId,
+      queryParams: {
         calendarId: connection.calendar_id,
+      },
+      requestBody: {
         title: `${job.title} - ${job.customer.name}`,
         description: [
           job.description,
@@ -155,7 +168,7 @@ export async function createCalendarEvent(
 
     return event.data.id;
   } catch (error) {
-    console.error('Error creating calendar event:', error);
+    syncLogger.error({ msg: 'Error creating calendar event', error });
     return null;
   }
 }
@@ -180,6 +193,9 @@ export async function updateCalendarEvent(
     return;
   }
 
+  // Decrypt grant ID for API call
+  const decryptedGrantId = decrypt(connection.nylas_grant_id);
+
   const startTime = combineDateAndTime(
     job.scheduled_date,
     job.scheduled_time_start || '09:00'
@@ -188,10 +204,12 @@ export async function updateCalendarEvent(
 
   try {
     await nylas.events.update({
-      identifier: connection.nylas_grant_id,
+      identifier: decryptedGrantId,
       eventId,
-      requestBody: {
+      queryParams: {
         calendarId: connection.calendar_id,
+      },
+      requestBody: {
         title: `${job.title} - ${job.customer.name}`,
         description: [
           job.description,
@@ -211,7 +229,7 @@ export async function updateCalendarEvent(
       },
     });
   } catch (error) {
-    console.error('Error updating calendar event:', error);
+    syncLogger.error({ msg: 'Error updating calendar event', error });
   }
 }
 
@@ -222,16 +240,31 @@ export async function deleteCalendarEvent(
   userId: string,
   eventId: string
 ): Promise<void> {
-  const grantId = await getGrantId(userId);
-  if (!grantId) return;
+  const supabase = await createServerSupabaseClient();
+
+  const { data: connection } = await supabase
+    .from('calendar_connections')
+    .select('nylas_grant_id, calendar_id')
+    .eq('user_id', userId)
+    .single();
+
+  if (!connection?.nylas_grant_id || !connection?.calendar_id) {
+    return;
+  }
+
+  // Decrypt grant ID for API call
+  const decryptedGrantId = decrypt(connection.nylas_grant_id);
 
   try {
     await nylas.events.destroy({
-      identifier: grantId,
+      identifier: decryptedGrantId,
       eventId,
+      queryParams: {
+        calendarId: connection.calendar_id,
+      },
     });
   } catch (error) {
-    console.error('Error deleting calendar event:', error);
+    syncLogger.error({ msg: 'Error deleting calendar event', error });
   }
 }
 

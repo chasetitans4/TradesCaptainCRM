@@ -1,7 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
-import { CheckCircle, XCircle, Clock, Building2, Phone, Mail, MapPin } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Building2, Phone, Mail } from 'lucide-react';
 import { formatPhoneNumber } from '@/lib/utils';
+import { AddressLink } from '@/components/ui/address-link';
 
 interface QuoteItem {
   id: string;
@@ -76,7 +77,37 @@ async function getQuote(token: string): Promise<Quote | null> {
       .eq('id', quote.id);
   }
 
-  return quote;
+  const normalized: Quote = {
+    id: quote.id,
+    quote_number: quote.quote_number,
+    status: quote.status,
+    subtotal: quote.subtotal,
+    tax_rate: quote.tax_rate,
+    tax_amount: quote.tax_amount,
+    discount_amount: quote.discount_amount,
+    total: quote.total,
+    customer_notes: quote.customer_notes,
+    terms: quote.terms,
+    valid_until: quote.valid_until,
+    created_at: quote.created_at,
+    customer: Array.isArray((quote as any).customer)
+      ? (quote as any).customer[0]
+      : (quote as any).customer,
+    business: Array.isArray((quote as any).business)
+      ? (quote as any).business[0]
+      : (quote as any).business,
+    items: ((quote as any).items || []).map((item: any) => ({
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      total: item.total,
+      is_taxable: item.is_taxable,
+    })),
+  };
+
+  return normalized;
 }
 
 async function acceptQuote(quoteId: string) {
@@ -296,10 +327,10 @@ export default async function PublicQuotePage({
               </a>
             )}
             {quote.business.address && (
-              <p className="flex items-center gap-2 text-gray-600">
-                <MapPin className="h-4 w-4" />
-                {quote.business.address}
-              </p>
+              <AddressLink
+                address={quote.business.address}
+                className="flex items-center gap-2 text-gray-600"
+              />
             )}
           </div>
         </div>

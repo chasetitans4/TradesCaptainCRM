@@ -46,10 +46,7 @@ const envSchema = z.object({
   NYLAS_API_URI: z.string().url().optional(),
 
   // Sentry
-  NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
-
-  // Google
-  NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().optional(),
+  NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
 
   // Feature flags
   NEXT_PUBLIC_ENABLE_AI_SMS: z.coerce.boolean().default(false),
@@ -64,19 +61,25 @@ function validateEnv(): Env {
   const parsed = envSchema.safeParse(process.env);
 
   if (!parsed.success) {
-    console.error('Invalid environment configuration:');
-    console.error(parsed.error.format());
+    const errors = parsed.error.format();
+    console.error('\n❌ INVALID ENVIRONMENT CONFIGURATION');
+    console.error('━'.repeat(50));
+    console.error(JSON.stringify(errors, null, 2));
+    console.error('━'.repeat(50));
 
-    // In development, warn but continue
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('Continuing with default values in development mode');
-      return envSchema.parse({
-        NEXT_PUBLIC_SUPABASE_URL: 'https://placeholder.supabase.co',
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: 'placeholder',
-      });
-    }
+    // FAIL LOUDLY - even in development
+    // Silent defaults mask misconfigurations that cause debugging nightmares
+    const missingVars = Object.keys(errors)
+      .filter(k => k !== '_errors')
+      .join(', ');
 
-    throw new Error('Invalid environment configuration');
+    throw new Error(
+      `\n⚠️  Missing required environment variables: ${missingVars}\n` +
+      `\n   To fix this:\n` +
+      `   1. Copy .env.example to .env.local\n` +
+      `   2. Fill in the required values (at minimum: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY)\n` +
+      `   3. Restart the dev server\n`
+    );
   }
 
   return parsed.data;
@@ -236,16 +239,6 @@ export const config = {
     },
   },
 
-  // Google
-  google: {
-    get mapsApiKey() {
-      return getEnv().NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    },
-    get isConfigured() {
-      return !!getEnv().NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    },
-  },
-
   // Sentry
   sentry: {
     get dsn() {
@@ -268,7 +261,6 @@ export function checkIntegrations(): Record<string, boolean> {
     resend: config.resend.isConfigured,
     openai: config.openai.isConfigured,
     nylas: config.nylas.isConfigured,
-    google: config.google.isConfigured,
     sentry: config.sentry.isConfigured,
   };
 }

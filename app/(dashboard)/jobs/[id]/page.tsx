@@ -13,8 +13,9 @@ import {
   formatTime,
   formatAddress,
   formatCurrency,
-  getNavigationUrl,
 } from '@/lib/utils';
+import { getSmartNavigationUrl } from '@/lib/utils/navigation';
+import { AddressLink } from '@/components/ui/address-link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
@@ -45,6 +46,9 @@ import {
   Trash2,
   AlertCircle,
 } from 'lucide-react';
+import { MobileDetailHeader } from '@/components/ui/mobile-breadcrumb';
+import { BottomActionBar, BottomActionBarSpacer } from '@/components/mobile/bottom-action-bar';
+import { QuickContactBar } from '@/components/mobile/quick-contact-bar';
 
 interface JobWithDetails extends Job {
   customer: Customer;
@@ -56,6 +60,7 @@ const STATUS_COLORS: Record<JobStatus, string> = {
   in_progress: 'bg-warning/10 text-warning border-warning/20',
   completed: 'bg-success/10 text-success border-success/20',
   cancelled: 'bg-danger/10 text-danger border-danger/20',
+  no_show: 'bg-muted/10 text-muted-foreground border-muted/20',
 };
 
 const STATUS_OPTIONS: { value: JobStatus; label: string; icon: React.ElementType }[] = [
@@ -303,10 +308,24 @@ export default function JobDetailPage() {
     job.customer.address_line1,
     job.customer.city,
     job.customer.state,
-    job.customer.postal_code
+    job.customer.zip
   );
 
   const canEdit = user.role === 'owner' || user.role === 'admin' || job.assigned_user_id === user.id;
+
+  // Get next status action
+  const getNextStatusAction = () => {
+    switch (job.status) {
+      case 'scheduled':
+        return { label: 'Start Job', status: 'in_progress' as JobStatus, icon: PlayCircle };
+      case 'in_progress':
+        return { label: 'Complete Job', status: 'completed' as JobStatus, icon: CheckCircle };
+      default:
+        return null;
+    }
+  };
+
+  const nextAction = getNextStatusAction();
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -380,44 +399,13 @@ export default function JobDetailPage() {
 
       {/* Main Content */}
       <div className="px-4 py-4 space-y-4">
-        {/* Quick Actions */}
-        <div className="grid grid-cols-3 gap-3">
-          {job.customer.phone && (
-            <a
-              href={`tel:${job.customer.phone}`}
-              className="card p-3 flex flex-col items-center gap-2 active:scale-95 transition-transform"
-            >
-              <div className="p-2 rounded-full bg-success/10">
-                <Phone className="h-5 w-5 text-success" />
-              </div>
-              <span className="text-xs font-medium text-text">Call</span>
-            </a>
-          )}
-          {job.customer.phone && (
-            <a
-              href={`sms:${job.customer.phone}`}
-              className="card p-3 flex flex-col items-center gap-2 active:scale-95 transition-transform"
-            >
-              <div className="p-2 rounded-full bg-info/10">
-                <MessageSquare className="h-5 w-5 text-info" />
-              </div>
-              <span className="text-xs font-medium text-text">Text</span>
-            </a>
-          )}
-          {address && (
-            <a
-              href={getNavigationUrl(address)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="card p-3 flex flex-col items-center gap-2 active:scale-95 transition-transform"
-            >
-              <div className="p-2 rounded-full bg-primary/10">
-                <MapPin className="h-5 w-5 text-primary" />
-              </div>
-              <span className="text-xs font-medium text-text">Navigate</span>
-            </a>
-          )}
-        </div>
+        {/* Quick Contact Actions - Enhanced with QuickContactBar */}
+        <QuickContactBar
+          phone={job.customer.phone}
+          email={job.customer.email}
+          address={address}
+          layout="2x2"
+        />
 
         {/* Job Info */}
         <section className="card p-4">
@@ -495,10 +483,14 @@ export default function JobDetailPage() {
               </div>
             </div>
             {address && (
-              <div className="flex items-start gap-3">
-                <MapPin className="h-5 w-5 text-text-muted shrink-0 mt-0.5" />
-                <p className="text-text">{address}</p>
-              </div>
+              <AddressLink
+                address={job.customer.address_line1}
+                city={job.customer.city}
+                state={job.customer.state}
+                zip={job.customer.zip}
+                className="flex items-start gap-3 text-primary"
+                iconClassName="h-5 w-5 text-text-muted shrink-0 mt-0.5"
+              />
             )}
           </div>
         </section>
@@ -666,7 +658,34 @@ export default function JobDetailPage() {
             </div>
           )}
         </section>
+
+        {/* Bottom spacer for action bar */}
+        <BottomActionBarSpacer />
       </div>
+
+      {/* Bottom Action Bar - Mobile only */}
+      {canEdit && nextAction && (
+        <BottomActionBar
+          actions={[
+            ...(job.customer.phone ? [{
+              icon: Phone,
+              label: 'Call',
+              onClick: () => window.location.href = `tel:${job.customer.phone}`,
+            }] : []),
+            ...(address ? [{
+              icon: MapPin,
+              label: 'Navigate',
+              onClick: () => window.open(getSmartNavigationUrl(address), '_blank'),
+            }] : []),
+          ]}
+          primaryAction={{
+            icon: nextAction.icon,
+            label: nextAction.label,
+            onClick: () => updateStatus(nextAction.status),
+            disabled: updating,
+          }}
+        />
+      )}
     </div>
   );
 }

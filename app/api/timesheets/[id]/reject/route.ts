@@ -63,7 +63,7 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const reason = body.reason || '';
 
-    const updatedEntry = await rejectTimeEntry(id, profile.id, reason);
+    const updatedEntry = await rejectTimeEntry(id, reason);
 
     return NextResponse.json({ entry: updatedEntry });
   } catch (error: any) {

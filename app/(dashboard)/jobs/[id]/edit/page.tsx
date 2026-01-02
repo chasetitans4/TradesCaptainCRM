@@ -9,6 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { UserWithBusiness, Job, Customer, User, JobStatus } from '@/types';
+
+// Partial user type for team member selection
+type TeamMember = Pick<User, 'id' | 'name' | 'role'>;
 import {
   ArrowLeft,
   User as UserIcon,
@@ -58,7 +61,7 @@ export default function EditJobPage() {
 
   const [user, setUser] = useState<UserWithBusiness | null>(null);
   const [job, setJob] = useState<JobWithCustomer | null>(null);
-  const [teamMembers, setTeamMembers] = useState<User[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

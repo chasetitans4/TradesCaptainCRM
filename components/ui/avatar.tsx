@@ -51,6 +51,7 @@ interface AvatarProps {
   alt?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  children?: React.ReactNode;
 }
 
 const sizeClasses = {
@@ -60,7 +61,17 @@ const sizeClasses = {
   xl: 'h-16 w-16 text-lg',
 };
 
-function Avatar({ src, fallback = '?', alt = '', size = 'md', className }: AvatarProps) {
+function Avatar({ src, fallback = '?', alt = '', size = 'md', className, children }: AvatarProps) {
+  // If children are provided, use composable pattern
+  if (children) {
+    return (
+      <AvatarRoot className={cn(sizeClasses[size], className)}>
+        {children}
+      </AvatarRoot>
+    );
+  }
+
+  // Otherwise use simplified API
   return (
     <AvatarRoot className={cn(sizeClasses[size], className)}>
       {src && <AvatarImage src={src} alt={alt} />}

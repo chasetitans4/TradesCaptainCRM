@@ -22,9 +22,12 @@ interface PortalSession {
 }
 
 function getSecretKey(): Uint8Array {
-  const secret = process.env.PORTAL_SESSION_SECRET || process.env.ENCRYPTION_KEY;
+  const secret = process.env.PORTAL_SESSION_SECRET;
   if (!secret) {
-    throw new Error('PORTAL_SESSION_SECRET environment variable is not set');
+    throw new Error('PORTAL_SESSION_SECRET environment variable must be configured');
+  }
+  if (secret.length < 32) {
+    throw new Error('PORTAL_SESSION_SECRET must be at least 32 characters');
   }
   return new TextEncoder().encode(secret);
 }

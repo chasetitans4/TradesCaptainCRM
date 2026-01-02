@@ -297,6 +297,11 @@ export async function getFieldValues(
 ): Promise<Record<string, any>> {
   const supabase = await createServerClient();
 
+  type FieldValueJoinRow = {
+    value: any;
+    field_definition: { field_name: string; is_active: boolean }[] | null;
+  };
+
   const { data, error } = await supabase
     .from('custom_field_values')
     .select(`
@@ -309,9 +314,10 @@ export async function getFieldValues(
   if (error) throw error;
 
   const result: Record<string, any> = {};
-  for (const item of data || []) {
-    if (item.field_definition?.is_active) {
-      result[item.field_definition.field_name] = item.value;
+  for (const item of (data || []) as FieldValueJoinRow[]) {
+    const def = item.field_definition?.[0];
+    if (def && def.is_active) {
+      result[def.field_name] = item.value;
     }
   }
 

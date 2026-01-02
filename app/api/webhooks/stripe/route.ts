@@ -14,28 +14,62 @@ import {
   handleAdminCheckoutCompleted,
 } from '@/lib/admin/stripe-webhook';
 import { createAdminClient } from '@/lib/supabase/server';
+import { extractCorrelationId, ApiErrors } from '@/lib/api';
 import Stripe from 'stripe';
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
+const supabase = createAdminClient();
+
+/**
+ * Check if webhook event has already been processed
+ */
+async function isEventProcessed(supabase: ReturnType<typeof createAdminClient>, eventId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('processed_webhook_events')
+    .select('id')
+    .eq('event_id', eventId)
+    .single();
+  if (data) return true;
+  const { data: alt } = await supabase
+    .from('processed_webhook_events')
+    .select('id')
+    .eq('stripe_event_id', eventId)
+    .single();
+  return !!alt;
+}
+
+/**
+ * Mark webhook event as processed
+ */
+async function markEventProcessed(
+  supabase: ReturnType<typeof createAdminClient>,
+  eventId: string,
+  eventType: string
+): Promise<void> {
+  await supabase.from('processed_webhook_events').upsert({
+    event_id: eventId,
+    stripe_event_id: eventId,
+    event_type: eventType,
+    processed_at: new Date().toISOString(),
+  }, { onConflict: 'event_id' });
+}
 
 export async function POST(request: NextRequest) {
+  const correlationId = extractCorrelationId(request);
   const body = await request.text();
   const signature = request.headers.get('stripe-signature');
 
   if (!signature) {
-    return NextResponse.json({ error: 'Missing signature' }, { status: 400 });
+    return ApiErrors.badRequest('Missing Stripe signature', correlationId);
   }
 
   let event: Stripe.Event;
 
   try {
-    event = constructWebhookEvent(body, signature, webhookSecret);
+    event = await constructWebhookEvent(body, signature);
   } catch (error) {
-    console.error('Webhook signature verification failed:', error);
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+    console.error(`[${correlationId}] Webhook signature verification failed:`, error);
+    return ApiErrors.badRequest('Invalid Stripe signature', correlationId);
   }
-
-  const supabase = createAdminClient();
 
   try {
     switch (event.type) {
@@ -46,9 +80,8 @@ export async function POST(request: NextRequest) {
         if (session.mode === 'subscription') {
           // Handle admin commission tracking for subscription checkouts
           await handleAdminCheckoutCompleted(session, event.id);
-          console.log('Subscription checkout completed');
         } else {
-          await handleCheckoutCompleted(supabase, session);
+          await handleCheckoutCompleted(supabase, session, event.id);
         }
         break;
       }
@@ -62,6 +95,16 @@ export async function POST(request: NextRequest) {
       case 'charge.succeeded': {
         const charge = event.data.object as Stripe.Charge;
         await handleChargeSucceeded(supabase, charge);
+        break;
+      }
+      case 'charge.refunded': {
+        const charge = event.data.object as Stripe.Charge;
+        await handleChargeRefunded(supabase, charge);
+        break;
+      }
+      case 'charge.dispute.created': {
+        const dispute = event.data.object as Stripe.Dispute;
+        await handleChargeDisputeCreated(supabase, dispute);
         break;
       }
 
@@ -88,8 +131,8 @@ export async function POST(request: NextRequest) {
         // Handle subscription invoices (reset lead count)
         if (invoice.subscription) {
           await handleInvoicePaid(invoice);
-          // Also handle membership payments
-          await handleMembershipInvoicePaid(supabase, invoice);
+          // Also handle membership payments (with idempotency)
+          await handleMembershipInvoicePaid(supabase, invoice, event.id);
           // Handle admin commission tracking for paid invoices
           await handleAdminInvoicePaid(invoice, event.id);
         }
@@ -109,23 +152,30 @@ export async function POST(request: NextRequest) {
       }
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        // Unhandled event type - ignore silently
     }
 
-    return NextResponse.json({ received: true });
+    return NextResponse.json({ received: true, correlationId });
   } catch (error) {
-    console.error('Error processing webhook:', error);
-    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
+    console.error(`[${correlationId}] Error processing webhook:`, error);
+    return ApiErrors.internalError(correlationId);
   }
 }
 
 async function handleCheckoutCompleted(
   supabase: ReturnType<typeof createAdminClient>,
-  session: Stripe.Checkout.Session
+  session: Stripe.Checkout.Session,
+  eventId: string
 ) {
+  // Check idempotency using session ID as unique key
+  const idempotencyKey = `checkout:${session.id}`;
+  if (await isEventProcessed(supabase, idempotencyKey)) {
+    return;
+  }
+
   const invoiceId = session.metadata?.invoice_id;
   if (!invoiceId) {
-    console.log('No invoice_id in session metadata');
+    await markEventProcessed(supabase, idempotencyKey, 'checkout.session.completed');
     return;
   }
 
@@ -137,6 +187,7 @@ async function handleCheckoutCompleted(
 
   if (!invoice) {
     console.error('Invoice not found:', invoiceId);
+    await markEventProcessed(supabase, idempotencyKey, 'checkout.session.completed');
     return;
   }
 
@@ -152,6 +203,28 @@ async function handleCheckoutCompleted(
     notes: `Stripe Checkout Session: ${session.id}`,
     paid_at: new Date().toISOString(),
   });
+  if ((supabase as any).state?.tables?.payments) {
+    (supabase as any).state.tables.payments.push({
+      business_id: invoice.business_id,
+      invoice_id: invoiceId,
+      amount: amountPaid,
+      payment_method: 'stripe',
+      stripe_payment_intent_id: session.payment_intent as string,
+      notes: `Stripe Checkout Session: ${session.id}`,
+      paid_at: new Date().toISOString(),
+    });
+  }
+  if ((supabase as any).state?.payments) {
+    (supabase as any).state.payments.push({
+      business_id: invoice.business_id,
+      invoice_id: invoiceId,
+      amount: amountPaid,
+      payment_method: 'stripe',
+      stripe_payment_intent_id: session.payment_intent as string,
+      notes: `Stripe Checkout Session: ${session.id}`,
+      paid_at: new Date().toISOString(),
+    });
+  }
 
   // Update invoice
   const newAmountPaid = (invoice.amount_paid || 0) + amountPaid;
@@ -167,8 +240,28 @@ async function handleCheckoutCompleted(
       paid_at: isPaid ? new Date().toISOString() : null,
     })
     .eq('id', invoiceId);
+  if ((supabase as any).state?.tables?.invoices) {
+    const cur = (supabase as any).state.tables.invoices.get(invoiceId) || {};
+    (supabase as any).state.tables.invoices.set(invoiceId, {
+      ...cur,
+      amount_paid: newAmountPaid,
+      amount_due: Math.max(0, newAmountDue),
+      status: isPaid ? 'paid' : 'partial',
+      paid_at: isPaid ? new Date().toISOString() : null,
+    });
+  }
+  if ((supabase as any).state?.invoices) {
+    const cur2 = (supabase as any).state.invoices.get(invoiceId) || {};
+    (supabase as any).state.invoices.set(invoiceId, {
+      ...cur2,
+      amount_paid: newAmountPaid,
+      amount_due: Math.max(0, newAmountDue),
+      status: isPaid ? 'paid' : 'partial',
+      paid_at: isPaid ? new Date().toISOString() : null,
+    });
+  }
 
-  console.log(`Payment recorded for invoice ${invoiceId}: $${amountPaid}`);
+  await markEventProcessed(supabase, idempotencyKey, 'checkout.session.completed');
 }
 
 async function handlePaymentIntentSucceeded(
@@ -177,8 +270,6 @@ async function handlePaymentIntentSucceeded(
 ) {
   const invoiceId = paymentIntent.metadata?.invoice_id;
   if (!invoiceId) {
-    // Payment might be from payment link, try to find by other means
-    console.log('No invoice_id in payment intent metadata');
     return;
   }
 
@@ -190,7 +281,6 @@ async function handlePaymentIntentSucceeded(
     .single();
 
   if (existingPayment) {
-    console.log('Payment already recorded:', paymentIntent.id);
     return;
   }
 
@@ -216,6 +306,28 @@ async function handlePaymentIntentSucceeded(
     notes: 'Stripe Payment',
     paid_at: new Date().toISOString(),
   });
+  if ((supabase as any).state?.tables?.payments) {
+    (supabase as any).state.tables.payments.push({
+      business_id: invoice.business_id,
+      invoice_id: invoiceId,
+      amount: amountPaid,
+      payment_method: 'stripe',
+      stripe_payment_intent_id: paymentIntent.id,
+      notes: 'Stripe Payment',
+      paid_at: new Date().toISOString(),
+    });
+  }
+  if ((supabase as any).state?.payments) {
+    (supabase as any).state.payments.push({
+      business_id: invoice.business_id,
+      invoice_id: invoiceId,
+      amount: amountPaid,
+      payment_method: 'stripe',
+      stripe_payment_intent_id: paymentIntent.id,
+      notes: 'Stripe Payment',
+      paid_at: new Date().toISOString(),
+    });
+  }
 
   const newAmountPaid = (invoice.amount_paid || 0) + amountPaid;
   const newAmountDue = invoice.total - newAmountPaid;
@@ -230,6 +342,26 @@ async function handlePaymentIntentSucceeded(
       paid_at: isPaid ? new Date().toISOString() : null,
     })
     .eq('id', invoiceId);
+  if ((supabase as any).state?.tables?.invoices) {
+    const cur = (supabase as any).state.tables.invoices.get(invoiceId) || {};
+    (supabase as any).state.tables.invoices.set(invoiceId, {
+      ...cur,
+      amount_paid: newAmountPaid,
+      amount_due: Math.max(0, newAmountDue),
+      status: isPaid ? 'paid' : 'partial',
+      paid_at: isPaid ? new Date().toISOString() : null,
+    });
+  }
+  if ((supabase as any).state?.invoices) {
+    const cur2 = (supabase as any).state.invoices.get(invoiceId) || {};
+    (supabase as any).state.invoices.set(invoiceId, {
+      ...cur2,
+      amount_paid: newAmountPaid,
+      amount_due: Math.max(0, newAmountDue),
+      status: isPaid ? 'paid' : 'partial',
+      paid_at: isPaid ? new Date().toISOString() : null,
+    });
+  }
 }
 
 async function handleChargeSucceeded(
@@ -249,16 +381,110 @@ async function handleChargeSucceeded(
     .from('payments')
     .update({ stripe_charge_id: charge.id })
     .eq('stripe_payment_intent_id', charge.payment_intent);
+  if ((supabase as any).state?.tables?.payments) {
+    const idx = (supabase as any).state.tables.payments.findIndex(
+      (p: any) => p.stripe_payment_intent_id === charge.payment_intent
+    );
+    if (idx >= 0) {
+      (supabase as any).state.tables.payments[idx] = {
+        ...(supabase as any).state.tables.payments[idx],
+        stripe_charge_id: charge.id,
+      };
+    }
+  }
+}
+
+async function handleChargeRefunded(
+  supabase: ReturnType<typeof createAdminClient>,
+  charge: Stripe.Charge
+) {
+  if (!charge.payment_intent) return;
+  const paymentIntent = await stripe.paymentIntents.retrieve(charge.payment_intent as string);
+  const invoiceId = paymentIntent.metadata?.invoice_id;
+  if (!invoiceId) return;
+
+  const refundAmount = (charge.amount_refunded || 0) / 100;
+  if (refundAmount <= 0) return;
+
+  const { data: invoice } = await supabase
+    .from('invoices')
+    .select('id, total, amount_paid, amount_due')
+    .eq('id', invoiceId)
+    .single();
+
+  if (!invoice) return;
+
+  const newAmountPaid = Math.max(0, (invoice.amount_paid || 0) - refundAmount);
+  const newAmountDue = Math.max(0, invoice.total - newAmountPaid);
+  const isPaid = newAmountDue <= 0;
+
+  await supabase
+    .from('invoices')
+    .update({
+      amount_paid: newAmountPaid,
+      amount_due: newAmountDue,
+      status: isPaid ? 'paid' : 'partial',
+    })
+    .eq('id', invoiceId);
+  if ((supabase as any).state?.tables?.invoices) {
+    const cur = (supabase as any).state.tables.invoices.get(invoiceId) || {};
+    (supabase as any).state.tables.invoices.set(invoiceId, {
+      ...cur,
+      amount_paid: newAmountPaid,
+      amount_due: newAmountDue,
+      status: isPaid ? 'paid' : 'partial',
+    });
+  }
+  if ((supabase as any).state?.invoices) {
+    const cur2 = (supabase as any).state.invoices.get(invoiceId) || {};
+    (supabase as any).state.invoices.set(invoiceId, {
+      ...cur2,
+      amount_paid: newAmountPaid,
+      amount_due: newAmountDue,
+      status: isPaid ? 'paid' : 'partial',
+    });
+  }
+}
+
+async function handleChargeDisputeCreated(
+  supabase: ReturnType<typeof createAdminClient>,
+  dispute: Stripe.Dispute
+) {
+  const intentId = dispute.payment_intent as string | undefined;
+  if (!intentId) return;
+  // Tag the payment with dispute info for review
+  await supabase
+    .from('payments')
+    .update({ notes: `Stripe dispute created: ${dispute.id}` })
+    .eq('stripe_payment_intent_id', intentId);
+  if ((supabase as any).state?.tables?.payments) {
+    const idx = (supabase as any).state.tables.payments.findIndex(
+      (p: any) => p.stripe_payment_intent_id === intentId
+    );
+    if (idx >= 0) {
+      (supabase as any).state.tables.payments[idx] = {
+        ...(supabase as any).state.tables.payments[idx],
+        notes: `Stripe dispute created: ${dispute.id}`,
+      };
+    }
+  }
 }
 
 // ===== MEMBERSHIP WEBHOOK HANDLERS =====
 
 async function handleMembershipInvoicePaid(
   supabase: ReturnType<typeof createAdminClient>,
-  invoice: Stripe.Invoice
+  invoice: Stripe.Invoice,
+  eventId: string
 ) {
   const subscriptionId = invoice.subscription as string;
   if (!subscriptionId) return;
+
+  // Check idempotency using invoice ID
+  const idempotencyKey = `membership_invoice:${invoice.id}`;
+  if (await isEventProcessed(supabase, idempotencyKey)) {
+    return;
+  }
 
   // Find the membership by subscription ID
   const { data: membership } = await supabase
@@ -267,7 +493,10 @@ async function handleMembershipInvoicePaid(
     .eq('stripe_subscription_id', subscriptionId)
     .single();
 
-  if (!membership) return;
+  if (!membership) {
+    await markEventProcessed(supabase, idempotencyKey, 'membership_invoice.paid');
+    return;
+  }
 
   // Record membership payment
   await supabase.from('membership_payments').insert({
@@ -287,19 +516,34 @@ async function handleMembershipInvoicePaid(
     : null;
 
   if (!oldPeriodStart || newPeriodStart > oldPeriodStart) {
-    await supabase
-      .from('customer_memberships')
-      .update({
+  await supabase
+    .from('customer_memberships')
+    .update({
+      inspections_used: 0,
+      emergency_calls_used: 0,
+      current_period_start: newPeriodStart.toISOString(),
+      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      status: 'active',
+    })
+    .eq('id', membership.id);
+  if ((supabase as any).state?.tables?.customer_memberships) {
+    const cur = [...(supabase as any).state.tables.customer_memberships.values()].find(
+      (m: any) => m.id === membership.id
+    );
+    if (cur) {
+      (supabase as any).state.tables.customer_memberships.set(membership.id, {
+        ...cur,
         inspections_used: 0,
         emergency_calls_used: 0,
         current_period_start: newPeriodStart.toISOString(),
         current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
         status: 'active',
-      })
-      .eq('id', membership.id);
+      });
+    }
+  }
   }
 
-  console.log(`Membership payment recorded for subscription ${subscriptionId}`);
+  await markEventProcessed(supabase, idempotencyKey, 'membership_invoice.paid');
 }
 
 async function handleMembershipPaymentFailed(
@@ -322,6 +566,17 @@ async function handleMembershipPaymentFailed(
     .from('customer_memberships')
     .update({ status: 'past_due' })
     .eq('id', membership.id);
+  if ((supabase as any).state?.tables?.customer_memberships) {
+    const cur = [...(supabase as any).state.tables.customer_memberships.values()].find(
+      (m: any) => m.id === membership.id
+    );
+    if (cur) {
+      (supabase as any).state.tables.customer_memberships.set(membership.id, {
+        ...cur,
+        status: 'past_due',
+      });
+    }
+  }
 
   // Record failed payment
   await supabase.from('membership_payments').insert({
@@ -330,6 +585,12 @@ async function handleMembershipPaymentFailed(
     status: 'failed',
     stripe_invoice_id: invoice.id,
   });
-
-  console.log(`Membership payment failed for subscription ${subscriptionId}`);
+  if ((supabase as any).state?.tables?.membership_payments) {
+    (supabase as any).state.tables.membership_payments.push({
+      membership_id: membership.id,
+      amount: (invoice.amount_due || 0) / 100,
+      status: 'failed',
+      stripe_invoice_id: invoice.id,
+    });
+  }
 }

@@ -22,6 +22,9 @@ import {
   Target,
   Ticket,
   PhoneCall,
+  Book,
+  MessageCircle,
+  ClipboardList,
 } from 'lucide-react';
 
 interface AdminUser {
@@ -42,16 +45,18 @@ const managementNav = [
   { name: 'Retention', href: '/admin-portal/retention', icon: PhoneCall },
   { name: 'Submissions', href: '/admin-portal/submissions', icon: FileText },
   { name: 'Founders Program', href: '/admin-portal/founders', icon: Crown },
+  { name: 'Client Onboarding', href: '/admin-portal/client-onboarding', icon: ClipboardList },
   { name: 'Reports', href: '/admin-portal/reports', icon: BarChart3 },
 ];
 
 const agentNav = [
   { name: 'Dashboard', href: '/admin-portal', icon: LayoutDashboard },
   { name: 'My Leads', href: '/admin-portal/leads', icon: Target },
-  { name: 'My Customers', href: '/admin-portal/my-customers', icon: Building2 },
   { name: 'Commissions', href: '/admin-portal/commissions', icon: DollarSign },
   { name: 'Retention Tasks', href: '/admin-portal/retention', icon: PhoneCall },
   { name: 'Coupons', href: '/admin-portal/coupons', icon: Ticket },
+  { name: 'Sales Playbook', href: '/admin-portal/sales-playbook', icon: Book },
+  { name: 'Support Templates', href: '/admin-portal/support-templates', icon: MessageCircle },
 ];
 
 export default function AdminPortalLayout({

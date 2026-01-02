@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const lead = await createLead(body, auth.user.id);
+    const lead = await createLead(auth.user.id, body);
 
     return NextResponse.json({ success: true, lead });
   } catch (error: any) {

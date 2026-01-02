@@ -6,6 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { verifyAdminAuth } from '@/lib/admin/auth';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 export async function GET(request: NextRequest) {
   const auth = await verifyAdminAuth(request);
@@ -141,13 +143,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate a temporary password hash (agent will need to reset)
-    const crypto = require('crypto');
+    // Generate a temporary password and hash with bcrypt (agent will need to reset)
     const tempPassword = crypto.randomBytes(16).toString('hex');
-    const passwordHash = crypto
-      .createHash('sha256')
-      .update(tempPassword)
-      .digest('hex');
+    const passwordHash = await bcrypt.hash(tempPassword, 12);
 
     const { data: agent, error } = await supabase
       .from('admin_users')

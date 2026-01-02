@@ -115,7 +115,6 @@ async function extractReceiptData(imageUrl: string) {
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
-    console.log('OpenAI API key not configured, skipping OCR');
     return null;
   }
 

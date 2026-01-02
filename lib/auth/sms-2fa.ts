@@ -33,14 +33,13 @@ export async function sendSMS2FACode(
     expires_at: new Date(Date.now() + CODE_EXPIRY_MINUTES * 60 * 1000).toISOString(),
   });
 
-  // Send SMS via Twilio (import your Twilio helper)
-  // This assumes you have a sendSMS function from lib/twilio
+  // Send SMS via Twilio
   try {
-    const { sendSMS } = await import('@/lib/twilio');
-    await sendSMS(
-      phone,
-      `Your TradesCaptain verification code is: ${code}. It expires in ${CODE_EXPIRY_MINUTES} minutes. Don't share this code with anyone.`
-    );
+    const { sendSms } = await import('@/lib/sms');
+    await sendSms({
+      to: phone,
+      body: `Your TradesCaptain verification code is: ${code}. It expires in ${CODE_EXPIRY_MINUTES} minutes. Don't share this code with anyone.`,
+    });
   } catch (error) {
     // If Twilio is not configured, log for development
     console.log(`[DEV] SMS 2FA code for ${phone}: ${code}`);

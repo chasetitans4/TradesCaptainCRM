@@ -6,34 +6,88 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createAdminClient } from '@/lib/supabase/server';
+import { checkLoginRateLimit } from '@/lib/rate-limit';
+import { SignJWT } from 'jose';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'fallback-secret';
-
-function base64Encode(str: string): string {
-  return Buffer.from(str).toString('base64url');
+/**
+ * Get JWT secret key - throws if not configured
+ */
+function getJwtSecret(): Uint8Array {
+  const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable must be configured');
+  }
+  if (secret.length < 32) {
+    throw new Error('JWT_SECRET must be at least 32 characters');
+  }
+  return new TextEncoder().encode(secret);
 }
 
-function createToken(payload: any, expiresIn: number): string {
-  const crypto = require('crypto');
-  const expPayload = { ...payload, exp: Date.now() + expiresIn };
-  const payloadStr = base64Encode(JSON.stringify(expPayload));
-  const signature = crypto
-    .createHmac('sha256', JWT_SECRET)
-    .update(payloadStr)
-    .digest('base64url');
-  return `${payloadStr}.${signature}`;
+/**
+ * Create JWT token using jose library
+ */
+async function createToken(
+  payload: Record<string, unknown>,
+  expiresIn: string
+): Promise<string> {
+  const secret = getJwtSecret();
+  return new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(expiresIn)
+    .sign(secret);
 }
 
+/**
+ * Verify password using bcrypt (secure) or legacy PBKDF2 (for migration)
+ */
 async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
-  const crypto = require('crypto');
+  // Check if it's a bcrypt hash (starts with $2a$, $2b$, or $2y$)
+  if (storedHash.startsWith('$2')) {
+    return bcrypt.compare(password, storedHash);
+  }
+
+  // Legacy PBKDF2 format: salt:hash - use timing-safe comparison
   const [salt, hash] = storedHash.split(':');
   if (!salt || !hash) return false;
+
   const verifyHash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
-  return hash === verifyHash;
+
+  // Use timing-safe comparison to prevent timing attacks
+  try {
+    return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(verifyHash, 'hex'));
+  } catch {
+    return false;
+  }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // Get client IP for rate limiting
+    const ip = request.headers.get('cf-connecting-ip') ||
+               request.headers.get('x-real-ip') ||
+               request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+               'unknown';
+
+    // Check Redis-backed rate limit (5 attempts per 15 minutes per IP)
+    const rateLimit = await checkLoginRateLimit(ip);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': '5',
+            'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+            'X-RateLimit-Reset': rateLimit.resetAt.toISOString(),
+            'Retry-After': (rateLimit.retryAfter || 900).toString(),
+          },
+        }
+      );
+    }
+
     const body = await request.json();
     const { email, password } = body;
 
@@ -76,15 +130,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate tokens
-    const accessToken = createToken(
+    // Generate tokens using jose
+    const accessToken = await createToken(
       { userId: user.id, email: user.email, role: user.role, type: 'access' },
-      15 * 60 * 1000 // 15 minutes
+      '15m' // 15 minutes
     );
 
-    const refreshToken = createToken(
+    const refreshToken = await createToken(
       { userId: user.id, email: user.email, role: user.role, type: 'refresh' },
-      7 * 24 * 60 * 60 * 1000 // 7 days
+      '7d' // 7 days
     );
 
     // Update last login

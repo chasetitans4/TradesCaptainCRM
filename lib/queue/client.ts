@@ -3,12 +3,12 @@
 // Background job processing with Redis
 // =====================================================
 
-import { Queue, QueueEvents } from 'bullmq';
+import { Queue, QueueEvents, type ConnectionOptions } from 'bullmq';
 
 // Connection config (reuse Redis connection settings)
-const getConnection = () => {
+const getConnection = (): ConnectionOptions => {
   if (process.env.REDIS_URL) {
-    return process.env.REDIS_URL;
+    return { url: process.env.REDIS_URL };
   }
 
   return {
@@ -97,7 +97,6 @@ export async function getQueueHealth(): Promise<Record<string, {
  */
 export async function pauseAllQueues(): Promise<void> {
   await Promise.all(allQueues.map(q => q.pause()));
-  console.log('All queues paused');
 }
 
 /**
@@ -105,7 +104,6 @@ export async function pauseAllQueues(): Promise<void> {
  */
 export async function resumeAllQueues(): Promise<void> {
   await Promise.all(allQueues.map(q => q.resume()));
-  console.log('All queues resumed');
 }
 
 /**
@@ -113,5 +111,4 @@ export async function resumeAllQueues(): Promise<void> {
  */
 export async function closeAllQueues(): Promise<void> {
   await Promise.all(allQueues.map(q => q.close()));
-  console.log('All queues closed');
 }

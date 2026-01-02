@@ -13,7 +13,7 @@ function getStripe(): Stripe {
       throw new Error('STRIPE_SECRET_KEY is not set. Stripe features are disabled.');
     }
     _stripe = new Stripe(key, {
-      apiVersion: '2024-04-10',
+      apiVersion: '2025-02-24.acacia',
       typescript: true,
     });
   }

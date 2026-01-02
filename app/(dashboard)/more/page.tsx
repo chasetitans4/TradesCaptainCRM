@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getCurrentUserProfile, signOut } from '@/lib/supabase/client';
-import { hasPermission } from '@/lib/permissions';
+import { hasPermission, type Permission } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -35,7 +35,7 @@ interface MenuItem {
   label: string;
   description: string;
   icon: React.ElementType;
-  permission?: string;
+  permission?: Permission;
   badge?: string;
 }
 
@@ -123,7 +123,7 @@ const MENU_SECTIONS: {
         permission: 'view_reports',
       },
       {
-        href: '/team',
+        href: '/settings/team',
         label: 'Team',
         description: 'Manage team members',
         icon: UserPlus,
@@ -147,7 +147,7 @@ const MENU_SECTIONS: {
         icon: Settings,
       },
       {
-        href: '/settings/business',
+        href: '/settings',
         label: 'Business Profile',
         description: 'Company information',
         icon: Building2,
@@ -162,7 +162,7 @@ const MENU_SECTIONS: {
         badge: 'Pro',
       },
       {
-        href: '/settings/email-recipients',
+        href: '/settings',
         label: 'Email Alerts',
         description: 'Notification recipients',
         icon: Mail,

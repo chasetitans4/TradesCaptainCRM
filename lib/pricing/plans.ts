@@ -1,10 +1,11 @@
 // =====================================================
-// TRADESCAPTAIN PRICING & PLANS CONFIGURATION - v5
-// Updated: December 2025
+// TRADESCAPTAIN PRICING & PLANS CONFIGURATION - v5.9
+// Updated: December 2024
+// Terms: Month-to-month | $0 deposit | Cancel anytime
 // =====================================================
 
 // Plan track types
-export type PlanTrack = 'blue' | 'web' | 'seo' | 'gold';
+export type PlanTrack = 'leads_captain' | 'blue' | 'web' | 'seo' | 'silver' | 'gold';
 export type PlanTier = 'starter' | 'pro' | 'enterprise' | 'custom';
 export type PlanType = 'individual' | 'teams';
 export type BillingFrequency = 'monthly' | 'annual';
@@ -13,6 +14,7 @@ export interface PlanFeatures {
   website_pages?: string;
   users: number;
   user_limit?: number; // Alias for users for backwards compatibility
+  contacts?: number | 'unlimited'; // Contact limit for CRM plans
   includes_website: boolean;
   includes_crm: boolean;
   includes_local_seo: boolean;
@@ -20,13 +22,16 @@ export interface PlanFeatures {
   includes_gbp: boolean;
   gbp_addon_available: boolean;
   includes_ai_sms: boolean;
+  includes_leads_captain: boolean; // v5.9: Leads Captain inclusion
+  sms_limit?: number; // Monthly SMS limit
   citations?: number;
   requires_existing_website: boolean;
   features: string[];
+  support_level?: 'email' | 'email_chat' | 'priority';
 }
 
 // Available plan tracks
-export const PLAN_TRACKS: PlanTrack[] = ['blue', 'web', 'seo', 'gold'];
+export const PLAN_TRACKS: PlanTrack[] = ['leads_captain', 'blue', 'web', 'seo', 'silver', 'gold'];
 
 export interface Plan {
   id: string;
@@ -54,7 +59,47 @@ export interface AddOn {
 }
 
 // =====================================================
-// BLUE PLANS (CRM Only) - No pricing changes
+// LEADS CAPTAIN - $39/mo - AI Missed Call Text-Back
+// =====================================================
+
+export const LEADS_CAPTAIN_PLANS: Plan[] = [
+  {
+    id: 'leads_captain',
+    name: 'Leads Captain',
+    track: 'leads_captain',
+    tier: 'starter',
+    type: 'individual',
+    monthly_price: 39,
+    annual_price: 398, // 15% discount (~2 months free)
+    description: 'AI Missed Call Text-Back',
+    features: {
+      users: 1,
+      includes_website: false,
+      includes_crm: false,
+      includes_local_seo: false,
+      includes_gbp: false,
+      gbp_addon_available: false,
+      includes_ai_sms: true,
+      includes_leads_captain: true,
+      sms_limit: 700, // Soft cap
+      requires_existing_website: false,
+      support_level: 'email',
+      features: [
+        'Dedicated phone number',
+        'Automatic text-back',
+        'AI SMS conversations',
+        '700 SMS messages/month (soft cap)',
+        'Conversation dashboard',
+      ],
+    },
+    invoice_description: 'Leads Captain — AI Missed Call Text-Back',
+    invoice_includes: 'Dedicated phone number, AI SMS conversations, 700 SMS/month',
+    is_active: true,
+  },
+];
+
+// =====================================================
+// BLUE CRM PLANS - v5.9 pricing
 // =====================================================
 
 export const BLUE_PLANS: Plan[] = [
@@ -65,27 +110,29 @@ export const BLUE_PLANS: Plan[] = [
     tier: 'starter',
     type: 'individual',
     monthly_price: 49,
-    annual_price: 441,
+    annual_price: 500, // 15% discount
     description: 'Perfect for solo contractors',
     features: {
       users: 1,
+      contacts: 500,
       includes_website: false,
       includes_crm: true,
       includes_local_seo: false,
       includes_gbp: false,
       gbp_addon_available: false,
-      includes_ai_sms: true,
+      includes_ai_sms: false, // No Leads Captain in Starter
+      includes_leads_captain: false,
       requires_existing_website: false,
+      support_level: 'email',
       features: [
-        'BlueHQ CRM (1 user)',
-        'AI SMS Lead Capture',
-        'Lead Management',
-        'Job Scheduling',
-        'Basic Invoicing',
+        'Blue CRM (1 user)',
+        '500 contacts',
+        'Lead tracking',
+        'Basic job management',
       ],
     },
     invoice_description: 'Blue Starter — CRM Only',
-    invoice_includes: 'BlueHQ CRM (1 user), AI SMS Lead Capture',
+    invoice_includes: 'Blue CRM (1 user), 500 contacts, lead tracking, basic job management',
     is_active: true,
   },
   {
@@ -95,29 +142,34 @@ export const BLUE_PLANS: Plan[] = [
     tier: 'pro',
     type: 'individual',
     monthly_price: 99,
-    annual_price: 891,
-    description: 'Advanced features for growing businesses',
+    annual_price: 1010, // 15% discount
+    description: 'Advanced features with Leads Captain included',
     features: {
-      users: 1,
+      users: 3,
+      contacts: 2000,
       includes_website: false,
       includes_crm: true,
       includes_local_seo: false,
       includes_gbp: false,
       gbp_addon_available: false,
       includes_ai_sms: true,
+      includes_leads_captain: true, // Included!
+      sms_limit: 1000,
       requires_existing_website: false,
+      support_level: 'email_chat',
       features: [
-        'BlueHQ CRM (1 user)',
-        'AI SMS Lead Capture',
-        'Advanced Lead Management',
-        'Job Scheduling & Dispatch',
-        'Quotes & Invoicing',
-        'Expense Tracking',
-        'Basic Reports',
+        'Blue CRM (3 users)',
+        '2,000 contacts',
+        'Lead tracking',
+        'Full job management',
+        'Two-way SMS',
+        'Estimate templates',
+        'Document storage',
+        'Leads Captain included (1,000 SMS)',
       ],
     },
-    invoice_description: 'Blue Pro — CRM Only',
-    invoice_includes: 'BlueHQ CRM (1 user), AI SMS, Advanced Features',
+    invoice_description: 'Blue Pro — CRM + Leads Captain',
+    invoice_includes: 'Blue CRM (3 users), 2,000 contacts, Leads Captain (1,000 SMS)',
     is_active: true,
   },
   {
@@ -127,128 +179,44 @@ export const BLUE_PLANS: Plan[] = [
     tier: 'enterprise',
     type: 'individual',
     monthly_price: 199,
-    annual_price: 1791,
+    annual_price: 2030, // 15% discount
     description: 'Full-featured CRM with priority support',
     features: {
-      users: 1,
-      includes_website: false,
-      includes_crm: true,
-      includes_local_seo: false,
-      includes_gbp: false,
-      gbp_addon_available: false,
-      includes_ai_sms: true,
-      requires_existing_website: false,
-      features: [
-        'BlueHQ CRM (1 user)',
-        'AI SMS Lead Capture',
-        'Full CRM Features',
-        'Advanced Dispatch',
-        'Full Reporting Suite',
-        'Integrations',
-        'Priority Support',
-      ],
-    },
-    invoice_description: 'Blue Enterprise — CRM Only',
-    invoice_includes: 'BlueHQ CRM (1 user), Full Features, Priority Support',
-    is_active: true,
-  },
-  {
-    id: 'blue_starter_teams',
-    name: 'Blue Starter Teams',
-    track: 'blue',
-    tier: 'starter',
-    type: 'teams',
-    monthly_price: 149,
-    annual_price: 1341,
-    description: 'Team CRM for small crews',
-    features: {
-      users: 5,
-      includes_website: false,
-      includes_crm: true,
-      includes_local_seo: false,
-      includes_gbp: false,
-      gbp_addon_available: false,
-      includes_ai_sms: true,
-      requires_existing_website: false,
-      features: [
-        'BlueHQ CRM (5 users)',
-        'AI SMS Lead Capture',
-        'Team Management',
-        'Role-based Access',
-        'Job Scheduling',
-      ],
-    },
-    invoice_description: 'Blue Starter Teams — CRM (5 users)',
-    invoice_includes: 'BlueHQ CRM (5 users), AI SMS, Team Features',
-    is_active: true,
-  },
-  {
-    id: 'blue_pro_teams',
-    name: 'Blue Pro Teams',
-    track: 'blue',
-    tier: 'pro',
-    type: 'teams',
-    monthly_price: 199,
-    annual_price: 1791,
-    description: 'Advanced team features with dispatch',
-    features: {
       users: 10,
+      contacts: 'unlimited',
       includes_website: false,
       includes_crm: true,
       includes_local_seo: false,
       includes_gbp: false,
       gbp_addon_available: false,
       includes_ai_sms: true,
+      includes_leads_captain: true, // Included!
+      sms_limit: 1500,
       requires_existing_website: false,
+      support_level: 'priority',
       features: [
-        'BlueHQ CRM (10 users)',
-        'AI SMS Lead Capture',
-        'Advanced Team Management',
-        'Dispatch & Routing',
-        'Full Reporting',
+        'Blue CRM (10 users)',
+        'Unlimited contacts',
+        'Lead tracking',
+        'Full job management',
+        'Two-way SMS',
+        'Estimate templates',
+        'Document storage',
+        'Calendar sync',
+        'Auto follow-ups',
+        'Leads Captain included (1,500 SMS)',
+        'Priority support',
       ],
     },
-    invoice_description: 'Blue Pro Teams — CRM (10 users)',
-    invoice_includes: 'BlueHQ CRM (10 users), AI SMS, Advanced Team Features',
-    is_active: true,
-  },
-  {
-    id: 'blue_enterprise_teams',
-    name: 'Blue Enterprise Teams',
-    track: 'blue',
-    tier: 'enterprise',
-    type: 'teams',
-    monthly_price: 399,
-    annual_price: 3591,
-    description: 'Enterprise CRM for large operations',
-    features: {
-      users: 20,
-      includes_website: false,
-      includes_crm: true,
-      includes_local_seo: false,
-      includes_gbp: false,
-      gbp_addon_available: false,
-      includes_ai_sms: true,
-      requires_existing_website: false,
-      features: [
-        'BlueHQ CRM (20 users)',
-        'AI SMS Lead Capture',
-        'Enterprise Team Management',
-        'Advanced Dispatch',
-        'Full Reporting Suite',
-        'API Access',
-        'Dedicated Support',
-      ],
-    },
-    invoice_description: 'Blue Enterprise Teams — CRM (20 users)',
-    invoice_includes: 'BlueHQ CRM (20 users), Full Enterprise Features',
+    invoice_description: 'Blue Enterprise — CRM + Leads Captain',
+    invoice_includes: 'Blue CRM (10 users), Unlimited contacts, Leads Captain (1,500 SMS), Priority support',
     is_active: true,
   },
 ];
 
 // =====================================================
-// WEB PLANS (Website Only) - No pricing changes
-// GBP Add-On available ($99 one-time)
+// WEB PLANS (Website Only) - v5.9 pricing
+// Cloud hosting: 2 years included, then $15/mo
 // =====================================================
 
 export const WEB_PLANS: Plan[] = [
@@ -258,30 +226,35 @@ export const WEB_PLANS: Plan[] = [
     track: 'web',
     tier: 'starter',
     type: 'individual',
-    monthly_price: 149,
-    annual_price: 1341,
-    description: 'Professional 1-5 page website',
+    monthly_price: 199,
+    annual_price: 2030, // 15% discount
+    description: 'Professional 5-page website',
     features: {
-      website_pages: '1-5',
+      website_pages: '5',
       users: 0,
       includes_website: true,
       includes_crm: false,
       includes_local_seo: false,
       includes_gbp: false,
-      gbp_addon_available: true, // GBP add-on available for Web plans
+      gbp_addon_available: true,
       includes_ai_sms: false,
+      includes_leads_captain: false,
       requires_existing_website: false,
       features: [
-        'Semi-Custom Website (1-5 pages)',
-        'Mobile Responsive',
-        'On-Page SEO (meta tags, schema)',
-        'SSL Certificate',
-        'Hosting Included',
-        'Monthly Maintenance',
+        '5 pages',
+        'Mobile responsive',
+        'Basic on-page SEO',
+        'Contact forms',
+        'Domain name (1 year)',
+        'Cloud hosting (2 years included)',
+        'SSL certificate',
+        '3 stock images/graphics',
+        '1 design revision',
+        'Delivery: 3-4 weeks',
       ],
     },
     invoice_description: 'Web Starter — Professional Website',
-    invoice_includes: '1-5 page website, On-Page SEO, Hosting & SSL',
+    invoice_includes: '5 page website, domain, 2 years hosting, SSL',
     is_active: true,
   },
   {
@@ -290,11 +263,11 @@ export const WEB_PLANS: Plan[] = [
     track: 'web',
     tier: 'pro',
     type: 'individual',
-    monthly_price: 249,
-    annual_price: 2241,
-    description: 'Feature-rich 5-10 page website with blog',
+    monthly_price: 299,
+    annual_price: 3050, // 15% discount
+    description: 'Feature-rich 10-page website with blog',
     features: {
-      website_pages: '5-10',
+      website_pages: '10',
       users: 0,
       includes_website: true,
       includes_crm: false,
@@ -302,20 +275,26 @@ export const WEB_PLANS: Plan[] = [
       includes_gbp: false,
       gbp_addon_available: true,
       includes_ai_sms: false,
+      includes_leads_captain: false,
       requires_existing_website: false,
       features: [
-        'Semi-Custom Website (5-10 pages)',
-        'Mobile Responsive',
-        'On-Page SEO',
-        'SSL Certificate',
-        'Hosting Included',
-        'Blog Setup',
-        'Contact Forms',
-        'Monthly Updates',
+        '10 pages',
+        'Mobile responsive',
+        'Basic on-page SEO',
+        'Contact forms',
+        'Domain name (1 year)',
+        'Cloud hosting (2 years included)',
+        'SSL certificate',
+        '6 stock images/graphics',
+        '3 service area pages',
+        'Blog setup',
+        'Schema markup',
+        '2 design revisions',
+        'Delivery: 3-4 weeks',
       ],
     },
     invoice_description: 'Web Pro — Professional Website',
-    invoice_includes: '5-10 page website, On-Page SEO, Hosting & SSL, Blog',
+    invoice_includes: '10 page website, domain, 2 years hosting, SSL, blog, service area pages',
     is_active: true,
   },
   {
@@ -324,43 +303,9 @@ export const WEB_PLANS: Plan[] = [
     track: 'web',
     tier: 'enterprise',
     type: 'individual',
-    monthly_price: 349,
-    annual_price: 3141,
-    description: 'Premium 10-15 page website',
-    features: {
-      website_pages: '10-15',
-      users: 0,
-      includes_website: true,
-      includes_crm: false,
-      includes_local_seo: false,
-      includes_gbp: false,
-      gbp_addon_available: true,
-      includes_ai_sms: false,
-      requires_existing_website: false,
-      features: [
-        'Semi-Custom Website (10-15 pages)',
-        'Mobile Responsive',
-        'Advanced On-Page SEO',
-        'SSL Certificate',
-        'Premium Hosting',
-        'Blog & News Section',
-        'Custom Forms',
-        'Priority Updates',
-      ],
-    },
-    invoice_description: 'Web Enterprise — Professional Website',
-    invoice_includes: '10-15 page website, Advanced SEO, Premium Hosting',
-    is_active: true,
-  },
-  {
-    id: 'web_custom',
-    name: 'Web Full Custom',
-    track: 'web',
-    tier: 'custom',
-    type: 'individual',
-    monthly_price: 0, // Quote-based
-    annual_price: 0,
-    description: 'Fully custom 15+ page website',
+    monthly_price: 499,
+    annual_price: 5090, // 15% discount
+    description: 'Premium 15+ page website',
     features: {
       website_pages: '15+',
       users: 0,
@@ -370,25 +315,33 @@ export const WEB_PLANS: Plan[] = [
       includes_gbp: false,
       gbp_addon_available: true,
       includes_ai_sms: false,
+      includes_leads_captain: false,
       requires_existing_website: false,
       features: [
-        'Fully Custom Website (15+ pages)',
-        'Custom Design',
-        'Advanced Functionality',
-        'E-commerce Options',
-        'Custom Integrations',
-        'Dedicated Support',
+        '15+ pages',
+        'Mobile responsive',
+        'Basic on-page SEO',
+        'Contact forms',
+        'Domain name (1 year)',
+        'Cloud hosting (2 years included)',
+        'SSL certificate',
+        '9 stock images/graphics',
+        '10 service area pages',
+        'Blog setup',
+        'Schema markup',
+        '3 design revisions',
+        'Delivery: 3-4 weeks',
       ],
     },
-    invoice_description: 'Web Full Custom — Custom Website',
-    invoice_includes: 'Custom website build per quote',
+    invoice_description: 'Web Enterprise — Professional Website',
+    invoice_includes: '15+ page website, domain, 2 years hosting, SSL, blog, 10 service area pages',
     is_active: true,
   },
 ];
 
 // =====================================================
-// LOCAL SEO PLANS (NEW) - For existing websites
-// GBP Management INCLUDED
+// LOCAL SEO PLANS - v5.9 pricing
+// For existing websites - GBP Management INCLUDED
 // =====================================================
 
 export const SEO_PLANS: Plan[] = [
@@ -399,30 +352,29 @@ export const SEO_PLANS: Plan[] = [
     tier: 'starter',
     type: 'individual',
     monthly_price: 99,
-    annual_price: 891,
-    description: 'GBP management + 20 citations',
+    annual_price: 1010, // 15% discount
+    description: 'GBP optimization & initial setup',
     features: {
-      website_pages: '1-5',
       users: 0,
       includes_website: false,
       includes_crm: false,
       includes_local_seo: true,
       local_seo_tier: 'starter',
-      includes_gbp: true, // GBP INCLUDED
-      gbp_addon_available: false, // Already included
+      includes_gbp: true,
+      gbp_addon_available: false,
       includes_ai_sms: false,
-      citations: 20,
-      requires_existing_website: true, // Client must have existing website
+      includes_leads_captain: false,
+      requires_existing_website: true,
       features: [
-        'GBP Setup & Management',
-        '20 Local Citations',
-        'Basic On-Site Optimization',
-        'Monthly Ranking Report',
-        '2 GBP Posts/Month',
+        'GBP optimization (initial setup)',
+        'Geogrid ranking report (monthly)',
+        'Citation audit (initial)',
+        'NAP consistency check',
+        'Local SEO audit (initial only)',
       ],
     },
-    invoice_description: 'Local SEO Starter — For websites with 1-5 pages',
-    invoice_includes: 'GBP setup & management, 20 citations, on-site optimization, monthly ranking report',
+    invoice_description: 'Local SEO Starter',
+    invoice_includes: 'GBP initial setup, monthly geogrid report, citation audit',
     is_active: true,
   },
   {
@@ -431,11 +383,10 @@ export const SEO_PLANS: Plan[] = [
     track: 'seo',
     tier: 'pro',
     type: 'individual',
-    monthly_price: 149,
-    annual_price: 1341,
-    description: 'GBP + 50 citations + competitor tracking',
+    monthly_price: 199,
+    annual_price: 2030, // 15% discount
+    description: 'Setup + monthly review with citation building',
     features: {
-      website_pages: '5-10',
       users: 0,
       includes_website: false,
       includes_crm: false,
@@ -444,20 +395,23 @@ export const SEO_PLANS: Plan[] = [
       includes_gbp: true,
       gbp_addon_available: false,
       includes_ai_sms: false,
-      citations: 50,
+      includes_leads_captain: false,
+      citations: 30,
       requires_existing_website: true,
       features: [
-        'GBP Management',
-        '50 Local Citations',
-        'On-Site Optimization',
-        'Review Response Templates',
-        'Competitor Tracking (3)',
-        'Bi-Weekly Ranking Reports',
-        '4 GBP Posts/Month',
+        'GBP optimization (setup + monthly review)',
+        '2 GBP posts/month',
+        'Geogrid ranking report (bi-weekly)',
+        'Citation audit (quarterly)',
+        'Citation building (up to 30 directories)',
+        'NAP consistency check',
+        'Competitor ranking comparison',
+        'Review monitoring alerts',
+        'Local SEO audit (quarterly)',
       ],
     },
-    invoice_description: 'Local SEO Pro — For websites with 5-10 pages',
-    invoice_includes: 'GBP management, 50 citations, review templates, competitor tracking, bi-weekly reports',
+    invoice_description: 'Local SEO Pro',
+    invoice_includes: 'GBP monthly review, 2 posts/mo, bi-weekly reports, 30 citations, competitor tracking',
     is_active: true,
   },
   {
@@ -466,11 +420,10 @@ export const SEO_PLANS: Plan[] = [
     track: 'seo',
     tier: 'enterprise',
     type: 'individual',
-    monthly_price: 199,
-    annual_price: 1791,
-    description: 'Full GBP + 100+ citations + review mgmt',
+    monthly_price: 249,
+    annual_price: 2540, // 15% discount
+    description: 'Full GBP management with strategy calls',
     features: {
-      website_pages: '10-15',
       users: 0,
       includes_website: false,
       includes_crm: false,
@@ -479,28 +432,154 @@ export const SEO_PLANS: Plan[] = [
       includes_gbp: true,
       gbp_addon_available: false,
       includes_ai_sms: false,
-      citations: 100,
+      includes_leads_captain: false,
+      citations: 50,
       requires_existing_website: true,
       features: [
-        'Full GBP Management',
-        '100+ Local Citations',
-        'Advanced On-Site Optimization',
-        'Review Management',
-        'Competitor Tracking (5)',
-        'Weekly Ranking Reports',
-        '8 GBP Posts/Month',
-        'Priority Support',
+        'Full GBP management',
+        '4 GBP posts/month',
+        'Geogrid ranking report (weekly)',
+        'Citation audit (monthly)',
+        'Citation building (up to 50 directories)',
+        'NAP consistency check',
+        'Competitor ranking comparison',
+        'Review monitoring alerts',
+        'Local SEO audit (quarterly)',
+        'Strategy review call (quarterly)',
       ],
     },
-    invoice_description: 'Local SEO Enterprise — For websites with 10-15 pages',
-    invoice_includes: 'Full GBP management, 100+ citations, review management, weekly reports',
+    invoice_description: 'Local SEO Enterprise',
+    invoice_includes: 'Full GBP management, 4 posts/mo, weekly reports, 50 citations, quarterly strategy calls',
     is_active: true,
   },
 ];
 
 // =====================================================
-// GOLD PLANS (All-in-One) - UPDATED PRICING +$50
-// Website + CRM + Local SEO + GBP INCLUDED
+// SILVER BUNDLE - v5.9 pricing
+// Website + CRM + Leads Captain (no Local SEO)
+// =====================================================
+
+export const SILVER_PLANS: Plan[] = [
+  {
+    id: 'silver_starter',
+    name: 'Silver Starter',
+    track: 'silver',
+    tier: 'starter',
+    type: 'individual',
+    monthly_price: 249,
+    annual_price: 2540, // 15% discount
+    description: 'Website + CRM + Leads Captain bundle',
+    features: {
+      website_pages: '5',
+      users: 1,
+      contacts: 500,
+      includes_website: true,
+      includes_crm: true,
+      includes_local_seo: false,
+      includes_gbp: false,
+      gbp_addon_available: false,
+      includes_ai_sms: true,
+      includes_leads_captain: true,
+      sms_limit: 700,
+      requires_existing_website: false,
+      features: [
+        'Web Starter (5 pages)',
+        'Blue Starter CRM',
+        'Leads Captain included',
+        'Domain name (1 year)',
+        'Cloud hosting (2 years)',
+        '500 contacts',
+        '1 team member',
+        '700 SMS/month',
+      ],
+    },
+    invoice_description: 'Silver Starter — Website + CRM + Leads Captain',
+    invoice_includes: '5 page website, Blue CRM, Leads Captain, 700 SMS/mo',
+    is_active: true,
+  },
+  {
+    id: 'silver_pro',
+    name: 'Silver Pro',
+    track: 'silver',
+    tier: 'pro',
+    type: 'individual',
+    monthly_price: 349,
+    annual_price: 3560, // 15% discount
+    description: 'Enhanced bundle with two-way SMS',
+    features: {
+      website_pages: '10',
+      users: 3,
+      contacts: 2000,
+      includes_website: true,
+      includes_crm: true,
+      includes_local_seo: false,
+      includes_gbp: false,
+      gbp_addon_available: false,
+      includes_ai_sms: true,
+      includes_leads_captain: true,
+      sms_limit: 700,
+      requires_existing_website: false,
+      features: [
+        'Web Pro (10 pages)',
+        'Blue Pro CRM',
+        'Leads Captain included',
+        'Domain name (1 year)',
+        'Cloud hosting (2 years)',
+        '2,000 contacts',
+        '3 team members',
+        '700 SMS/month',
+        'Two-way SMS',
+        '3 service area pages',
+      ],
+    },
+    invoice_description: 'Silver Pro — Website + CRM + Leads Captain',
+    invoice_includes: '10 page website, Blue Pro CRM, Leads Captain, 700 SMS/mo, two-way SMS',
+    is_active: true,
+  },
+  {
+    id: 'silver_enterprise',
+    name: 'Silver Enterprise',
+    track: 'silver',
+    tier: 'enterprise',
+    type: 'individual',
+    monthly_price: 499,
+    annual_price: 5090, // 15% discount
+    description: 'Premium bundle with unlimited contacts',
+    features: {
+      website_pages: '15+',
+      users: 10,
+      contacts: 'unlimited',
+      includes_website: true,
+      includes_crm: true,
+      includes_local_seo: false,
+      includes_gbp: false,
+      gbp_addon_available: false,
+      includes_ai_sms: true,
+      includes_leads_captain: true,
+      sms_limit: 700,
+      requires_existing_website: false,
+      features: [
+        'Web Enterprise (15+ pages)',
+        'Blue Enterprise CRM',
+        'Leads Captain included',
+        'Domain name (1 year)',
+        'Cloud hosting (2 years)',
+        'Unlimited contacts',
+        '10 team members',
+        '700 SMS/month',
+        'Two-way SMS',
+        '10 service area pages',
+      ],
+    },
+    invoice_description: 'Silver Enterprise — Website + CRM + Leads Captain',
+    invoice_includes: '15+ page website, Blue Enterprise CRM, Leads Captain, 700 SMS/mo',
+    is_active: true,
+  },
+];
+
+// =====================================================
+// GOLD BUNDLE - v5.9 pricing
+// Website + CRM + Leads Captain + Local SEO
 // =====================================================
 
 export const GOLD_PLANS: Plan[] = [
@@ -510,33 +589,38 @@ export const GOLD_PLANS: Plan[] = [
     track: 'gold',
     tier: 'starter',
     type: 'individual',
-    monthly_price: 249, // WAS $199
-    annual_price: 2241, // WAS $1,791
-    description: 'Complete package: website + CRM + SEO',
+    monthly_price: 299,
+    annual_price: 3050, // 15% discount
+    description: 'Complete package: Website + CRM + Leads Captain + SEO',
     features: {
-      website_pages: '1-5',
-      users: 1,
+      website_pages: '5',
+      users: 3,
+      contacts: 2000,
       includes_website: true,
       includes_crm: true,
       includes_local_seo: true,
-      local_seo_tier: 'starter', // Matches plan tier
-      includes_gbp: true, // GBP INCLUDED
-      gbp_addon_available: false, // Already included
+      local_seo_tier: 'starter',
+      includes_gbp: true,
+      gbp_addon_available: false,
       includes_ai_sms: true,
-      citations: 20,
+      includes_leads_captain: true,
+      sms_limit: 700,
       requires_existing_website: false,
       features: [
-        'Website (1-5 pages)',
-        'BlueHQ CRM (1 user)',
-        'AI SMS Lead Capture',
+        'Web Starter (5 pages)',
+        'Blue Pro CRM (3 users)',
+        'Leads Captain included',
         'Local SEO Starter',
-        'GBP Management',
-        '20 Local Citations',
-        'Monthly Ranking Report',
+        'GBP optimization',
+        'Domain name (1 year)',
+        'Cloud hosting (2 years)',
+        '2,000 contacts',
+        '700 SMS/month',
+        'Monthly geogrid report',
       ],
     },
-    invoice_description: 'Gold Starter — Website + CRM + Local SEO Starter',
-    invoice_includes: '1-5 page website, BlueHQ CRM (1 user), AI SMS, GBP management, 20 citations',
+    invoice_description: 'Gold Starter — Website + CRM + Leads Captain + Local SEO',
+    invoice_includes: '5 page website, Blue Pro CRM (3 users), Leads Captain, Local SEO Starter',
     is_active: true,
   },
   {
@@ -545,12 +629,13 @@ export const GOLD_PLANS: Plan[] = [
     track: 'gold',
     tier: 'pro',
     type: 'individual',
-    monthly_price: 399, // WAS $349
-    annual_price: 3591, // WAS $3,141
+    monthly_price: 399,
+    annual_price: 4070, // 15% discount
     description: 'Recommended all-in-one for growing businesses',
     features: {
-      website_pages: '5-10',
-      users: 1,
+      website_pages: '10',
+      users: 3,
+      contacts: 2000,
       includes_website: true,
       includes_crm: true,
       includes_local_seo: true,
@@ -558,21 +643,28 @@ export const GOLD_PLANS: Plan[] = [
       includes_gbp: true,
       gbp_addon_available: false,
       includes_ai_sms: true,
-      citations: 50,
+      includes_leads_captain: true,
+      sms_limit: 700,
+      citations: 30,
       requires_existing_website: false,
       features: [
-        'Website (5-10 pages)',
-        'BlueHQ CRM (1 user)',
-        'AI SMS Lead Capture',
+        'Web Pro (10 pages)',
+        'Blue Pro CRM (3 users)',
+        'Leads Captain included',
         'Local SEO Pro',
-        'GBP Management',
-        '50 Local Citations',
-        'Competitor Tracking',
-        'Bi-Weekly Reports',
+        'GBP management + 2 posts/mo',
+        'Domain name (1 year)',
+        'Cloud hosting (2 years)',
+        '2,000 contacts',
+        '700 SMS/month',
+        'Up to 30 citations',
+        'Bi-weekly geogrid report',
+        'Competitor comparison',
+        'Review monitoring',
       ],
     },
-    invoice_description: 'Gold Pro — Website + CRM + Local SEO Pro',
-    invoice_includes: '5-10 page website, BlueHQ CRM (1 user), AI SMS, GBP management, 50 citations, competitor tracking',
+    invoice_description: 'Gold Pro — Website + CRM + Leads Captain + Local SEO Pro',
+    invoice_includes: '10 page website, Blue Pro CRM (3 users), Leads Captain, Local SEO Pro, 30 citations',
     is_active: true,
   },
   {
@@ -581,12 +673,13 @@ export const GOLD_PLANS: Plan[] = [
     track: 'gold',
     tier: 'enterprise',
     type: 'individual',
-    monthly_price: 549, // WAS $499
-    annual_price: 4941, // WAS $4,491
+    monthly_price: 598,
+    annual_price: 6100, // 15% discount
     description: 'Premium all-in-one with full features',
     features: {
-      website_pages: '10-15',
-      users: 1,
+      website_pages: '15+',
+      users: 10,
+      contacts: 'unlimited',
       includes_website: true,
       includes_crm: true,
       includes_local_seo: true,
@@ -594,169 +687,76 @@ export const GOLD_PLANS: Plan[] = [
       includes_gbp: true,
       gbp_addon_available: false,
       includes_ai_sms: true,
-      citations: 100,
-      requires_existing_website: false,
-      features: [
-        'Website (10-15 pages)',
-        'BlueHQ CRM (1 user)',
-        'AI SMS Lead Capture',
-        'Local SEO Enterprise',
-        'Full GBP Management',
-        '100+ Local Citations',
-        'Review Management',
-        'Weekly Reports',
-      ],
-    },
-    invoice_description: 'Gold Enterprise — Website + CRM + Local SEO Enterprise',
-    invoice_includes: '10-15 page website, BlueHQ CRM (1 user), AI SMS, full GBP management, 100+ citations, review management',
-    is_active: true,
-  },
-  {
-    id: 'gold_starter_teams',
-    name: 'Gold Starter Teams',
-    track: 'gold',
-    tier: 'starter',
-    type: 'teams',
-    monthly_price: 349, // WAS $299
-    annual_price: 3141, // WAS $2,691
-    description: 'All-in-one for small teams (5 users)',
-    features: {
-      website_pages: '1-5',
-      users: 5,
-      includes_website: true,
-      includes_crm: true,
-      includes_local_seo: true,
-      local_seo_tier: 'starter',
-      includes_gbp: true,
-      gbp_addon_available: false,
-      includes_ai_sms: true,
-      citations: 20,
-      requires_existing_website: false,
-      features: [
-        'Website (1-5 pages)',
-        'BlueHQ CRM (5 users)',
-        'AI SMS Lead Capture',
-        'Local SEO Starter',
-        'GBP Management',
-        '20 Local Citations',
-        'Team Management',
-      ],
-    },
-    invoice_description: 'Gold Starter Teams — Website + CRM (5 users) + Local SEO Starter',
-    invoice_includes: '1-5 page website, BlueHQ CRM (5 users), AI SMS, GBP management, 20 citations',
-    is_active: true,
-  },
-  {
-    id: 'gold_pro_teams',
-    name: 'Gold Pro Teams',
-    track: 'gold',
-    tier: 'pro',
-    type: 'teams',
-    monthly_price: 499, // WAS $449
-    annual_price: 4491, // WAS $4,041
-    description: 'All-in-one for growing teams (10 users)',
-    features: {
-      website_pages: '5-10',
-      users: 10,
-      includes_website: true,
-      includes_crm: true,
-      includes_local_seo: true,
-      local_seo_tier: 'pro',
-      includes_gbp: true,
-      gbp_addon_available: false,
-      includes_ai_sms: true,
+      includes_leads_captain: true,
+      sms_limit: 700,
       citations: 50,
       requires_existing_website: false,
       features: [
-        'Website (5-10 pages)',
-        'BlueHQ CRM (10 users)',
-        'AI SMS Lead Capture',
-        'Local SEO Pro',
-        'GBP Management',
-        '50 Local Citations',
-        'Competitor Tracking',
-        'Advanced Team Features',
-      ],
-    },
-    invoice_description: 'Gold Pro Teams — Website + CRM (10 users) + Local SEO Pro',
-    invoice_includes: '5-10 page website, BlueHQ CRM (10 users), AI SMS, GBP management, 50 citations',
-    is_active: true,
-  },
-  {
-    id: 'gold_enterprise_teams',
-    name: 'Gold Enterprise Teams',
-    track: 'gold',
-    tier: 'enterprise',
-    type: 'teams',
-    monthly_price: 799, // WAS $749
-    annual_price: 7191, // WAS $6,741
-    description: 'Enterprise all-in-one (20 users)',
-    features: {
-      website_pages: '10-15',
-      users: 20,
-      includes_website: true,
-      includes_crm: true,
-      includes_local_seo: true,
-      local_seo_tier: 'enterprise',
-      includes_gbp: true,
-      gbp_addon_available: false,
-      includes_ai_sms: true,
-      citations: 100,
-      requires_existing_website: false,
-      features: [
-        'Website (10-15 pages)',
-        'BlueHQ CRM (20 users)',
-        'AI SMS Lead Capture',
+        'Web Enterprise (15+ pages)',
+        'Blue Enterprise CRM (10 users)',
+        'Leads Captain included',
         'Local SEO Enterprise',
-        'Full GBP Management',
-        '100+ Local Citations',
-        'Review Management',
-        'Enterprise Team Features',
-        'Dedicated Support',
+        'Full GBP management + 4 posts/mo',
+        'Domain name (1 year)',
+        'Cloud hosting (2 years)',
+        'Unlimited contacts',
+        '700 SMS/month',
+        'Up to 50 citations',
+        'Weekly geogrid report',
+        'Competitor comparison',
+        'Review monitoring',
       ],
     },
-    invoice_description: 'Gold Enterprise Teams — Website + CRM (20 users) + Local SEO Enterprise',
-    invoice_includes: '10-15 page website, BlueHQ CRM (20 users), AI SMS, full GBP management, 100+ citations',
+    invoice_description: 'Gold Enterprise — Website + CRM + Leads Captain + Local SEO Enterprise',
+    invoice_includes: '15+ page website, Blue Enterprise CRM (10 users), Leads Captain, Local SEO Enterprise, 50 citations',
     is_active: true,
   },
 ];
 
 // =====================================================
-// ADD-ONS
+// ADD-ONS - v5.9
 // =====================================================
 
 export const ADDONS: AddOn[] = [
   {
-    id: 'gbp_setup',
-    name: 'GBP Setup/Optimization',
+    id: 'background_video',
+    name: 'Background Video Creation',
     price: 99,
     billing_type: 'one_time',
-    description: 'One-time setup: GBP creation/claim, profile optimization, description, categories, initial photos, first 2 posts',
-    available_for: ['web_starter', 'web_pro', 'web_enterprise', 'web_custom'],
-    not_available_for: ['gold_*', 'seo_*', 'blue_*'], // Included in Gold/SEO, not available for Blue
+    description: 'Custom background video for hero section',
+    available_for: ['web_*', 'silver_*', 'gold_*'],
+    not_available_for: ['blue_*', 'seo_*', 'leads_captain'],
   },
   {
-    id: 'extra_location',
-    name: 'Extra Location',
-    price: 199,
-    billing_type: 'recurring',
-    description: 'Additional business location with full service coverage',
-    available_for: ['web_*', 'gold_*', 'seo_*'],
-    not_available_for: ['blue_*'],
+    id: 'textual_page_update',
+    name: 'Textual Page Update',
+    price: 29,
+    billing_type: 'one_time',
+    description: 'Text changes beyond monthly allowance (per page)',
+    available_for: ['web_*', 'silver_*', 'gold_*'],
+    not_available_for: ['blue_*', 'seo_*', 'leads_captain'],
+  },
+  {
+    id: 'design_page_update',
+    name: 'Design Page Update',
+    price: 69,
+    billing_type: 'one_time',
+    description: 'Layout/design changes to existing page (per page)',
+    available_for: ['web_*', 'silver_*', 'gold_*'],
+    not_available_for: ['blue_*', 'seo_*', 'leads_captain'],
   },
 ];
-
-// Convenience export for the GBP add-on
-export const GBP_ADDON = ADDONS.find(a => a.id === 'gbp_setup')!;
 
 // =====================================================
 // ALL PLANS COMBINED
 // =====================================================
 
 export const ALL_PLANS: Plan[] = [
+  ...LEADS_CAPTAIN_PLANS,
   ...BLUE_PLANS,
   ...WEB_PLANS,
   ...SEO_PLANS,
+  ...SILVER_PLANS,
   ...GOLD_PLANS,
 ];
 
@@ -808,16 +808,19 @@ export function isAddOnAvailableForPlan(addonId: string, planId: string): boolea
 }
 
 export function calculateAnnualDiscount(monthlyPrice: number): number {
-  // 25% discount for annual (customer pays 9 months instead of 12)
-  return Math.round(monthlyPrice * 12 * 0.75);
+  // 15% discount for annual (~2 months free)
+  // Formula: monthly * 12 * 0.85, rounded to nearest $10
+  return Math.round((monthlyPrice * 12 * 0.85) / 10) * 10;
 }
 
 export function getTrackLabel(track: PlanTrack): string {
   const labels: Record<PlanTrack, string> = {
-    blue: 'Blue (CRM)',
+    leads_captain: 'Leads Captain',
+    blue: 'Blue CRM',
     web: 'Web (Website)',
     seo: 'Local SEO',
-    gold: 'Gold (All-in-One)',
+    silver: 'Silver Bundle',
+    gold: 'Gold Bundle',
   };
   return labels[track];
 }

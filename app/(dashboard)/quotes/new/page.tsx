@@ -21,6 +21,9 @@ import { createClient, getCurrentUserProfile } from '@/lib/supabase/client';
 import { formatPhoneNumber } from '@/lib/utils';
 import type { UserWithBusiness, Customer } from '@/types';
 
+// Partial customer type for search results
+type CustomerSearchResult = Pick<Customer, 'id' | 'name' | 'phone' | 'email'> & { address?: string };
+
 interface LineItem {
   id: string;
   saved_service_id: string | null;
@@ -51,9 +54,9 @@ export default function NewQuotePage() {
   const [sending, setSending] = useState(false);
 
   // Form state
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerSearchResult | null>(null);
   const [customerSearch, setCustomerSearch] = useState('');
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<CustomerSearchResult[]>([]);
   const [showCustomerSearch, setShowCustomerSearch] = useState(!customerId);
 
   const [lineItems, setLineItems] = useState<LineItem[]>([]);

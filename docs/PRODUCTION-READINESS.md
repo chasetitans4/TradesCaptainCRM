@@ -25,7 +25,7 @@ This document summarizes the production-readiness status of the TradesCaptain CR
 | CSP Headers | Ready | Dynamic CSP with nonces in middleware |
 | CSRF Protection | Ready | Origin/host validation in middleware |
 | Security Headers | Ready | HSTS, X-Frame-Options, etc. in next.config.js |
-| Rate Limiting | Ready | lib/rate-limit/ with per-action limits |
+| Rate Limiting | Ready | Global API handler IP-based limits |
 | Input Validation | Ready | lib/validation/ with Zod schemas |
 | Authentication | Ready | Supabase Auth + middleware protection |
 | Role-Based Access | Ready | Admin portal restricted to authorized roles |
@@ -148,7 +148,9 @@ These features are fully implemented but require API keys to function:
 
 - [ ] Copy `.env.example` to production environment
 - [ ] Configure all required Supabase variables
-- [ ] Configure Sentry DSN
+- [ ] Configure Sentry DSN (`NEXT_PUBLIC_SENTRY_DSN`)
+- [ ] Configure JWT secret (`JWT_SECRET` >= 32 chars, HS256)
+- [ ] Optional: set `JWT_ISSUER` and `JWT_AUDIENCE`
 - [ ] Configure optional integrations as needed
 
 ### Database

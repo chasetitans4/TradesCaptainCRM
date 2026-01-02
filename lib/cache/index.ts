@@ -3,6 +3,8 @@
 // Redis-based caching with memory fallback
 // =====================================================
 
+import { getRedis } from '@/lib/redis/client';
+
 // In-memory cache store for fallback when Redis is unavailable
 const memoryStore = new Map<string, { data: string; expiresAt: number }>();
 const MEMORY_CLEANUP_INTERVAL = 60000; // 1 minute
@@ -74,11 +76,14 @@ export class Cache {
     if (this.useMemoryFallback) {
       const entry = memoryStore.get(fullKey);
       if (entry && entry.expiresAt > Date.now()) {
-        try {
-          return JSON.parse(entry.data) as T;
-        } catch {
-          return null;
+        if (typeof entry.data === 'string') {
+          try {
+            return JSON.parse(entry.data) as T;
+          } catch {
+            return null;
+          }
         }
+        return entry.data as unknown as T;
       }
       memoryStore.delete(fullKey);
       return null;
@@ -94,7 +99,14 @@ export class Cache {
       const data = await redis.get(fullKey);
       if (!data) return null;
 
-      return JSON.parse(data) as T;
+      if (typeof data === 'string') {
+        try {
+          return JSON.parse(data) as T;
+        } catch {
+          return null;
+        }
+      }
+      return data as unknown as T;
     } catch (error) {
       console.error('Cache get error:', error);
       // Fall back to memory
@@ -259,7 +271,14 @@ export class Cache {
     const redis = getRedis();
     const data = await redis.hget(this.getKey(key), field);
     if (!data) return null;
-    return JSON.parse(data) as T;
+    if (typeof data === 'string') {
+      try {
+        return JSON.parse(data) as T;
+      } catch {
+        return null;
+      }
+    }
+    return data as unknown as T;
   }
 
   async hgetall<T>(key: string): Promise<Record<string, T>> {
@@ -267,7 +286,15 @@ export class Cache {
     const data = await redis.hgetall(this.getKey(key));
     const result: Record<string, T> = {};
     for (const [field, value] of Object.entries(data)) {
-      result[field] = JSON.parse(value) as T;
+      if (typeof value === 'string') {
+        try {
+          result[field] = JSON.parse(value) as T;
+        } catch {
+          result[field] = null as unknown as T;
+        }
+      } else {
+        result[field] = value as unknown as T;
+      }
     }
     return result;
   }

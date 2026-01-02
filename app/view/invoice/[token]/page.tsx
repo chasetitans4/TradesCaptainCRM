@@ -1,8 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
-import { CheckCircle, XCircle, Clock, Building2, Phone, Mail, MapPin, CreditCard, AlertTriangle } from 'lucide-react';
+import { CheckCircle, XCircle, Building2, Phone, Mail, CreditCard, AlertTriangle } from 'lucide-react';
 import { formatPhoneNumber } from '@/lib/utils';
-import Link from 'next/link';
+import { AddressLink } from '@/components/ui/address-link';
 
 interface InvoiceItem {
   id: string;
@@ -92,19 +92,57 @@ async function getInvoice(token: string): Promise<Invoice | null> {
       .eq('id', invoice.id);
   }
 
-  // Check if overdue
+  const normalized: Invoice = {
+    id: invoice.id,
+    invoice_number: invoice.invoice_number,
+    status: invoice.status,
+    subtotal: invoice.subtotal,
+    tax_rate: invoice.tax_rate,
+    tax_amount: invoice.tax_amount,
+    discount_amount: invoice.discount_amount,
+    total: invoice.total,
+    amount_paid: invoice.amount_paid,
+    amount_due: invoice.amount_due,
+    customer_notes: invoice.customer_notes,
+    terms: invoice.terms,
+    due_date: invoice.due_date,
+    created_at: invoice.created_at,
+    stripe_payment_link_url: invoice.stripe_payment_link_url,
+    customer: Array.isArray((invoice as any).customer)
+      ? (invoice as any).customer[0]
+      : (invoice as any).customer,
+    business: Array.isArray((invoice as any).business)
+      ? (invoice as any).business[0]
+      : (invoice as any).business,
+    items: ((invoice as any).items || []).map((item: any) => ({
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      total: item.total,
+      is_taxable: item.is_taxable,
+    })),
+    payments: ((invoice as any).payments || []).map((p: any) => ({
+      id: p.id,
+      amount: p.amount,
+      payment_method: p.payment_method,
+      paid_at: p.paid_at,
+    })),
+  };
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   if (
-    invoice.due_date &&
-    new Date(invoice.due_date) < today &&
-    invoice.amount_due > 0 &&
-    !['paid', 'void', 'overdue'].includes(invoice.status)
+    normalized.due_date &&
+    new Date(normalized.due_date) < today &&
+    normalized.amount_due > 0 &&
+    !['paid', 'void', 'overdue'].includes(normalized.status)
   ) {
-    invoice.status = 'overdue';
+    normalized.status = 'overdue';
   }
 
-  return invoice;
+  return normalized;
 }
 
 export default async function PublicInvoicePage({
@@ -369,10 +407,10 @@ export default async function PublicInvoicePage({
               </a>
             )}
             {invoice.business.address && (
-              <p className="flex items-center gap-2 text-gray-600">
-                <MapPin className="h-4 w-4" />
-                {invoice.business.address}
-              </p>
+              <AddressLink
+                address={invoice.business.address}
+                className="flex items-center gap-2 text-gray-600"
+              />
             )}
           </div>
         </div>

@@ -24,11 +24,12 @@ import {
   Tag,
   Calendar,
   Info,
+  Smartphone,
 } from 'lucide-react';
 import {
   ALL_PLANS,
   PLAN_TRACKS,
-  GBP_ADDON,
+  ADDONS,
   type Plan,
   type PlanTrack,
   type PlanTier,
@@ -41,6 +42,12 @@ import {
 } from '@/lib/pricing/offers';
 
 const TRACK_CONFIG: Record<PlanTrack, { icon: React.ElementType; label: string; description: string; color: string }> = {
+  leads_captain: {
+    icon: Phone,
+    label: 'Leads Captain',
+    description: 'AI Missed Call Text-Back',
+    color: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+  },
   blue: {
     icon: Building2,
     label: 'Blue (CRM)',
@@ -59,10 +66,16 @@ const TRACK_CONFIG: Record<PlanTrack, { icon: React.ElementType; label: string; 
     description: 'SEO for existing websites',
     color: 'bg-green-100 text-green-700 border-green-200',
   },
+  silver: {
+    icon: Layers,
+    label: 'Silver',
+    description: 'Website + CRM + Leads Captain',
+    color: 'bg-gray-100 text-gray-700 border-gray-200',
+  },
   gold: {
     icon: Layers,
     label: 'Gold (All-in-One)',
-    description: 'Website + CRM + Local SEO',
+    description: 'Website + CRM + Leads Captain + Local SEO',
     color: 'bg-yellow-100 text-yellow-700 border-yellow-200',
   },
 };
@@ -79,7 +92,6 @@ export default function NewTrialSubmissionPage() {
   const [selectedPlanId, setSelectedPlanId] = useState('blue_starter');
   const [billingFrequency, setBillingFrequency] = useState<'monthly' | 'annual'>('monthly');
   const [selectedOffers, setSelectedOffers] = useState<string[]>([]);
-  const [includeGbpAddon, setIncludeGbpAddon] = useState(false);
 
   const [formData, setFormData] = useState({
     client_company_name: '',
@@ -109,8 +121,7 @@ export default function NewTrialSubmissionPage() {
       if (offer.applies_to.includes(selectedPlan.id)) return true;
       if (offer.applies_to.includes(selectedTrack)) return true;
       // Check billing-specific offers
-      if (offer.code === 'ANNUAL25' && billingFrequency !== 'annual') return false;
-      if (offer.code === 'WAIVE99' && selectedTrack !== 'web') return false;
+      if (offer.code === 'ANNUAL15' && billingFrequency !== 'annual') return false;
       return true;
     });
   }, [selectedPlan, selectedTrack, billingFrequency]);
@@ -118,8 +129,13 @@ export default function NewTrialSubmissionPage() {
   // Calculate pricing
   const pricing = useMemo(() => {
     if (!selectedPlan) return null;
-    const offerCodes = selectedOffers;
-    return calculatePricing(selectedPlan.id, offerCodes, billingFrequency);
+    return calculatePricing(
+      selectedPlan.monthly_price,
+      selectedPlan.annual_price,
+      billingFrequency,
+      selectedOffers,
+      false // GBP addon removed in v5.9
+    );
   }, [selectedPlan, selectedOffers, billingFrequency]);
 
   // Handle track change
@@ -130,8 +146,6 @@ export default function NewTrialSubmissionPage() {
     if (firstPlan) {
       setSelectedPlanId(firstPlan.id);
     }
-    // Reset GBP addon when switching tracks
-    setIncludeGbpAddon(false);
     // Reset offers
     setSelectedOffers([]);
   };
@@ -173,7 +187,6 @@ export default function NewTrialSubmissionPage() {
         plan_track: selectedTrack,
         billing_frequency: billingFrequency,
         offers_applied: selectedOffers,
-        include_gbp_addon: includeGbpAddon && selectedTrack === 'web',
         pricing: pricing,
       };
 
@@ -528,40 +541,27 @@ export default function NewTrialSubmissionPage() {
                 )}
               >
                 <Calendar className="h-4 w-4 inline mr-1" />
-                Annual (25% off)
+                Annual (15% off)
               </button>
             </div>
           </div>
 
-          {/* GBP Add-on (Web plans only) */}
-          {selectedTrack === 'web' && (
-            <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={includeGbpAddon}
-                  onChange={(e) => setIncludeGbpAddon(e.target.checked)}
-                  className="mt-1 h-4 w-4 text-primary border-gray-300 rounded"
-                />
-                <div>
-                  <div className="font-medium text-gray-900">
-                    Add GBP Setup & Optimization
-                    <span className="ml-2 text-purple-700">${GBP_ADDON.price} one-time</span>
-                  </div>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {GBP_ADDON.description}
-                  </p>
-                </div>
-              </label>
+          {/* Leads Captain indicator for Silver/Gold */}
+          {(selectedTrack === 'silver' || selectedTrack === 'gold') && (
+            <div className="p-4 bg-cyan-50 border border-cyan-200 rounded-lg flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-cyan-600" />
+              <span className="text-sm text-cyan-800">
+                <strong>Leads Captain:</strong> AI Missed Call Text-Back included with this bundle
+              </span>
             </div>
           )}
 
-          {/* Gold/SEO - Show GBP is included */}
-          {(selectedTrack === 'gold' || selectedTrack === 'seo') && (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-              <span className="text-sm text-green-800">
-                <strong>GBP Management:</strong> Included with this plan
+          {/* Pro/Enterprise CRM includes Leads Captain */}
+          {selectedTrack === 'blue' && selectedPlan && ['blue_pro', 'blue_enterprise'].includes(selectedPlan.id) && (
+            <div className="p-4 bg-cyan-50 border border-cyan-200 rounded-lg flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-cyan-600" />
+              <span className="text-sm text-cyan-800">
+                <strong>Leads Captain:</strong> Included with Pro and Enterprise CRM tiers
               </span>
             </div>
           )}
@@ -636,12 +636,6 @@ export default function NewTrialSubmissionPage() {
                 </span>
               </div>
 
-              {includeGbpAddon && selectedTrack === 'web' && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">GBP Setup (one-time)</span>
-                  <span className="text-gray-900">${GBP_ADDON.price}</span>
-                </div>
-              )}
 
               {selectedOffers.length > 0 && (
                 <>
@@ -662,26 +656,20 @@ export default function NewTrialSubmissionPage() {
 
               <div className="border-t border-gray-200 pt-3 flex justify-between">
                 <span className="font-semibold text-gray-900">
-                  {pricing.has_free_trial ? 'After Trial' : 'Total'} ({billingFrequency}):
+                  {pricing.trial_days > 0 ? 'After Trial' : 'Total'} ({billingFrequency}):
                 </span>
                 <span className="font-bold text-xl text-gray-900">
-                  ${pricing.final_price.toFixed(2)}
+                  ${billingFrequency === 'annual' ? pricing.annual_rate?.toFixed(2) : pricing.effective_monthly_rate.toFixed(2)}
                   {billingFrequency === 'monthly' && '/mo'}
                 </span>
               </div>
 
-              {pricing.has_free_trial && (
+              {pricing.trial_days > 0 && (
                 <div className="bg-blue-50 -mx-4 -mb-4 mt-3 px-4 py-3 rounded-b-lg text-sm text-blue-800">
-                  <strong>14-day free trial</strong> — No charge until trial ends
+                  <strong>{pricing.trial_days}-day free trial</strong> — No charge until trial ends
                 </div>
               )}
 
-              {includeGbpAddon && selectedTrack === 'web' && (
-                <div className="flex justify-between text-sm pt-2 border-t border-gray-200">
-                  <span className="text-gray-600">Due today (one-time fees):</span>
-                  <span className="font-medium text-gray-900">${GBP_ADDON.price}</span>
-                </div>
-              )}
             </div>
           </div>
         )}

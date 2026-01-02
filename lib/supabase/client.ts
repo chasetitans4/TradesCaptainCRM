@@ -105,15 +105,32 @@ export async function signOut() {
 }
 
 /**
- * Reset password
+ * Reset password - routes through server API for rate limiting
  */
 export async function resetPassword(email: string) {
-  const supabase = createClient();
-  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/auth/reset-password`
-  });
-  
-  return { data, error };
+  try {
+    const response = await fetch('/api/auth/password/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        data: null,
+        error: { message: data.error || 'Failed to send reset email' },
+      };
+    }
+
+    return { data, error: null };
+  } catch (error: any) {
+    return {
+      data: null,
+      error: { message: error.message || 'Failed to send reset email' },
+    };
+  }
 }
 
 /**

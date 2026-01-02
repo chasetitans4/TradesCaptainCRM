@@ -4,6 +4,8 @@
 // =====================================================
 
 import { createClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
+const receiptsLogger = logger.child({ context: 'receipts' });
 
 export interface Receipt {
   id: string;
@@ -89,7 +91,7 @@ export async function createReceipt(
     .single();
 
   if (error) {
-    console.error('Error creating receipt:', error);
+    receiptsLogger.error({ msg: 'Error creating receipt', error });
     throw new Error('Failed to create receipt');
   }
 

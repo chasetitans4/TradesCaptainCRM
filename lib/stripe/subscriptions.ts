@@ -5,11 +5,6 @@
 import { stripe } from './client';
 import { createClient } from '@/lib/supabase/server';
 
-// Price IDs from environment
-const STRIPE_PRICE_GROWTH_MONTHLY = process.env.STRIPE_PRICE_GROWTH_MONTHLY;
-const STRIPE_PRICE_PRO_MONTHLY = process.env.STRIPE_PRICE_PRO_MONTHLY;
-const STRIPE_PRICE_MULTI_LOCATION_ADDON = process.env.STRIPE_PRICE_MULTI_LOCATION_ADDON;
-
 export interface SubscriptionDetails {
   status: string;
   planTier: string | null;
@@ -223,7 +218,7 @@ export async function getInvoiceHistory(
       date: new Date(invoice.created * 1000),
       amount: invoice.amount_paid / 100,
       status: invoice.status || 'unknown',
-      pdfUrl: invoice.invoice_pdf,
+      pdfUrl: invoice.invoice_pdf ?? null,
     }));
   } catch (error) {
     console.error('Error fetching invoice history:', error);
@@ -267,7 +262,7 @@ export async function changePlan(
   });
 
   // Update plan tier in database
-  const planTier = newPriceId === STRIPE_PRICE_GROWTH_MONTHLY ? 'growth' : 'pro';
+  const planTier = newPriceId === process.env.STRIPE_PRICE_GROWTH_MONTHLY ? 'growth' : 'pro';
   await supabase
     .from('businesses')
     .update({
@@ -335,7 +330,7 @@ export async function reactivateSubscription(businessId: string): Promise<void> 
  * Add multi-location addon to subscription
  */
 export async function addMultiLocationAddon(businessId: string): Promise<void> {
-  if (!STRIPE_PRICE_MULTI_LOCATION_ADDON) {
+  if (!process.env.STRIPE_PRICE_MULTI_LOCATION_ADDON) {
     throw new Error('Multi-location addon price not configured');
   }
 
@@ -358,7 +353,7 @@ export async function addMultiLocationAddon(businessId: string): Promise<void> {
   // Add addon to subscription
   await stripe.subscriptionItems.create({
     subscription: business.stripe_subscription_id,
-    price: STRIPE_PRICE_MULTI_LOCATION_ADDON,
+    price: process.env.STRIPE_PRICE_MULTI_LOCATION_ADDON,
     quantity: 1,
   });
 
@@ -376,8 +371,8 @@ export async function addMultiLocationAddon(businessId: string): Promise<void> {
  */
 export function getPriceIds() {
   return {
-    growth: STRIPE_PRICE_GROWTH_MONTHLY,
-    pro: STRIPE_PRICE_PRO_MONTHLY,
-    multiLocation: STRIPE_PRICE_MULTI_LOCATION_ADDON,
+    growth: process.env.STRIPE_PRICE_GROWTH_MONTHLY,
+    pro: process.env.STRIPE_PRICE_PRO_MONTHLY,
+    multiLocation: process.env.STRIPE_PRICE_MULTI_LOCATION_ADDON,
   };
 }

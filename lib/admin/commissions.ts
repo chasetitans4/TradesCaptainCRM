@@ -10,11 +10,12 @@ import { Commission, CommissionRule, CommissionStatus, CommissionType, Retention
  */
 export async function getCommissionRules(
   planType: string,
-  billingInterval: string
+  billingInterval: string,
+  planTier?: string
 ): Promise<CommissionRule | null> {
   const supabase = createAdminClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('commission_rules')
     .select('*')
     .eq('plan_type', planType)
@@ -22,7 +23,12 @@ export async function getCommissionRules(
     .eq('is_active', true)
     .order('effective_from', { ascending: false })
     .limit(1)
-    .single();
+  
+  if (planTier) {
+    query = query.eq('plan_tier', planTier);
+  }
+  
+  const { data, error } = await query.single();
 
   if (error) return null;
   return data;
@@ -132,6 +138,7 @@ export async function getAgentCommissionSummary(agentId: string): Promise<{
 
 /**
  * Create a commission record
+ * v5.9: Added scheduled_payout_date and trigger_payment_date for 1st/15th payout scheduling
  */
 export async function createCommission(data: {
   agentId: string;
@@ -149,6 +156,8 @@ export async function createCommission(data: {
   paymentNumber?: number;
   retentionMilestone?: string;
   saleDate: Date;
+  triggerPaymentDate?: Date;
+  scheduledPayoutDate?: Date;
 }): Promise<Commission> {
   const supabase = createAdminClient();
 
@@ -171,6 +180,8 @@ export async function createCommission(data: {
       retention_milestone: data.retentionMilestone,
       status: 'pending',
       sale_date: data.saleDate.toISOString(),
+      trigger_payment_date: data.triggerPaymentDate?.toISOString(),
+      scheduled_payout_date: data.scheduledPayoutDate?.toISOString().split('T')[0],
     })
     .select()
     .single();
@@ -181,6 +192,7 @@ export async function createCommission(data: {
 
 /**
  * Create upfront commission (pending until 2nd payment)
+ * v5.9: Added triggerPaymentDate and scheduledPayoutDate for 1st/15th payout
  */
 export async function createUpfrontCommission(
   agentId: string,
@@ -189,7 +201,9 @@ export async function createUpfrontCommission(
   stripeSubscriptionId: string,
   rules: CommissionRule,
   saleAmount: number,
-  saleDate: Date
+  saleDate: Date,
+  triggerPaymentDate?: Date,
+  scheduledPayoutDate?: Date
 ): Promise<Commission> {
   if (!rules.upfront_amount) {
     throw new Error('No upfront amount defined for this plan');
@@ -208,11 +222,14 @@ export async function createUpfrontCommission(
     commissionType: 'upfront',
     commissionAmount: rules.upfront_amount,
     saleDate,
+    triggerPaymentDate,
+    scheduledPayoutDate,
   });
 }
 
 /**
  * Create recurring commission
+ * v5.9: Added triggerPaymentDate and scheduledPayoutDate for 1st/15th payout
  */
 export async function createRecurringCommission(
   agentId: string,
@@ -222,7 +239,9 @@ export async function createRecurringCommission(
   rules: CommissionRule,
   saleAmount: number,
   paymentNumber: number,
-  firstPaymentDate: Date
+  firstPaymentDate: Date,
+  triggerPaymentDate?: Date,
+  scheduledPayoutDate?: Date
 ): Promise<Commission> {
   const commissionAmount = saleAmount * Number(rules.recurring_rate);
 
@@ -241,6 +260,8 @@ export async function createRecurringCommission(
     commissionAmount,
     paymentNumber,
     saleDate: firstPaymentDate,
+    triggerPaymentDate,
+    scheduledPayoutDate,
   });
 
   // Recurring commissions are immediately eligible
@@ -251,6 +272,7 @@ export async function createRecurringCommission(
 
 /**
  * Create annual commission (35% one-time)
+ * v5.9: Added triggerPaymentDate and scheduledPayoutDate for 1st/15th payout
  */
 export async function createAnnualCommission(
   agentId: string,
@@ -259,7 +281,9 @@ export async function createAnnualCommission(
   stripeSubscriptionId: string,
   rules: CommissionRule,
   saleAmount: number,
-  saleDate: Date
+  saleDate: Date,
+  triggerPaymentDate?: Date,
+  scheduledPayoutDate?: Date
 ): Promise<Commission> {
   const commissionAmount = saleAmount * Number(rules.annual_rate);
 
@@ -277,6 +301,8 @@ export async function createAnnualCommission(
     commissionRate: Number(rules.annual_rate),
     commissionAmount,
     saleDate,
+    triggerPaymentDate,
+    scheduledPayoutDate,
   });
 
   // Annual commissions are immediately eligible
@@ -287,16 +313,51 @@ export async function createAnnualCommission(
 
 /**
  * Create retention bonus commission
+ * Supports both positional arguments (legacy) and options object
  */
 export async function createRetentionCommission(
-  agentId: string,
-  accountId: string,
-  accountType: 'crm' | 'web',
-  stripeSubscriptionId: string,
-  milestone: string,
-  bonusAmount: number,
-  firstPaymentDate: Date
+  agentIdOrOptions: string | {
+    agentId: string;
+    crmAccountId?: string;
+    webCustomerId?: string;
+    milestone: string;
+    bonusAmount: number;
+    planType?: string;
+    planTier?: string;
+    billingInterval?: string;
+  },
+  accountId?: string,
+  accountType?: 'crm' | 'web',
+  stripeSubscriptionId?: string,
+  milestone?: string,
+  bonusAmount?: number,
+  firstPaymentDate?: Date
 ): Promise<Commission> {
+  // Support options object format
+  if (typeof agentIdOrOptions === 'object') {
+    const opts = agentIdOrOptions;
+    const commission = await createCommission({
+      agentId: opts.agentId,
+      crmAccountId: opts.crmAccountId,
+      webCustomerId: opts.webCustomerId,
+      saleType: 'retention',
+      planType: opts.planType || 'retention',
+      planTier: opts.planTier,
+      billingInterval: opts.billingInterval || 'month',
+      saleAmount: 0,
+      commissionType: 'retention',
+      commissionAmount: opts.bonusAmount,
+      retentionMilestone: opts.milestone,
+      saleDate: new Date(),
+    });
+
+    // Retention commissions are immediately eligible
+    await markCommissionEligible(commission.id);
+    return commission;
+  }
+
+  // Legacy positional arguments format
+  const agentId = agentIdOrOptions;
   const commission = await createCommission({
     agentId,
     crmAccountId: accountType === 'crm' ? accountId : undefined,
@@ -307,9 +368,9 @@ export async function createRetentionCommission(
     billingInterval: 'month',
     saleAmount: 0,
     commissionType: 'retention',
-    commissionAmount: bonusAmount,
+    commissionAmount: bonusAmount!,
     retentionMilestone: milestone,
-    saleDate: firstPaymentDate,
+    saleDate: firstPaymentDate!,
   });
 
   // Retention commissions are immediately eligible
@@ -426,7 +487,8 @@ export async function batchPayCommissions(
   for (const id of commissionIds) {
     try {
       const commission = await markCommissionPaid(id, paidVia, paymentReference);
-      totalAmount += Number(commission.commission_amount);
+      const amt = Number((commission as any).commission_amount ?? 0);
+      totalAmount += isNaN(amt) ? 0 : amt;
       success++;
     } catch {
       failed++;
@@ -466,7 +528,7 @@ export async function forfeitSubscriptionCommissions(
 ): Promise<number> {
   const supabase = createAdminClient();
 
-  const { data } = await supabase
+  const result = await supabase
     .from('commissions')
     .update({
       status: 'forfeited',
@@ -478,23 +540,38 @@ export async function forfeitSubscriptionCommissions(
     .in('status', ['pending', 'eligible'])
     .select();
 
-  return data?.length || 0;
+  const rows = Array.isArray(result) ? result : (result as any)?.data;
+  return Array.isArray(rows) ? rows.length : 0;
 }
 
 /**
  * Get retention tracking for an account
+ * Can be called with (accountId, accountType) or just (trackingId)
  */
 export async function getRetentionTracking(
-  accountId: string,
-  accountType: 'crm' | 'web'
+  accountIdOrTrackingId: string,
+  accountType?: 'crm' | 'web'
 ): Promise<RetentionTracking | null> {
   const supabase = createAdminClient();
 
-  const field = accountType === 'crm' ? 'crm_account_id' : 'web_customer_id';
+  // If accountType is provided, search by account ID
+  if (accountType) {
+    const field = accountType === 'crm' ? 'crm_account_id' : 'web_customer_id';
+    const { data, error } = await supabase
+      .from('retention_tracking')
+      .select('*')
+      .eq(field, accountIdOrTrackingId)
+      .single();
+
+    if (error) return null;
+    return data;
+  }
+
+  // Otherwise, treat as tracking ID
   const { data, error } = await supabase
     .from('retention_tracking')
     .select('*')
-    .eq(field, accountId)
+    .eq('id', accountIdOrTrackingId)
     .single();
 
   if (error) return null;
@@ -533,39 +610,116 @@ export async function upsertRetentionTracking(
 
 /**
  * Mark Month 3 call completed
+ * Can be called with (trackingId, notes) or (accountId, accountType, agentId, notes)
  */
 export async function completeMonth3Call(
-  accountId: string,
-  accountType: 'crm' | 'web',
-  agentId: string,
-  notes: string
+  trackingIdOrAccountId: string,
+  notesOrAccountType: string | 'crm' | 'web',
+  agentId?: string,
+  notes?: string
 ): Promise<void> {
   const supabase = createAdminClient();
 
-  await upsertRetentionTracking(accountId, accountType, agentId, {
-    month_3_call_completed: true,
-    month_3_call_date: new Date().toISOString(),
-    month_3_call_notes: notes,
-  });
+  // Check if called with tracking ID (2 args) or account ID (4 args)
+  if (agentId === undefined) {
+    // Called with (trackingId, notes) format
+    const tracking = await getRetentionTracking(trackingIdOrAccountId);
+    if (!tracking) {
+      throw new Error('Retention tracking not found');
+    }
+
+    await supabase
+      .from('retention_tracking')
+      .update({
+        month_3_call_completed: true,
+        month_3_call_date: new Date().toISOString(),
+        month_3_call_notes: notesOrAccountType as string,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', trackingIdOrAccountId);
+  } else {
+    // Called with (accountId, accountType, agentId, notes) format
+    await upsertRetentionTracking(trackingIdOrAccountId, notesOrAccountType as 'crm' | 'web', agentId, {
+      month_3_call_completed: true,
+      month_3_call_date: new Date().toISOString(),
+      month_3_call_notes: notes || '',
+    });
+  }
 }
 
 /**
  * Mark Month 3 audit sent
+ * Can be called with just (trackingId) or (accountId, accountType, agentId)
  */
 export async function sendMonth3Audit(
-  accountId: string,
-  accountType: 'crm' | 'web',
-  agentId: string
+  trackingIdOrAccountId: string,
+  accountType?: 'crm' | 'web',
+  agentId?: string
 ): Promise<void> {
   const supabase = createAdminClient();
 
-  const tracking = await getRetentionTracking(accountId, accountType);
+  // If called with just trackingId (1 arg)
+  if (accountType === undefined) {
+    const tracking = await getRetentionTracking(trackingIdOrAccountId);
+    if (!tracking) {
+      throw new Error('Retention tracking not found');
+    }
+
+    if (!tracking.month_3_call_completed) {
+      throw new Error('Must complete Month 3 call before sending audit');
+    }
+
+    await supabase
+      .from('retention_tracking')
+      .update({
+        month_3_audit_sent: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', trackingIdOrAccountId);
+
+    // Handle commission if there's an agent
+    if (tracking.agent_id) {
+      const accountId = tracking.crm_account_id || tracking.web_customer_id;
+      const acctType = tracking.crm_account_id ? 'crm' : 'web';
+      if (accountId) {
+        const { data: account } = await supabase
+          .from(acctType === 'crm' ? 'crm_accounts' : 'web_customers')
+          .select('plan_type, stripe_subscription_id')
+          .eq('id', accountId)
+          .single();
+
+        if (account) {
+          const rules = await getCommissionRules(account.plan_type, 'month');
+          if (rules?.month_3_call_bonus) {
+            await createRetentionCommission(
+              tracking.agent_id,
+              accountId,
+              acctType,
+              account.stripe_subscription_id,
+              'month_3_call',
+              rules.month_3_call_bonus,
+              new Date()
+            );
+
+            await supabase
+              .from('retention_tracking')
+              .update({ month_3_bonus_paid: true })
+              .eq('id', trackingIdOrAccountId);
+          }
+        }
+      }
+    }
+    return;
+  }
+
+  // Called with (accountId, accountType, agentId) format
+  const tracking = await getRetentionTracking(trackingIdOrAccountId, accountType);
 
   if (!tracking?.month_3_call_completed) {
     throw new Error('Must complete Month 3 call before sending audit');
   }
 
-  await upsertRetentionTracking(accountId, accountType, agentId, {
+  await upsertRetentionTracking(trackingIdOrAccountId, accountType, agentId!, {
     month_3_audit_sent: true,
   });
 
@@ -573,7 +727,7 @@ export async function sendMonth3Audit(
   const { data: account } = await supabase
     .from(accountType === 'crm' ? 'crm_accounts' : 'web_customers')
     .select('plan_type, stripe_subscription_id')
-    .eq('id', accountId)
+    .eq('id', trackingIdOrAccountId)
     .single();
 
   if (account) {
@@ -581,8 +735,8 @@ export async function sendMonth3Audit(
     if (rules?.month_3_call_bonus) {
       // Create the Month 3 call bonus
       await createRetentionCommission(
-        agentId,
-        accountId,
+        agentId!,
+        trackingIdOrAccountId,
         accountType,
         account.stripe_subscription_id,
         'month_3_call',
@@ -591,7 +745,7 @@ export async function sendMonth3Audit(
       );
 
       // Mark as paid
-      await upsertRetentionTracking(accountId, accountType, agentId, {
+      await upsertRetentionTracking(trackingIdOrAccountId, accountType, agentId!, {
         month_3_bonus_paid: true,
       });
     }
@@ -660,6 +814,38 @@ export async function getRetentionTasks(agentId?: string): Promise<{
   }
 
   return { month3Calls, month6Checks, month12Checks };
+}
+
+export async function setSaleAttribution(
+  accountType: 'crm' | 'web',
+  accountId: string,
+  attributedTo: 'company' | string,
+  createdBy: string,
+  saleAmount?: number,
+  planType?: string,
+  notes?: string
+): Promise<void> {
+  const supabase = createAdminClient();
+  const table = accountType === 'crm' ? 'crm_accounts' : 'web_customers';
+  const updates: Record<string, any> =
+    attributedTo === 'company'
+      ? { agent_id: null, company_sale: true, updated_at: new Date().toISOString() }
+      : { agent_id: attributedTo, company_sale: false, updated_at: new Date().toISOString() };
+  await supabase.from(table).update(updates).eq('id', accountId);
+  const logData: Record<string, any> = {
+    attributed_to: attributedTo === 'company' ? 'company' : 'agent',
+    agent_id: attributedTo === 'company' ? null : attributedTo,
+    created_by: createdBy,
+    sale_amount: saleAmount,
+    plan_type: planType,
+    notes,
+  };
+  if (accountType === 'crm') {
+    logData.crm_account_id = accountId;
+  } else {
+    logData.web_customer_id = accountId;
+  }
+  await supabase.from('sales_attribution_log').insert(logData);
 }
 
 /**

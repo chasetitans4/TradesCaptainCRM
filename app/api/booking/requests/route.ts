@@ -6,6 +6,10 @@ import {
   BookingRequestInput,
 } from '@/lib/booking/requests';
 import { getBookingSettingsBySlug } from '@/lib/booking/settings';
+import { z } from 'zod';
+import { schemas, validateRequest, formatZodErrors, sanitizeEmail, sanitizePhone } from '@/lib/validation';
+import { logApiError } from '@/lib/logger';
+import { formatPhoneE164 } from '@/lib/twilio/sms';
 
 // GET /api/booking/requests - Get booking requests (authenticated)
 export async function GET(request: NextRequest) {
@@ -30,24 +34,46 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status') || undefined;
-    const startDate = searchParams.get('startDate') || undefined;
-    const endDate = searchParams.get('endDate') || undefined;
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const raw = {
+      status: searchParams.get('status'),
+      startDate: searchParams.get('startDate'),
+      endDate: searchParams.get('endDate'),
+      limit: Number(searchParams.get('limit') || '20'),
+      offset: Number(searchParams.get('offset') || '0'),
+    };
+
+    const querySchema = z.object({
+      status: z.string().optional(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+      limit: z.number().int().min(1).max(100).default(20),
+      offset: z.number().int().min(0).default(0),
+    }).refine((data) => {
+      if (data.startDate && isNaN(Date.parse(data.startDate))) return false;
+      if (data.endDate && isNaN(Date.parse(data.endDate))) return false;
+      if (data.startDate && data.endDate) {
+        return new Date(data.startDate) <= new Date(data.endDate);
+      }
+      return true;
+    }, { message: 'Invalid date range' });
+
+    const parsed = querySchema.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json({ error: formatZodErrors(parsed.error) }, { status: 400 });
+    }
 
     const result = await getBookingRequests(userData.business_id, {
-      status,
-      startDate,
-      endDate,
-      limit,
-      offset,
+      status: parsed.data.status,
+      startDate: parsed.data.startDate,
+      endDate: parsed.data.endDate,
+      limit: parsed.data.limit,
+      offset: parsed.data.offset,
     });
 
     return NextResponse.json(result);
   } catch (error: any) {
-    console.error('Error fetching booking requests:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    logApiError('GET', '/api/booking/requests', error);
+    return NextResponse.json({ error: 'Failed to fetch booking requests' }, { status: 500 });
   }
 }
 
@@ -75,45 +101,58 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate required fields
-    const required = ['customerName', 'customerEmail', 'customerPhone', 'serviceType', 'preferredDate', 'address'];
-    for (const field of required) {
-      if (!requestData[field]) {
-        return NextResponse.json(
-          { error: `${field} is required` },
-          { status: 400 }
-        );
-      }
+    const bookingSchema = z.object({
+      customerName: z.string().min(1).max(200),
+      customerEmail: schemas.email,
+      customerPhone: z.string().min(10).max(20),
+      serviceType: z.string().min(1).max(100),
+      description: z.string().optional(),
+      urgency: z.enum(['normal', 'urgent', 'emergency']).optional(),
+      preferredDate: schemas.date,
+      preferredTimeSlot: z.string().optional(),
+      alternateDate: schemas.date.optional(),
+      alternateTimeSlot: z.string().optional(),
+      address: z.string().min(1).max(200),
+      city: z.string().optional(),
+      state: z.string().optional(),
+      zip: z.string().optional(),
+      source: z.string().optional(),
+      utmSource: z.string().optional(),
+      utmMedium: z.string().optional(),
+      utmCampaign: z.string().optional(),
+    });
+
+    const validation = validateRequest(bookingSchema, requestData);
+    if (!validation.success) {
+      return NextResponse.json({ error: formatZodErrors(validation.errors) }, { status: 400 });
     }
 
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(requestData.customerEmail)) {
-      return NextResponse.json(
-        { error: 'Invalid email address' },
-        { status: 400 }
-      );
+    const cleanEmail = sanitizeEmail(validation.data.customerEmail);
+    const sanitizedPhone = sanitizePhone(validation.data.customerPhone);
+    if (!cleanEmail || !sanitizedPhone) {
+      return NextResponse.json({ error: 'Invalid email or phone' }, { status: 400 });
     }
+    const cleanPhone = formatPhoneE164(sanitizedPhone);
 
     const input: BookingRequestInput = {
-      customerName: requestData.customerName,
-      customerEmail: requestData.customerEmail,
-      customerPhone: requestData.customerPhone,
-      serviceType: requestData.serviceType,
-      description: requestData.description,
-      urgency: requestData.urgency,
-      preferredDate: requestData.preferredDate,
-      preferredTimeSlot: requestData.preferredTimeSlot,
-      alternateDate: requestData.alternateDate,
-      alternateTimeSlot: requestData.alternateTimeSlot,
-      address: requestData.address,
-      city: requestData.city,
-      state: requestData.state,
-      zip: requestData.zip,
-      source: requestData.source || 'website',
-      utmSource: requestData.utmSource,
-      utmMedium: requestData.utmMedium,
-      utmCampaign: requestData.utmCampaign,
+      customerName: validation.data.customerName,
+      customerEmail: cleanEmail,
+      customerPhone: cleanPhone,
+      serviceType: validation.data.serviceType,
+      description: validation.data.description,
+      urgency: validation.data.urgency,
+      preferredDate: validation.data.preferredDate,
+      preferredTimeSlot: validation.data.preferredTimeSlot,
+      alternateDate: validation.data.alternateDate,
+      alternateTimeSlot: validation.data.alternateTimeSlot,
+      address: validation.data.address,
+      city: validation.data.city,
+      state: validation.data.state,
+      zip: validation.data.zip,
+      source: validation.data.source || 'website',
+      utmSource: validation.data.utmSource,
+      utmMedium: validation.data.utmMedium,
+      utmCampaign: validation.data.utmCampaign,
     };
 
     const result = await createBookingRequest(targetBusinessId, input);
@@ -127,7 +166,7 @@ export async function POST(request: NextRequest) {
       requestId: result.requestId,
     });
   } catch (error: any) {
-    console.error('Error creating booking request:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    logApiError('POST', '/api/booking/requests', error);
+    return NextResponse.json({ error: 'Failed to create booking request' }, { status: 500 });
   }
 }

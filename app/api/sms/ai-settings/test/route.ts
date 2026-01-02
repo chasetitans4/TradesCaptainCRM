@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import OpenAI from 'openai';
+import { checkAIRateLimit } from '@/lib/rate-limit';
 
 let _openai: OpenAI | null = null;
 
@@ -33,6 +34,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Only owners and admins can test AI settings' },
         { status: 403 }
+      );
+    }
+
+    // Rate limit AI test calls (50 per minute per business)
+    const rateLimit = await checkAIRateLimit(profile.business_id);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'AI rate limit exceeded. Please wait a moment.' },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': '50',
+            'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+            'X-RateLimit-Reset': rateLimit.resetAt.toISOString(),
+            'Retry-After': (rateLimit.retryAfter || 60).toString(),
+          },
+        }
       );
     }
 

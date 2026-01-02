@@ -13,8 +13,12 @@ import {
   Calendar,
   Download,
   Check,
+  BarChart3,
+  Users,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CommissionTracker } from '@/components/admin/commission-tracker';
 
 interface Commission {
   id: string;
@@ -194,25 +198,47 @@ export default function CommissionsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Commissions</h1>
           <p className="text-gray-500">Track and manage sales commissions</p>
         </div>
-        {isAdmin && selectedIds.length > 0 && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleBatchApprove}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-            >
-              <Check className="h-4 w-4" />
-              Approve ({selectedIds.length})
-            </button>
-            <button
-              onClick={handleBatchPay}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
-            >
-              <DollarSign className="h-4 w-4" />
-              Mark Paid ({selectedIds.length})
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* View Tabs - My Tracker for agents, Admin for admins */}
+      <Tabs defaultValue={isAdmin ? 'admin' : 'tracker'} className="w-full">
+        <TabsList>
+          <TabsTrigger value="tracker" className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            My Commission Tracker
+          </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="admin" className="gap-2">
+              <Users className="h-4 w-4" />
+              Admin View
+            </TabsTrigger>
+          )}
+        </TabsList>
+
+        <TabsContent value="tracker" className="mt-6">
+          <CommissionTracker />
+        </TabsContent>
+
+        <TabsContent value="admin" className="mt-6 space-y-6">
+          {/* Admin-only batch actions */}
+          {isAdmin && selectedIds.length > 0 && (
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={handleBatchApprove}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              >
+                <Check className="h-4 w-4" />
+                Approve ({selectedIds.length})
+              </button>
+              <button
+                onClick={handleBatchPay}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+              >
+                <DollarSign className="h-4 w-4" />
+                Mark Paid ({selectedIds.length})
+              </button>
+            </div>
+          )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -436,6 +462,8 @@ export default function CommissionsPage() {
           </div>
         </div>
       )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
