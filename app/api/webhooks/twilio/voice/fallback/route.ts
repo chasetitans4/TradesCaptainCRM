@@ -1,14 +1,14 @@
 // =====================================================
 // TWILIO VOICE FALLBACK (When forward fails)
 // POST /api/webhooks/twilio/voice/fallback
-// Triggers NeverMiss AI conversation on missed calls
-// Supports both v1 and v2 NeverMiss processing
+// Triggers Leads Captain AI conversation on missed calls
+// Supports both v1 and v2 Leads Captain processing
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import twilio from 'twilio';
-import { handleMissedCall, hasNeverMissAccess, TwilioMissedCallPayload } from '@/lib/nevermiss';
-import { processInboundMessage, type ProcessorOptions } from '@/lib/nevermiss/v2';
+import { handleMissedCall, hasLeadsCaptainAccess, TwilioMissedCallPayload } from '@/lib/leads-captain';
+import { processInboundMessage, type ProcessorOptions } from '@/lib/leads-captain/v2';
 import { createAdminClient } from '@/lib/supabase/server';
 import { formatPhoneE164, sendSMS } from '@/lib/twilio';
 
@@ -27,9 +27,9 @@ export async function POST(request: NextRequest) {
 
     const twiml = new twilio.twiml.VoiceResponse();
 
-    // If the call wasn't answered, trigger NeverMiss and/or voicemail
+    // If the call wasn't answered, trigger Leads Captain and/or voicemail
     if (dialCallStatus !== 'completed') {
-      // Check if NeverMiss is enabled for this business
+      // Check if Leads Captain is enabled for this business
       const supabase = createAdminClient();
       const { data: business } = await supabase
         .from('businesses')
@@ -38,16 +38,16 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (business && business.ai_sms_enabled) {
-        // Check for NeverMiss v2 config first
+        // Check for Leads Captain v2 config first
         const { data: v2Config } = await supabase
-          .from('nevermiss_config')
+          .from('leads_captain_config')
           .select('id, global_mode')
           .eq('business_id', business.id)
           .neq('global_mode', 'paused')
           .single();
 
         if (v2Config) {
-          // Use NeverMiss v2 processor for missed calls
+          // Use Leads Captain v2 processor for missed calls
           const handleV2MissedCall = async () => {
             try {
               const options: ProcessorOptions = {
@@ -70,21 +70,21 @@ export async function POST(request: NextRequest) {
                   businessId: business.id,
                   isAIResponse: result.ai_used,
                 });
-                console.log('NeverMiss v2 missed call response sent');
+                console.log('Leads Captain v2 missed call response sent');
               }
             } catch (error) {
-              console.error('NeverMiss v2 missed call handler error:', error);
+              console.error('Leads Captain v2 missed call handler error:', error);
             }
           };
 
           // Trigger in background
           handleV2MissedCall();
         } else {
-          // Check if business has NeverMiss v1 access based on plan
-          const hasAccess = await hasNeverMissAccess(business.id);
+          // Check if business has Leads Captain v1 access based on plan
+          const hasAccess = await hasLeadsCaptainAccess(business.id);
 
           if (hasAccess) {
-            // Trigger NeverMiss v1 AI conversation
+            // Trigger Leads Captain v1 AI conversation
             const missedCallPayload: TwilioMissedCallPayload = {
               CallSid: callSid,
               AccountSid: params.AccountSid || '',
@@ -100,9 +100,9 @@ export async function POST(request: NextRequest) {
               FromCountry: params.FromCountry,
             };
 
-            // Trigger NeverMiss in background (don't block TwiML response)
+            // Trigger Leads Captain in background (don't block TwiML response)
             handleMissedCall(missedCallPayload).catch(error => {
-              console.error('NeverMiss v1 missed call handler error:', error);
+              console.error('Leads Captain v1 missed call handler error:', error);
             });
           }
         }

@@ -480,7 +480,7 @@ describe('app/api/webhooks/twilio/sms route', () => {
                       : { data: { id: 'x' }, error: null },
                   neq: () => ({
                     single: async () =>
-                      table === 'nevermiss_config'
+                      table === 'leads_captain_config'
                         ? { data: { id: 'cfg1', global_mode: 'enabled' }, error: null }
                         : { data: { id: 'x' }, error: null },
                   }),
@@ -558,7 +558,7 @@ describe('app/api/webhooks/twilio/sms route', () => {
                       : { data: { id: 'x' }, error: null },
                   neq: () => ({
                     single: async () =>
-                      table === 'nevermiss_config'
+                      table === 'leads_captain_config'
                         ? { data: { id: 'cfgA', global_mode: 'enabled' }, error: null }
                         : { data: { id: 'x' }, error: null },
                   }),
@@ -811,7 +811,7 @@ describe('app/api/webhooks/twilio/sms route', () => {
                       : { data: { id: 'x' }, error: null },
                   neq: () => ({
                     single: async () =>
-                      table === 'nevermiss_config'
+                      table === 'leads_captain_config'
                         ? { data: null, error: null }
                         : { data: { id: 'x' }, error: null },
                   }),
@@ -876,7 +876,7 @@ describe('app/api/webhooks/twilio/sms route', () => {
                       : { data: { id: 'x' }, error: null },
                   neq: () => ({
                     single: async () =>
-                      table === 'nevermiss_config'
+                      table === 'leads_captain_config'
                         ? { data: null, error: null }
                         : { data: { id: 'x' }, error: null },
                   }),
@@ -1044,7 +1044,7 @@ describe('app/api/webhooks/twilio/sms route', () => {
                 }),
               };
             }
-            if (table === 'nevermiss_config') {
+            if (table === 'leads_captain_config') {
               return {
                 select: () => ({
                   eq: () => ({

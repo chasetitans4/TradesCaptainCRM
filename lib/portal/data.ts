@@ -367,7 +367,7 @@ async function notifyNewServiceRequest(
         `,
       });
     } catch {
-      console.log(`[DEV] New service request notification for ${businessId}`);
+      // Email sending failed - notification was not sent but request was still created
     }
   }
 

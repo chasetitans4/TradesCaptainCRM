@@ -1,7 +1,7 @@
 // =====================================================
 // TWILIO INCOMING SMS WEBHOOK
 // POST /api/webhooks/twilio/sms
-// Includes NeverMiss v2.0 with rules-first processing
+// Includes Leads Captain v2.0 with rules-first processing
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,11 +21,11 @@ import {
   checkForAbuse,
   blockForAbuse,
   incrementSMSUsage,
-  hasNeverMissAccess,
-  handleNeverMissInboundSMS,
+  hasLeadsCaptainAccess,
+  handleLeadsCaptainInboundSMS,
   TwilioInboundSmsPayload,
-} from '@/lib/nevermiss';
-import { processInboundMessage, type ProcessorOptions } from '@/lib/nevermiss/v2';
+} from '@/lib/leads-captain';
+import { processInboundMessage, type ProcessorOptions } from '@/lib/leads-captain/v2';
 import { sendSMS } from '@/lib/twilio';
 
 /**
@@ -52,7 +52,7 @@ async function markMessageProcessed(supabase: ReturnType<typeof createAdminClien
 }
 
 /**
- * Check if business has NeverMiss v2 config
+ * Check if business has Leads Captain v2 config
  * Returns the config_id if v2 is active, null otherwise
  */
 async function getV2ConfigId(
@@ -60,7 +60,7 @@ async function getV2ConfigId(
   businessId: string
 ): Promise<string | null> {
   const { data } = await supabase
-    .from('nevermiss_config')
+    .from('leads_captain_config')
     .select('id, global_mode')
     .eq('business_id', businessId)
     .neq('global_mode', 'paused')
@@ -70,9 +70,9 @@ async function getV2ConfigId(
 }
 
 /**
- * Handle message processing with NeverMiss v2
+ * Handle message processing with Leads Captain v2
  */
-async function handleNeverMissV2(
+async function handleLeadsCaptainV2(
   _supabase: ReturnType<typeof createAdminClient>,
   configId: string,
   businessId: string,
@@ -94,7 +94,7 @@ async function handleNeverMissV2(
     const result = await processInboundMessage(options);
 
     smsLogger.info({
-      msg: 'NeverMiss v2 processing complete',
+      msg: 'Leads Captain v2 processing complete',
       businessId,
       intent: result.classification.intent,
       ruleMatched: result.rule_matched?.name,
@@ -113,7 +113,7 @@ async function handleNeverMissV2(
       });
 
       smsLogger.info({
-        msg: 'NeverMiss v2 response sent',
+        msg: 'Leads Captain v2 response sent',
         businessId,
         template: result.template_used?.name,
         aiUsed: result.ai_used,
@@ -124,7 +124,7 @@ async function handleNeverMissV2(
     if (result.requires_approval && result.response_content) {
       // The processor already saved the message with requires_approval flag
       smsLogger.info({
-        msg: 'NeverMiss v2 response pending approval',
+        msg: 'Leads Captain v2 response pending approval',
         businessId,
         confidence: result.decision_details.ai_response,
       });
@@ -134,13 +134,13 @@ async function handleNeverMissV2(
     if (result.notifications.length > 0) {
       // TODO: Send notifications based on result.notifications
       smsLogger.info({
-        msg: 'NeverMiss v2 notifications triggered',
+        msg: 'Leads Captain v2 notifications triggered',
         count: result.notifications.length,
       });
     }
   } catch (error) {
     smsLogger.error({
-      msg: 'NeverMiss v2 processing error',
+      msg: 'Leads Captain v2 processing error',
       businessId,
       error: error instanceof Error ? error.message : 'Unknown error',
     });
@@ -274,19 +274,19 @@ export async function POST(request: NextRequest) {
 
     // Handle AI response if enabled
     if (business.ai_sms_enabled) {
-      // Check for NeverMiss v2 config first (new rules-first system)
+      // Check for Leads Captain v2 config first (new rules-first system)
       const v2ConfigId = await getV2ConfigId(supabase, business.id);
 
       if (v2ConfigId) {
-        // Route to NeverMiss v2 processor (rules-first)
-        await handleNeverMissV2(supabase, v2ConfigId, business.id, from, to, body, messageSid);
+        // Route to Leads Captain v2 processor (rules-first)
+        await handleLeadsCaptainV2(supabase, v2ConfigId, business.id, from, to, body, messageSid);
       } else {
-        // Check if this business has NeverMiss v1 access
-        const hasNeverMiss = await hasNeverMissAccess(business.id);
+        // Check if this business has Leads Captain v1 access
+        const hasLeadsCaptain = await hasLeadsCaptainAccess(business.id);
 
-        if (hasNeverMiss) {
-          // Route to NeverMiss v1 AI conversation handler (legacy)
-          const nevermissPayload: TwilioInboundSmsPayload = {
+        if (hasLeadsCaptain) {
+          // Route to Leads Captain v1 AI conversation handler (legacy)
+          const leadsCaptainPayload: TwilioInboundSmsPayload = {
             MessageSid: messageSid,
             SmsSid: messageSid,
             AccountSid: params.AccountSid || '',
@@ -306,9 +306,9 @@ export async function POST(request: NextRequest) {
             ToCountry: params.ToCountry,
           };
 
-          await handleNeverMissInboundSMS(nevermissPayload, business.id);
+          await handleLeadsCaptainInboundSMS(leadsCaptainPayload, business.id);
         } else {
-          // Use original AI handler for non-NeverMiss plans
+          // Use original AI handler for non-Leads Captain plans
           await handleIncomingWithAI(body, conversation ? conversation.id : '', business.id, from);
         }
       }

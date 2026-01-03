@@ -92,7 +92,9 @@ export async function sendMagicLink(
       text: `Sign in to your account\n\nClick this link to sign in: ${magicLink}\n\nThis link expires in ${MAGIC_LINK_EXPIRY_MINUTES} minutes.`,
     });
   } catch (error) {
-    console.log(`[DEV] Magic link for ${email}: ${magicLink}`);
+    // Email sending failed - in production, this should trigger an alert
+    // Magic link was still generated but customer won't receive it
+    console.error('Failed to send magic link email:', error instanceof Error ? error.message : 'Unknown error');
   }
 
   return { success: true };

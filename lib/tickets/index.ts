@@ -3,6 +3,7 @@
 // Handles ticket creation, management, and AI summarization
 // =====================================================
 
+import 'openai/shims/node';
 import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 import {

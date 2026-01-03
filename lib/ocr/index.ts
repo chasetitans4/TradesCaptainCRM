@@ -3,6 +3,7 @@
 // Extract structured data from receipt images using AI vision
 // =====================================================
 
+import 'openai/shims/node';
 import OpenAI from 'openai';
 import { createClient } from '@/lib/supabase/server';
 

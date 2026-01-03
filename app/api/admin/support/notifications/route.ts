@@ -8,7 +8,7 @@ import { requireAgentOrHigher } from '@/lib/admin/auth';
 import {
   getNotificationLogs,
   getNotificationQueue,
-} from '@/lib/admin/nevermiss-support';
+} from '@/lib/admin/leads-captain-support';
 
 export async function GET(request: NextRequest) {
   try {

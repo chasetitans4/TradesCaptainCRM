@@ -3,6 +3,7 @@
 // POST /api/sms/ai-settings/test
 // =====================================================
 
+import 'openai/shims/node';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import OpenAI from 'openai';

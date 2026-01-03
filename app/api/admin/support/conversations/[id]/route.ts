@@ -12,7 +12,7 @@ import {
   forceEndConversation,
   unblockConversation,
   getAIApiLogs,
-} from '@/lib/admin/nevermiss-support';
+} from '@/lib/admin/leads-captain-support';
 
 interface RouteContext {
   params: Promise<{ id: string }>;

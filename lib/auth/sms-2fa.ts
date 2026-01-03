@@ -41,8 +41,9 @@ export async function sendSMS2FACode(
       body: `Your TradesCaptain verification code is: ${code}. It expires in ${CODE_EXPIRY_MINUTES} minutes. Don't share this code with anyone.`,
     });
   } catch (error) {
-    // If Twilio is not configured, log for development
-    console.log(`[DEV] SMS 2FA code for ${phone}: ${code}`);
+    // SMS sending failed - code was still stored in database
+    // In production, this should trigger an alert to ops team
+    console.error('Failed to send SMS 2FA code:', error instanceof Error ? error.message : 'Unknown error');
   }
 }
 

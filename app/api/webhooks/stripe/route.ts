@@ -17,8 +17,6 @@ import { createAdminClient } from '@/lib/supabase/server';
 import { extractCorrelationId, ApiErrors } from '@/lib/api';
 import Stripe from 'stripe';
 
-const supabase = createAdminClient();
-
 /**
  * Check if webhook event has already been processed
  */
@@ -57,6 +55,7 @@ export async function POST(request: NextRequest) {
   const correlationId = extractCorrelationId(request);
   const body = await request.text();
   const signature = request.headers.get('stripe-signature');
+  const supabase = createAdminClient();
 
   if (!signature) {
     return ApiErrors.badRequest('Missing Stripe signature', correlationId);

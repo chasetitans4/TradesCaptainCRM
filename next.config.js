@@ -60,9 +60,8 @@ const nextConfig = {
   // Turbopack is the default bundler in Next.js 16
   turbopack: {},
   typescript: {
-    // Warning: This allows production builds to successfully complete even if
-    // your project has type errors (we've fixed critical ones, remaining are non-blocking).
-    ignoreBuildErrors: true,
+    // TypeScript errors must be fixed for production builds
+    ignoreBuildErrors: false,
   },
   images: {
     remotePatterns: [

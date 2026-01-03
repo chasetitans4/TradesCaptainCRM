@@ -18,7 +18,7 @@ import {
   Unlock,
   StopCircle,
 } from 'lucide-react';
-import { CONVERSATION_STATES } from '@/lib/admin/nevermiss-support';
+import { CONVERSATION_STATES } from '@/lib/admin/leads-captain-support';
 
 interface ConversationMessage {
   id: string;

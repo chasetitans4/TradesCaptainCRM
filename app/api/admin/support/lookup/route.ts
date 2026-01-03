@@ -9,7 +9,7 @@ import {
   lookupCustomerByPhone,
   lookupCustomerByEmail,
   lookupCustomerByName,
-} from '@/lib/admin/nevermiss-support';
+} from '@/lib/admin/leads-captain-support';
 
 export async function GET(request: NextRequest) {
   try {

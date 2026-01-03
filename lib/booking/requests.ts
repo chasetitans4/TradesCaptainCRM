@@ -549,7 +549,8 @@ async function sendBookingNotifications(
       text: `New booking request from ${request.customer_name}\n\nService: ${request.service_type}\nDate: ${request.preferred_date}\nPhone: ${request.customer_phone}\n\nView at: ${baseUrl}/dashboard/bookings/${request.id}`,
     });
   } catch (error) {
-    console.log('[DEV] Would send booking notification email');
+    // Email sending failed - log error but don't block booking creation
+    apiLogger.warn({ msg: 'Failed to send booking notification email', error });
   }
 }
 
@@ -596,7 +597,8 @@ async function sendConfirmationEmail(
       text: `Hi ${name.split(' ')[0]},\n\nYour appointment has been confirmed for ${date} at ${time}.\n\nWe look forward to seeing you!`,
     });
   } catch (error) {
-    console.log('[DEV] Would send confirmation email');
+    // Email sending failed - log error but don't block confirmation
+    apiLogger.warn({ msg: 'Failed to send booking confirmation email', error });
   }
 }
 
@@ -630,6 +632,7 @@ async function sendDeclineEmail(
       text: `Hi ${name.split(' ')[0]},\n\nUnfortunately, we are unable to accommodate your booking request at this time.\n\n${reason ? `Reason: ${reason}\n\n` : ''}Please contact us to discuss alternative options.`,
     });
   } catch (error) {
-    console.log('[DEV] Would send decline email');
+    // Email sending failed - log error but don't block decline
+    apiLogger.warn({ msg: 'Failed to send booking decline email', error });
   }
 }

@@ -9,7 +9,7 @@ import {
   getConversationLogs,
   getConversationById,
   getConversationMessages,
-} from '@/lib/admin/nevermiss-support';
+} from '@/lib/admin/leads-captain-support';
 
 export async function GET(request: NextRequest) {
   try {

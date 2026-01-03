@@ -1,17 +1,17 @@
 // =====================================================
-// ADMIN SUPPORT - NEVERMISS SETTINGS API
-// GET /api/admin/support/settings - Get NeverMiss settings
+// ADMIN SUPPORT - LEADS CAPTAIN SETTINGS API
+// GET /api/admin/support/settings - Get Leads Captain settings
 // PATCH /api/admin/support/settings - Update settings
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher, requireAdminOrHigher } from '@/lib/admin/auth';
 import {
-  getNeverMissSettings,
+  getLeadsCaptainSettings,
   updateForwardToNumber,
   getOrganizationStatus,
   getDailyMetrics,
-} from '@/lib/admin/nevermiss-support';
+} from '@/lib/admin/leads-captain-support';
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     }
 
     const [settings, status] = await Promise.all([
-      getNeverMissSettings(organizationId),
+      getLeadsCaptainSettings(organizationId),
       getOrganizationStatus(organizationId),
     ]);
 

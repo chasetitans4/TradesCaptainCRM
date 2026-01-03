@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminOrHigher } from '@/lib/admin/auth';
-import { removeFromSuppressionList } from '@/lib/admin/nevermiss-support';
+import { removeFromSuppressionList } from '@/lib/admin/leads-captain-support';
 
 export async function DELETE(request: NextRequest) {
   try {

@@ -203,7 +203,7 @@ describe('Twilio SMS webhook route', () => {
             if (table === 'businesses') {
               return { select: () => ({ eq: () => ({ single: async () => ({ data: { id: 'biz1', name: 'Biz', ai_sms_enabled: true, twilio_phone_number: '+15551112222' } }) }) }) };
             }
-            if (table === 'nevermiss_config') {
+            if (table === 'leads_captain_config') {
               return { select: () => ({ eq: () => ({ neq: () => ({ single: async () => ({ data: { id: 'cfg1', global_mode: 'normal' } }) }) }) }) };
             }
             return { upsert: async () => ({}) };
@@ -251,7 +251,7 @@ describe('Twilio SMS webhook route', () => {
             if (table === 'businesses') {
               return { select: () => ({ eq: () => ({ single: async () => ({ data: { id: 'biz1', name: 'Biz', ai_sms_enabled: true, twilio_phone_number: '+15551112222' } }) }) }) };
             }
-            if (table === 'nevermiss_config') {
+            if (table === 'leads_captain_config') {
               return { select: () => ({ eq: () => ({ neq: () => ({ single: async () => ({ data: null }) }) }) }) };
             }
             return { upsert: async () => ({}) };
@@ -288,7 +288,7 @@ describe('Twilio SMS webhook route', () => {
             if (table === 'businesses') {
               return { select: () => ({ eq: () => ({ single: async () => ({ data: { id: 'biz1', name: 'Biz', ai_sms_enabled: true, twilio_phone_number: '+15551112222' } }) }) }) };
             }
-            if (table === 'nevermiss_config') {
+            if (table === 'leads_captain_config') {
               return { select: () => ({ eq: () => ({ neq: () => ({ single: async () => ({ data: null }) }) }) }) };
             }
             return { upsert: async () => ({}) };

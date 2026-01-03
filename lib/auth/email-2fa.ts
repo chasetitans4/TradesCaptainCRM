@@ -77,8 +77,9 @@ export async function sendEmail2FACode(
       text: `Your TradesCaptain verification code is: ${code}\n\nThis code expires in ${CODE_EXPIRY_MINUTES} minutes.\n\nIf you didn't request this code, please ignore this email.`,
     });
   } catch (error) {
-    // If email is not configured, log for development
-    console.log(`[DEV] Email 2FA code for ${email}: ${code}`);
+    // Email sending failed - code was still stored in database
+    // In production, this should trigger an alert to ops team
+    console.error('Failed to send email 2FA code:', error instanceof Error ? error.message : 'Unknown error');
   }
 }
 

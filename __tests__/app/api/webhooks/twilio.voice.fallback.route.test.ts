@@ -42,7 +42,7 @@ describe('Twilio voice fallback route', () => {
             if (table === 'businesses') {
               return { select: () => ({ eq: () => ({ single: async () => ({ data: { id: 'biz1', ai_sms_enabled: true } }) }) }) };
             }
-            if (table === 'nevermiss_config') {
+            if (table === 'leads_captain_config') {
               return { select: () => ({ eq: () => ({ neq: () => ({ single: async () => ({ data: { id: 'cfg1', global_mode: 'normal' } }) }) }) }) };
             }
             return { select: () => ({ eq: () => ({ single: async () => ({ data: null }) }) }) };
@@ -55,6 +55,10 @@ describe('Twilio voice fallback route', () => {
           response_content: null,
           ai_used: false,
         }),
+      }));
+      jest.doMock('@/lib/leads-captain', () => ({
+        hasLeadsCaptainAccess: async () => false,
+        handleMissedCall: jest.fn(async () => ({})),
       }));
       jest.doMock('@/lib/twilio', () => ({
         formatPhoneE164: (x: string) => x,
@@ -94,7 +98,7 @@ describe('Twilio voice fallback route', () => {
             if (table === 'businesses') {
               return { select: () => ({ eq: () => ({ single: async () => ({ data: { id: 'biz2', ai_sms_enabled: true } }) }) }) };
             }
-            if (table === 'nevermiss_config') {
+            if (table === 'leads_captain_config') {
               return { select: () => ({ eq: () => ({ neq: () => ({ single: async () => ({ data: { id: 'cfg2', global_mode: 'normal' } }) }) }) }) };
             }
             return { select: () => ({ eq: () => ({ single: async () => ({ data: null }) }) }) };
@@ -107,6 +111,10 @@ describe('Twilio voice fallback route', () => {
           response_content: 'Thanks for calling, we will text you details.',
           ai_used: true,
         }),
+      }));
+      jest.doMock('@/lib/leads-captain', () => ({
+        hasLeadsCaptainAccess: async () => false,
+        handleMissedCall: jest.fn(async () => ({})),
       }));
       jest.doMock('@/lib/twilio', () => ({
         formatPhoneE164: (x: string) => x,
@@ -135,7 +143,7 @@ describe('Twilio voice fallback route', () => {
             if (table === 'businesses') {
               return { select: () => ({ eq: () => ({ single: async () => ({ data: { id: 'biz3', ai_sms_enabled: true } }) }) }) };
             }
-            if (table === 'nevermiss_config') {
+            if (table === 'leads_captain_config') {
               return { select: () => ({ eq: () => ({ neq: () => ({ single: async () => ({ data: { id: 'cfg3', global_mode: 'normal' } }) }) }) }) };
             }
             return { select: () => ({ eq: () => ({ single: async () => ({ data: null }) }) }) };
@@ -144,6 +152,10 @@ describe('Twilio voice fallback route', () => {
       }));
       jest.doMock('@/lib/leads-captain/v2', () => ({
         processInboundMessage: async () => { throw new Error('processor failed'); },
+      }));
+      jest.doMock('@/lib/leads-captain', () => ({
+        hasLeadsCaptainAccess: async () => false,
+        handleMissedCall: jest.fn(async () => ({})),
       }));
       jest.doMock('@/lib/twilio', () => ({
         formatPhoneE164: (x: string) => x,
@@ -169,7 +181,7 @@ describe('Twilio voice fallback route', () => {
             if (table === 'businesses') {
               return { select: () => ({ eq: () => ({ single: async () => ({ data: { id: 'biz4', ai_sms_enabled: true } }) }) }) };
             }
-            if (table === 'nevermiss_config') {
+            if (table === 'leads_captain_config') {
               return { select: () => ({ eq: () => ({ neq: () => ({ single: async () => ({ data: null }) }) }) }) };
             }
             return { select: () => ({ eq: () => ({ single: async () => ({ data: null }) }) }) };

@@ -27,7 +27,7 @@ interface SelectedCustomer {
   status: string;
   billing_status: string;
   plan_type: string;
-  nevermiss_phone?: string;
+  leads_captain_phone?: string;
   forward_to?: string;
 }
 
@@ -135,10 +135,10 @@ export default function AdminSupportPage() {
                     <p className="text-sm text-muted-foreground">
                       {selectedCustomer.email}
                     </p>
-                    {selectedCustomer.nevermiss_phone && (
+                    {selectedCustomer.leads_captain_phone && (
                       <p className="text-sm mt-1">
                         <span className="text-muted-foreground">Leads Captain:</span>{' '}
-                        {selectedCustomer.nevermiss_phone}
+                        {selectedCustomer.leads_captain_phone}
                       </p>
                     )}
                     {selectedCustomer.forward_to && (

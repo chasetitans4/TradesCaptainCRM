@@ -66,7 +66,7 @@ export async function POST(
         state,
         zip,
         phone,
-        use_separate_nevermiss: body.use_separate_nevermiss || false,
+        use_separate_leads_captain: body.use_separate_leads_captain || false,
       }
     );
 

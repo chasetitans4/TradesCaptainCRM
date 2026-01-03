@@ -4,6 +4,7 @@
 // Uses GPT-4o-mini for efficiency
 // ===========================================
 
+import 'openai/shims/node';
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { searchArticles, ARTICLES } from '@/lib/knowledge-base/articles';
