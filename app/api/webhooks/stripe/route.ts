@@ -267,12 +267,20 @@ async function handlePaymentIntentSucceeded(
   supabase: ReturnType<typeof createAdminClient>,
   paymentIntent: Stripe.PaymentIntent
 ) {
-  const invoiceId = paymentIntent.metadata?.invoice_id;
-  if (!invoiceId) {
+  // Use proper idempotency check using the deduplication system
+  const idempotencyKey = `payment_intent:${paymentIntent.id}`;
+  if (await isEventProcessed(supabase, idempotencyKey)) {
     return;
   }
 
-  // Check if payment already recorded
+  const invoiceId = paymentIntent.metadata?.invoice_id;
+  if (!invoiceId) {
+    // Mark as processed even if no invoice - prevents reprocessing
+    await markEventProcessed(supabase, idempotencyKey, 'payment_intent.succeeded');
+    return;
+  }
+
+  // Additional check for payment already recorded (belt and suspenders)
   const { data: existingPayment } = await supabase
     .from('payments')
     .select('id')
@@ -280,6 +288,7 @@ async function handlePaymentIntentSucceeded(
     .single();
 
   if (existingPayment) {
+    await markEventProcessed(supabase, idempotencyKey, 'payment_intent.succeeded');
     return;
   }
 
@@ -361,6 +370,9 @@ async function handlePaymentIntentSucceeded(
       paid_at: isPaid ? new Date().toISOString() : null,
     });
   }
+
+  // Mark event as processed at the end of successful handling
+  await markEventProcessed(supabase, idempotencyKey, 'payment_intent.succeeded');
 }
 
 async function handleChargeSucceeded(

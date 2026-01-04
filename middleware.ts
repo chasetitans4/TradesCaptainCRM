@@ -183,14 +183,20 @@ async function updateSession(request: NextRequest) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Generate or extract correlation ID for request tracing
+  // This enables end-to-end tracing across services and logs
+  const correlationId = request.headers.get('x-correlation-id') || crypto.randomUUID();
+
   // Skip middleware for static assets
   if (matchesPattern(pathname, staticPatterns)) {
     return NextResponse.next();
   }
 
-  // Skip API webhooks and public endpoints
+  // Skip API webhooks and public endpoints (but still add correlation ID)
   if (pathname.startsWith('/api/webhooks') || pathname.startsWith('/api/public') || pathname === '/api/health') {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set('x-correlation-id', correlationId);
+    return response;
   }
 
   // Apply rate limiting for API routes (Edge-compatible in-memory)
@@ -211,6 +217,9 @@ export async function middleware(request: NextRequest) {
   const csp = getCSP(nonce);
   response.headers.set('Content-Security-Policy', csp);
   response.headers.set('x-nonce', nonce);
+
+  // Add correlation ID for request tracing
+  response.headers.set('x-correlation-id', correlationId);
 
   // Check if route requires authentication
   const isPublicRoute = matchesPattern(pathname, publicRoutes);

@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 
+const { withSentryConfig } = require('@sentry/nextjs');
+
 const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
@@ -160,4 +162,32 @@ const nextConfig = {
   }),
 };
 
-module.exports = withPWA(nextConfig);
+// Sentry configuration for source maps upload
+// Source maps are uploaded to Sentry but NOT exposed to browser
+const sentryWebpackPluginOptions = {
+  // Suppresses source map uploading logs during build
+  silent: true,
+
+  // For all available options, see:
+  // https://github.com/getsentry/sentry-webpack-plugin#options
+
+  // Upload source maps to Sentry for better stack traces
+  // Requires SENTRY_AUTH_TOKEN, SENTRY_ORG, and SENTRY_PROJECT env vars
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+
+  // Hide source maps from the browser (only upload to Sentry)
+  hideSourceMaps: true,
+
+  // Automatically delete source maps after upload
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+
+  // Disable source map upload in development
+  disable: process.env.NODE_ENV !== 'production',
+};
+
+// Combine PWA and Sentry wrappers
+module.exports = withSentryConfig(withPWA(nextConfig), sentryWebpackPluginOptions);

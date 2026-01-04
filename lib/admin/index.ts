@@ -6,6 +6,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { format, addDays, addMonths, differenceInDays } from 'date-fns';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 
 // =====================================================
 // TYPES
@@ -193,8 +194,8 @@ export async function createAdminUser(
 ): Promise<AdminUser> {
   const supabase = await createClient();
 
-  // Hash password (use bcrypt in production)
-  const passwordHash = crypto.createHash('sha256').update(admin.password).digest('hex');
+  // Hash password using bcrypt with cost factor 12
+  const passwordHash = await bcrypt.hash(admin.password, 12);
 
   const { data, error } = await supabase
     .from('admin_users')
@@ -805,6 +806,47 @@ export async function validateWebInvoice(invoiceNumber: string): Promise<Invoice
 // IMPERSONATION
 // =====================================================
 
+/**
+ * Get the impersonation secret for HMAC signing
+ * Falls back to JWT_SECRET if ADMIN_IMPERSONATION_SECRET is not set
+ */
+function getImpersonationSecret(): string {
+  const secret = process.env.ADMIN_IMPERSONATION_SECRET || process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('ADMIN_IMPERSONATION_SECRET or JWT_SECRET must be configured');
+  }
+  return secret;
+}
+
+/**
+ * Sign an impersonation token with HMAC-SHA256
+ * Token format: imp_<base64-payload>.<hex-signature>
+ */
+function signImpersonationPayload(payload: string): string {
+  const signature = crypto
+    .createHmac('sha256', getImpersonationSecret())
+    .update(payload)
+    .digest('hex');
+  return signature;
+}
+
+/**
+ * Verify an impersonation token signature using timing-safe comparison
+ */
+function verifyImpersonationSignature(payload: string, signature: string): boolean {
+  const expectedSig = signImpersonationPayload(payload);
+
+  // Use timing-safe comparison to prevent timing attacks
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(signature, 'hex'),
+      Buffer.from(expectedSig, 'hex')
+    );
+  } catch {
+    return false;
+  }
+}
+
 export async function createImpersonationToken(
   adminId: string,
   accountId: string
@@ -818,18 +860,19 @@ export async function createImpersonationToken(
     { action: 'started' }
   );
 
-  // Generate temporary token
-  const token = crypto.randomBytes(32).toString('hex');
-
-  // In production, store this token with expiry and account mapping
-  // For now, encode the account ID in the token
-  const tokenData = Buffer.from(JSON.stringify({
+  // Create payload with 30-minute expiry (not 24 hours for security)
+  const payload = JSON.stringify({
     accountId,
     adminId,
-    expires: addDays(new Date(), 1).toISOString(),
-  })).toString('base64');
+    expires: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
+    nonce: crypto.randomBytes(16).toString('hex'), // Prevent replay attacks
+  });
 
-  return `imp_${tokenData}`;
+  const payloadB64 = Buffer.from(payload).toString('base64');
+  const signature = signImpersonationPayload(payload);
+
+  // Token format: imp_<base64-payload>.<hex-signature>
+  return `imp_${payloadB64}.${signature}`;
 }
 
 export async function validateImpersonationToken(token: string): Promise<{
@@ -842,8 +885,34 @@ export async function validateImpersonationToken(token: string): Promise<{
       return { valid: false };
     }
 
-    const tokenData = JSON.parse(Buffer.from(token.slice(4), 'base64').toString());
+    // Parse token: imp_<base64-payload>.<signature>
+    const tokenBody = token.slice(4); // Remove 'imp_' prefix
+    const lastDotIndex = tokenBody.lastIndexOf('.');
 
+    if (lastDotIndex === -1) {
+      // No signature found - invalid token format
+      return { valid: false };
+    }
+
+    const payloadB64 = tokenBody.slice(0, lastDotIndex);
+    const signature = tokenBody.slice(lastDotIndex + 1);
+
+    if (!payloadB64 || !signature) {
+      return { valid: false };
+    }
+
+    // Decode payload
+    const payload = Buffer.from(payloadB64, 'base64').toString();
+
+    // Verify signature BEFORE parsing/trusting any data
+    if (!verifyImpersonationSignature(payload, signature)) {
+      return { valid: false };
+    }
+
+    // Parse payload only after signature verification
+    const tokenData = JSON.parse(payload);
+
+    // Check expiry
     if (new Date(tokenData.expires) < new Date()) {
       return { valid: false };
     }

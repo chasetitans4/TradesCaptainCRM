@@ -182,6 +182,57 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
 
+    // Per-phone rate limiting (5 messages per minute per phone number)
+    // Prevents SMS abuse/flooding from a single phone number
+    const phoneRateLimitKey = `sms_rate:${formatPhoneE164(from)}`;
+    const now = Date.now();
+    const windowMs = 60000; // 1 minute window
+    const maxMessagesPerWindow = 5;
+
+    try {
+      const { data: rateData } = await supabase
+        .from('rate_limit_cache')
+        .select('count, window_start')
+        .eq('key', phoneRateLimitKey)
+        .single();
+
+      if (rateData) {
+        const windowStart = new Date(rateData.window_start).getTime();
+        const inCurrentWindow = now - windowStart < windowMs;
+
+        if (inCurrentWindow && rateData.count >= maxMessagesPerWindow) {
+          smsLogger.warn({
+            msg: 'SMS rate limit exceeded',
+            from: formatPhoneE164(from),
+            count: rateData.count,
+          });
+          // Silent drop - don't inform potential abuser
+          return twimlResponse('');
+        }
+
+        // Update counter
+        await supabase.from('rate_limit_cache').upsert({
+          key: phoneRateLimitKey,
+          count: inCurrentWindow ? rateData.count + 1 : 1,
+          window_start: inCurrentWindow ? rateData.window_start : new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'key' });
+      } else {
+        // First message from this phone in current window
+        await supabase.from('rate_limit_cache').insert({
+          key: phoneRateLimitKey,
+          count: 1,
+          window_start: new Date().toISOString(),
+        });
+      }
+    } catch (rateError) {
+      // Don't block messages if rate limit check fails - log and continue
+      smsLogger.warn({
+        msg: 'Rate limit check failed, continuing',
+        error: rateError instanceof Error ? rateError.message : 'Unknown error',
+      });
+    }
+
     // Idempotency check - skip if already processed
     if (await isMessageProcessed(supabase, messageSid)) {
       smsLogger.info({ msg: 'SMS already processed, skipping', messageSid });

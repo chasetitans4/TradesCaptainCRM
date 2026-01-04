@@ -38,6 +38,29 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
 
+    // Deduplicate by CallSid to prevent double-processing
+    // Twilio may retry webhooks if they timeout or fail
+    if (callSid) {
+      const idempotencyKey = `twilio_call:${callSid}`;
+      const { data: existing } = await supabase
+        .from('processed_webhook_events')
+        .select('id')
+        .eq('event_id', idempotencyKey)
+        .single();
+
+      if (existing) {
+        smsLogger.info({ msg: 'Duplicate call webhook ignored', callSid });
+        return twimlVoicemail('Thank you for calling.');
+      }
+
+      // Mark as processed early to prevent race conditions
+      await supabase.from('processed_webhook_events').upsert({
+        event_id: idempotencyKey,
+        event_type: 'twilio.voice.incoming',
+        processed_at: new Date().toISOString(),
+      }, { onConflict: 'event_id' });
+    }
+
     // Find business by phone number
     const { data: business } = await supabase
       .from('businesses')
