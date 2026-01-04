@@ -10,6 +10,7 @@ import { Header } from '@/components/layout/header';
 import { MobileNav } from '@/components/layout/mobile-nav';
 import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
 import { prefetchRoutes, CRITICAL_ROUTES, SECONDARY_ROUTES } from '@/lib/performance';
+import { InteractiveTour } from '@/components/onboarding';
 
 // Dynamic imports for non-critical components (loaded after initial render)
 const CommandPalette = dynamic(
@@ -162,6 +163,14 @@ export default function DashboardLayout({
       <Suspense fallback={null}>
         <AIAssistantWidget />
       </Suspense>
+
+      {/* Interactive Onboarding Tour - shows for new users on dashboard */}
+      {pathname === '/dashboard' && (
+        <InteractiveTour
+          tourId="dashboard-intro"
+          autoStart
+        />
+      )}
     </div>
   );
 }

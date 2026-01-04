@@ -15,6 +15,19 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
+import { toasts, showError, showSuccess } from '@/lib/toast';
+import { useURLFilters } from '@/hooks/useURLFilters';
+import { AdminPageHeader } from '@/components/admin/page-header';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface Coupon {
   id: string;
@@ -43,14 +56,28 @@ const statusIcons: Record<string, any> = {
   revoked: XCircle,
 };
 
+interface CouponFilters {
+  status: string;
+  page: number;
+  [key: string]: string | number | undefined;
+}
+
 export default function CouponsPage() {
+  const { filters, setFilter } = useURLFilters<CouponFilters>({
+    defaults: { status: '', page: 1 },
+  });
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [revokeDialog, setRevokeDialog] = useState<{ open: boolean; couponId: string | null }>({
+    open: false,
+    couponId: null,
+  });
+
+  const page = filters.page || 1;
+  const statusFilter = filters.status || '';
 
   useEffect(() => {
     fetchCoupons();
@@ -60,7 +87,7 @@ export default function CouponsPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        page: page.toString(),
+        page: String(page),
         limit: '25',
       });
       if (statusFilter) params.append('status', statusFilter);
@@ -77,20 +104,28 @@ export default function CouponsPage() {
     }
   }
 
-  function copyCode(code: string) {
-    navigator.clipboard.writeText(code);
-    setCopiedCode(code);
-    setTimeout(() => setCopiedCode(null), 2000);
+  async function copyCode(code: string) {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      toasts.copied();
+      setTimeout(() => setCopiedCode(null), 2000);
+    } catch {
+      toasts.copyFailed();
+    }
   }
 
-  async function revokeCoupon(id: string) {
-    if (!confirm('Are you sure you want to revoke this coupon?')) return;
+  async function handleRevokeCoupon() {
+    if (!revokeDialog.couponId) return;
     try {
-      const res = await fetch(`/api/admin/coupons/${id}/revoke`, { method: 'POST' });
+      const res = await fetch(`/api/admin/coupons/${revokeDialog.couponId}/revoke`, { method: 'POST' });
       if (!res.ok) throw new Error('Failed to revoke coupon');
+      showSuccess('Coupon revoked successfully');
       fetchCoupons();
     } catch (err: any) {
-      alert(err.message);
+      showError(err.message);
+    } finally {
+      setRevokeDialog({ open: false, couponId: null });
     }
   }
 
@@ -106,12 +141,12 @@ export default function CouponsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">CRM Coupons</h1>
-          <p className="text-gray-500">Free CRM with Web Plan promotion codes</p>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="CRM Coupons"
+        description="Free CRM with Web Plan promotion codes"
+        icon={Ticket}
+        breadcrumb={[{ label: 'Coupons' }]}
+      />
 
       {/* Info Banner */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -131,8 +166,8 @@ export default function CouponsPage() {
       <div className="flex flex-col sm:flex-row gap-4">
         <select
           value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+          onChange={(e) => { setFilter('status', e.target.value); setFilter('page', 1); }}
+          className="px-4 py-2 border border-input bg-background text-foreground rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
         >
           <option value="">All Status</option>
           <option value="active">Active</option>
@@ -199,8 +234,8 @@ export default function CouponsPage() {
                         </code>
                         <button
                           onClick={() => copyCode(coupon.code)}
-                          className="p-1 hover:bg-gray-200 rounded"
-                          title="Copy code"
+                          className="p-1 hover:bg-muted rounded"
+                          aria-label={`Copy coupon code ${coupon.code}`}
                         >
                           {copiedCode === coupon.code ? (
                             <Check className="h-4 w-4 text-green-600" />
@@ -237,7 +272,7 @@ export default function CouponsPage() {
                     <td className="px-4 py-3">
                       {coupon.status === 'active' && (
                         <button
-                          onClick={() => revokeCoupon(coupon.id)}
+                          onClick={() => setRevokeDialog({ open: true, couponId: coupon.id })}
                           className="text-sm text-red-600 hover:text-red-800"
                         >
                           Revoke
@@ -255,27 +290,45 @@ export default function CouponsPage() {
       {/* Pagination */}
       {total > 25 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             Showing {(page - 1) * 25 + 1} - {Math.min(page * 25, total)} of {total}
           </p>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
+              onClick={() => setFilter('page', Math.max(1, page - 1))}
               disabled={page === 1}
-              className="px-3 py-1 border border-gray-300 rounded-lg disabled:opacity-50"
+              className="px-3 py-1 border border-input bg-background text-foreground rounded-lg disabled:opacity-50"
             >
               Previous
             </button>
             <button
-              onClick={() => setPage(p => p + 1)}
+              onClick={() => setFilter('page', page + 1)}
               disabled={page * 25 >= total}
-              className="px-3 py-1 border border-gray-300 rounded-lg disabled:opacity-50"
+              className="px-3 py-1 border border-input bg-background text-foreground rounded-lg disabled:opacity-50"
             >
               Next
             </button>
           </div>
         </div>
       )}
+
+      {/* Revoke Confirmation Dialog */}
+      <AlertDialog open={revokeDialog.open} onOpenChange={(open) => setRevokeDialog({ open, couponId: open ? revokeDialog.couponId : null })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke Coupon</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to revoke this coupon? This action cannot be undone and the coupon will no longer be usable.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRevokeCoupon} className="bg-red-600 hover:bg-red-700">
+              Revoke
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

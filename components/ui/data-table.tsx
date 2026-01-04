@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   flexRender,
   getCoreRowModel,
@@ -64,6 +64,27 @@ export function DataTable<TData, TValue>({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [rowSelection, setRowSelection] = useState({});
+  const [searchValue, setSearchValue] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Debounced search - updates filter after 300ms of no typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchValue);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchValue]);
+
+  // Apply debounced search to column filter
+  useEffect(() => {
+    setColumnFilters((prev) => {
+      const otherFilters = prev.filter((f) => f.id !== searchKey);
+      if (debouncedSearch) {
+        return [...otherFilters, { id: searchKey, value: debouncedSearch }];
+      }
+      return otherFilters;
+    });
+  }, [debouncedSearch, searchKey]);
 
   const table = useReactTable({
     data,
@@ -119,8 +140,8 @@ export function DataTable<TData, TValue>({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder={searchPlaceholder}
-                value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ''}
-                onChange={(e) => table.getColumn(searchKey)?.setFilterValue(e.target.value)}
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
                 className="pl-9 w-full sm:w-80"
               />
             </div>

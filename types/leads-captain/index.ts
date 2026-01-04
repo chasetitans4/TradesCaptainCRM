@@ -354,6 +354,9 @@ export interface LeadsCaptainConversation {
   requires_human: boolean;
   opted_out: boolean;
 
+  // Per-conversation mute (Section 7.3 - Kill Switches)
+  muted_until: string | null;
+
   // Memory
   customer_memory: CustomerMemory;
 
@@ -481,6 +484,11 @@ export type AuditAction =
   | 'opt_in'
   | 'blocked'
   | 'unblocked'
+  | 'muted'
+  | 'unmuted'
+  | 'flagged_hot_lead'
+  | 'unflagged_hot_lead'
+  | 'conversation_closed'
   | 'approval_requested'
   | 'approval_approved'
   | 'approval_rejected'
@@ -775,6 +783,9 @@ export interface RuleEvaluationResult {
     result: boolean;
     actual_value: unknown;
   }>;
+  // Chain depth tracking (Section 3.3)
+  chain_depth?: number;
+  chain_depth_exceeded?: boolean;
 }
 
 // Template variables for rendering

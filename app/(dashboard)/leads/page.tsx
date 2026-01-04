@@ -7,6 +7,7 @@ import { createClient, getCurrentUserProfile } from '@/lib/supabase/client';
 import { hasPermission } from '@/lib/permissions';
 import { cn, formatRelativeDate, formatPhoneNumber } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import type { UserWithBusiness, Lead, Customer, LeadStatus } from '@/types';
@@ -61,6 +62,7 @@ const URGENCY_COLORS: Record<string, string> = {
 export default function LeadsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
   const [user, setUser] = useState<UserWithBusiness | null>(null);
   const [leads, setLeads] = useState<LeadWithCustomer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -115,6 +117,7 @@ export default function LeadsPage() {
       setLeads((data as LeadWithCustomer[]) || []);
     } catch (error) {
       console.error('Error loading leads:', error);
+      toast({ title: 'Error', description: 'Failed to load leads. Please try again.', variant: 'destructive' });
     } finally {
       setLoading(false);
       setRefreshing(false);

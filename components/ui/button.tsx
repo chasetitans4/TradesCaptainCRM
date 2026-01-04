@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]',
+  // Base styles with improved press feedback (active:scale-95 for tactile feel)
+  'inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-95 active:transition-none',
   {
     variants: {
       variant: {
@@ -16,16 +17,21 @@ const buttonVariants = cva(
         outline: 'border border-border bg-background hover:bg-muted hover:text-primary',
         secondary: 'bg-muted text-text hover:bg-muted/80',
         ghost: 'hover:bg-muted hover:text-primary',
-        link: 'text-primary underline-offset-4 hover:underline',
+        link: 'text-primary underline-offset-4 hover:underline active:scale-100', // links shouldn't scale
         success: 'bg-success text-white hover:bg-success/90 shadow-sm',
         warning: 'bg-warning text-white hover:bg-warning/90 shadow-sm',
       },
       size: {
+        // Default and lg already meet 44px minimum (h-12 = 48px, h-14 = 56px)
         default: 'h-12 px-4 py-2',
-        sm: 'h-10 rounded-md px-3',
+        // sm size now ensures minimum 44px touch target on mobile
+        sm: 'h-10 rounded-md px-3 min-h-[44px] md:min-h-0',
         lg: 'h-14 rounded-lg px-8',
-        icon: 'h-12 w-12',
-        'icon-sm': 'h-10 w-10',
+        // Icon sizes enforce 44px minimum for touch accessibility
+        icon: 'h-12 w-12 min-h-[44px] min-w-[44px]',
+        'icon-sm': 'h-10 w-10 min-h-[44px] min-w-[44px]',
+        // Explicit touch-friendly size for mobile contexts
+        touch: 'h-11 min-h-[44px] min-w-[44px] px-4',
       },
     },
     defaultVariants: {

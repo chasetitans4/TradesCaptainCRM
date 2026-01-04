@@ -37,11 +37,11 @@ export function ChatBubble({
             : 'bg-muted text-foreground rounded-bl-md'
         )}
       >
-        {/* AI indicator */}
+        {/* AI indicator - Per Section 8.1: "AI sent this message" → "Suggested response (you approved)" */}
         {isAI && isOutbound && (
           <div className="flex items-center gap-1 mb-1 opacity-80">
             <Bot className="h-3 w-3" />
-            <span className="text-xs">AI Response</span>
+            <span className="text-xs">Suggested Response</span>
           </div>
         )}
 

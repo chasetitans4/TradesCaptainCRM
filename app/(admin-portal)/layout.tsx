@@ -25,7 +25,14 @@ import {
   Book,
   MessageCircle,
   ClipboardList,
+  Lightbulb,
+  HeadphonesIcon,
+  Tag,
+  TrendingUp,
+  Keyboard,
 } from 'lucide-react';
+import { useAdminKeyboardShortcuts } from '@/hooks/useAdminKeyboardShortcuts';
+import { AdminKeyboardShortcutsHelp } from '@/components/admin/keyboard-shortcuts-help';
 
 interface AdminUser {
   id: string;
@@ -41,11 +48,16 @@ const managementNav = [
   { name: 'Sales Leads', href: '/admin-portal/leads', icon: Target },
   { name: 'Commissions', href: '/admin-portal/commissions', icon: DollarSign },
   { name: 'Agents', href: '/admin-portal/agents', icon: Users },
+  { name: 'Agent Performance', href: '/admin-portal/agent-performance', icon: TrendingUp },
   { name: 'Coupons', href: '/admin-portal/coupons', icon: Ticket },
   { name: 'Retention', href: '/admin-portal/retention', icon: PhoneCall },
   { name: 'Submissions', href: '/admin-portal/submissions', icon: FileText },
   { name: 'Founders Program', href: '/admin-portal/founders', icon: Crown },
   { name: 'Client Onboarding', href: '/admin-portal/client-onboarding', icon: ClipboardList },
+  { name: 'Pricing', href: '/admin-portal/pricing', icon: Tag },
+  { name: 'Offers', href: '/admin-portal/offers', icon: DollarSign },
+  { name: 'Feature Requests', href: '/admin-portal/feature-requests', icon: Lightbulb },
+  { name: 'Support Tickets', href: '/admin-portal/tickets', icon: HeadphonesIcon },
   { name: 'Reports', href: '/admin-portal/reports', icon: BarChart3 },
 ];
 
@@ -57,6 +69,7 @@ const agentNav = [
   { name: 'Coupons', href: '/admin-portal/coupons', icon: Ticket },
   { name: 'Sales Playbook', href: '/admin-portal/sales-playbook', icon: Book },
   { name: 'Support Templates', href: '/admin-portal/support-templates', icon: MessageCircle },
+  { name: 'Agent Performance', href: '/admin-portal/agent-performance', icon: TrendingUp },
 ];
 
 export default function AdminPortalLayout({
@@ -70,6 +83,11 @@ export default function AdminPortalLayout({
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  // Keyboard shortcuts
+  const { showHelp, setShowHelp } = useAdminKeyboardShortcuts({
+    enabled: pathname !== '/admin-portal/login',
+  });
 
   useEffect(() => {
     async function checkAuth() {
@@ -110,15 +128,17 @@ export default function AdminPortalLayout({
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case 'super_admin':
-        return 'bg-purple-100 text-purple-700';
+        return 'bg-purple-500/10 text-purple-600 dark:text-purple-400';
       case 'admin':
-        return 'bg-blue-100 text-blue-700';
+        return 'bg-blue-500/10 text-blue-600 dark:text-blue-400';
       case 'agent':
-        return 'bg-green-100 text-green-700';
+        return 'bg-green-500/10 text-green-600 dark:text-green-400';
       case 'support':
-        return 'bg-gray-100 text-gray-700';
+        return 'bg-muted text-muted-foreground';
+      case 'finance':
+        return 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400';
       default:
-        return 'bg-gray-100 text-gray-700';
+        return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -129,10 +149,10 @@ export default function AdminPortalLayout({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-pulse flex flex-col items-center">
           <Shield className="w-12 h-12 text-primary mb-4" />
-          <div className="h-4 w-32 bg-gray-200 rounded" />
+          <div className="h-4 w-32 bg-muted rounded" />
         </div>
       </div>
     );
@@ -143,7 +163,7 @@ export default function AdminPortalLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-muted/30">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
@@ -217,22 +237,35 @@ export default function AdminPortalLayout({
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Header */}
-        <header className="sticky top-0 z-30 bg-white border-b border-gray-200">
+        <header className="sticky top-0 z-30 bg-card border-b border-border">
           <div className="flex items-center justify-between h-16 px-4">
             <button
-              className="lg:hidden text-gray-500 hover:text-gray-700"
+              className="lg:hidden text-muted-foreground hover:text-foreground"
               onClick={() => setSidebarOpen(true)}
+              aria-label="Open sidebar"
             >
               <Menu className="h-6 w-6" />
             </button>
 
             <div className="flex-1" />
 
+            {/* Keyboard shortcuts button */}
+            <button
+              onClick={() => setShowHelp(true)}
+              className="hidden sm:flex items-center gap-1.5 px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors mr-2"
+              aria-label="Show keyboard shortcuts"
+            >
+              <Keyboard className="h-4 w-4" />
+              <kbd className="hidden lg:inline text-xs px-1.5 py-0.5 rounded bg-muted border border-border font-mono">?</kbd>
+            </button>
+
             {/* User menu */}
             <div className="relative">
               <button
-                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted transition-colors"
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
+                aria-expanded={userMenuOpen}
+                aria-haspopup="true"
               >
                 <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                   <span className="text-sm font-medium text-primary">
@@ -240,14 +273,14 @@ export default function AdminPortalLayout({
                   </span>
                 </div>
                 <div className="hidden sm:block text-left">
-                  <div className="text-sm font-medium text-gray-900">
+                  <div className="text-sm font-medium text-foreground">
                     {admin.full_name || admin.email}
                   </div>
                   <span className={`text-xs px-1.5 py-0.5 rounded ${getRoleBadgeColor(admin.role)}`}>
                     {admin.role.replace('_', ' ')}
                   </span>
                 </div>
-                <ChevronDown className="h-4 w-4 text-gray-500" />
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
               </button>
 
               {userMenuOpen && (
@@ -256,18 +289,18 @@ export default function AdminPortalLayout({
                     className="fixed inset-0 z-40"
                     onClick={() => setUserMenuOpen(false)}
                   />
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                  <div className="absolute right-0 mt-2 w-48 bg-popover rounded-lg shadow-lg border border-border z-50">
                     <div className="py-1">
                       <Link
                         href="/admin-portal/settings"
-                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
                         onClick={() => setUserMenuOpen(false)}
                       >
                         <Settings className="h-4 w-4" />
                         Settings
                       </Link>
                       <button
-                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-500/10"
                         onClick={handleLogout}
                       >
                         <LogOut className="h-4 w-4" />
@@ -284,6 +317,9 @@ export default function AdminPortalLayout({
         {/* Page content */}
         <main className="p-4 lg:p-6">{children}</main>
       </div>
+
+      {/* Keyboard Shortcuts Help Dialog */}
+      <AdminKeyboardShortcutsHelp open={showHelp} onOpenChange={setShowHelp} />
     </div>
   );
 }

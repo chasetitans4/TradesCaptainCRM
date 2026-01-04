@@ -281,7 +281,7 @@ export default function NewCustomerPage() {
               id="source"
               value={formData.source}
               onChange={(e) => updateField('source', e.target.value as LeadSource)}
-              className="mt-1 w-full h-12 px-4 rounded-lg border border-border bg-background text-text focus:outline-none focus:ring-2 focus:ring-primary"
+              className="mt-1 w-full h-12 px-4 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px]"
             >
               {SOURCE_OPTIONS.map((source) => (
                 <option key={source} value={source}>
@@ -318,7 +318,7 @@ export default function NewCustomerPage() {
               onChange={(e) => updateField('notes', e.target.value)}
               placeholder="Any additional notes about this customer..."
               rows={4}
-              className="mt-1 w-full px-4 py-3 rounded-lg border border-border bg-background text-text focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              className="mt-1 w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
             />
           </div>
         </section>

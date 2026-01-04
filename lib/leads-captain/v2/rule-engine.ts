@@ -1,6 +1,7 @@
 // =====================================================
 // Leads Captain v2.0 Rule Engine
 // Evaluates rules in priority order - first match wins
+// Per Section 3.3: Chain depth limited to 2
 // =====================================================
 
 import {
@@ -17,15 +18,37 @@ import {
   DayOfWeek,
 } from '@/types/leads-captain';
 
+// =====================================================
+// CHAIN DEPTH LIMITING (Section 3.3)
+// Maximum depth of automation chain to prevent runaway loops
+// =====================================================
+const MAX_CHAIN_DEPTH = 2;
+
 /**
  * Evaluate all rules against the current context
  * Rules are evaluated in priority order (lower number = higher priority)
  * Returns the first matching rule
+ *
+ * @param rules - Array of rules to evaluate
+ * @param context - Context including message, classification, etc.
+ * @param chainDepth - Current depth in automation chain (default 0)
  */
 export function evaluateRules(
   rules: LeadsCaptainRule[],
-  context: RuleEvaluationContext
+  context: RuleEvaluationContext,
+  chainDepth: number = 0
 ): RuleEvaluationResult {
+  // Section 3.3: Enforce chain depth limit
+  if (chainDepth >= MAX_CHAIN_DEPTH) {
+    console.warn(`[Leads Captain v2] Chain depth limit (${MAX_CHAIN_DEPTH}) reached. Stopping rule evaluation.`);
+    return {
+      matched: false,
+      rule: null,
+      conditions_checked: [],
+      chain_depth_exceeded: true,
+    };
+  }
+
   // Sort rules by priority (ascending - lower number = higher priority)
   const sortedRules = [...rules]
     .filter(r => r.is_active)
@@ -34,7 +57,10 @@ export function evaluateRules(
   for (const rule of sortedRules) {
     const result = evaluateRule(rule, context);
     if (result.matched) {
-      return result;
+      return {
+        ...result,
+        chain_depth: chainDepth,
+      };
     }
   }
 
@@ -44,6 +70,86 @@ export function evaluateRules(
     rule: null,
     conditions_checked: [],
   };
+}
+
+/**
+ * Validate that a rule doesn't create a circular chain
+ * Used when saving/updating rules
+ *
+ * @param ruleId - ID of the rule being validated
+ * @param rules - All rules in the system
+ * @param visited - Set of already visited rule IDs
+ * @param depth - Current chain depth
+ * @returns Object with valid boolean and error message if invalid
+ */
+export function validateRuleChain(
+  ruleId: string,
+  rules: LeadsCaptainRule[],
+  visited: Set<string> = new Set(),
+  depth: number = 0
+): { valid: boolean; error?: string; depth: number } {
+  // Check max depth
+  if (depth > MAX_CHAIN_DEPTH) {
+    return {
+      valid: false,
+      error: `Rule chain exceeds maximum depth of ${MAX_CHAIN_DEPTH}. Please simplify your automation.`,
+      depth,
+    };
+  }
+
+  // Check for circular reference
+  if (visited.has(ruleId)) {
+    return {
+      valid: false,
+      error: 'Circular rule chain detected. A rule cannot trigger itself directly or indirectly.',
+      depth,
+    };
+  }
+
+  const rule = rules.find(r => r.id === ruleId);
+  if (!rule) {
+    return { valid: true, depth };
+  }
+
+  visited.add(ruleId);
+
+  // Check if this rule triggers another rule
+  // (This would be if actions like follow-up templates can trigger additional rules)
+  // For now, we mainly validate depth since rules don't directly chain to other rules
+  // But we track this for future expansion
+
+  return { valid: true, depth };
+}
+
+/**
+ * Check if a new rule would create an invalid chain configuration
+ * Called before saving a rule
+ */
+export function validateNewRule(
+  newRule: Partial<LeadsCaptainRule>,
+  existingRules: LeadsCaptainRule[]
+): { valid: boolean; warnings: string[] } {
+  const warnings: string[] = [];
+
+  // Check if this rule might create a deep chain
+  const activeRules = existingRules.filter(r => r.is_active);
+
+  // Warning if there are already many active rules (potential for complex chains)
+  if (activeRules.length >= 10) {
+    warnings.push('You have many active rules. Consider consolidating to simplify automation.');
+  }
+
+  // Warning if rule has both send actions and follow-up questions
+  if (newRule.actions?.send_template && newRule.actions?.ask_followup) {
+    warnings.push('This rule sends a template AND asks a follow-up. The follow-up response may trigger additional rules.');
+  }
+
+  // Warning if rule uses AI fallback
+  if (newRule.actions?.use_ai && !newRule.actions?.stop_ai) {
+    warnings.push('AI responses can trigger additional rule evaluations. Consider adding stop_ai to prevent chains.');
+  }
+
+  return { valid: true, warnings };
 }
 
 /**

@@ -6,42 +6,42 @@ const statusBadgeVariants = cva(
   {
     variants: {
       variant: {
-        // Job statuses
-        scheduled: 'bg-blue-100 text-blue-700 border border-blue-200',
-        in_progress: 'bg-amber-100 text-amber-700 border border-amber-200',
-        completed: 'bg-green-100 text-green-700 border border-green-200',
-        cancelled: 'bg-gray-100 text-gray-700 border border-gray-200',
-        no_show: 'bg-red-100 text-red-700 border border-red-200',
+        // Job statuses - using theme-compatible colors
+        scheduled: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20',
+        in_progress: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+        completed: 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20',
+        cancelled: 'bg-muted text-muted-foreground border border-border',
+        no_show: 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20',
 
         // Lead statuses
-        new: 'bg-purple-100 text-purple-700 border border-purple-200',
-        contacted: 'bg-blue-100 text-blue-700 border border-blue-200',
-        qualified: 'bg-cyan-100 text-cyan-700 border border-cyan-200',
-        proposal_sent: 'bg-amber-100 text-amber-700 border border-amber-200',
-        quoted: 'bg-amber-100 text-amber-700 border border-amber-200',
-        won: 'bg-green-100 text-green-700 border border-green-200',
-        lost: 'bg-red-100 text-red-700 border border-red-200',
+        new: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20',
+        contacted: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20',
+        qualified: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20',
+        proposal_sent: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+        quoted: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+        won: 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20',
+        lost: 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20',
 
         // Invoice statuses
-        draft: 'bg-gray-100 text-gray-700 border border-gray-200',
-        sent: 'bg-blue-100 text-blue-700 border border-blue-200',
-        viewed: 'bg-purple-100 text-purple-700 border border-purple-200',
-        paid: 'bg-green-100 text-green-700 border border-green-200',
-        partial: 'bg-amber-100 text-amber-700 border border-amber-200',
-        overdue: 'bg-red-100 text-red-700 border border-red-200',
+        draft: 'bg-muted text-muted-foreground border border-border',
+        sent: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20',
+        viewed: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20',
+        paid: 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20',
+        partial: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+        overdue: 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20',
 
         // Generic
-        success: 'bg-green-100 text-green-700 border border-green-200',
-        warning: 'bg-amber-100 text-amber-700 border border-amber-200',
-        error: 'bg-red-100 text-red-700 border border-red-200',
-        info: 'bg-blue-100 text-blue-700 border border-blue-200',
-        neutral: 'bg-gray-100 text-gray-700 border border-gray-200',
+        success: 'bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20',
+        warning: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+        error: 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20',
+        info: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20',
+        neutral: 'bg-muted text-muted-foreground border border-border',
 
         // Priority
-        low: 'bg-gray-100 text-gray-600 border border-gray-200',
-        normal: 'bg-blue-100 text-blue-600 border border-blue-200',
-        high: 'bg-amber-100 text-amber-600 border border-amber-200',
-        urgent: 'bg-red-100 text-red-600 border border-red-200',
+        low: 'bg-muted text-muted-foreground border border-border',
+        normal: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20',
+        high: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+        urgent: 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20',
       },
       size: {
         sm: 'px-2 py-0.5 text-xs',

@@ -4,7 +4,8 @@
 // =====================================================
 
 import { createClient } from '@/lib/supabase/server';
-import { format, addDays } from 'date-fns';
+import { addDays } from 'date-fns';
+import { sendSMS } from '@/lib/twilio/sms';
 
 export interface ReviewRequest {
   id: string;
@@ -166,12 +167,25 @@ export async function sendReviewRequest(requestId: string): Promise<boolean> {
     .replace('{review_link}', request.review_link);
 
   try {
+    let sent = false;
+
     if (request.send_method === 'sms' && customer?.phone) {
-      // TODO: Send SMS via Twilio
-      // await sendSMS(customer.phone, message);
+      const result = await sendSMS({
+        to: customer.phone,
+        body: message,
+        businessId: request.business_id,
+      });
+      sent = result.success;
     } else if (customer?.email) {
-      // TODO: Send email via Resend
-      // await sendEmail(customer.email, 'How was your service?', message);
+      // Email sending would go here if Resend is configured
+      // For now, skip email-only requests
+      console.log('Email review requests not yet implemented');
+      return false;
+    }
+
+    if (!sent && request.send_method === 'sms') {
+      console.error('Failed to send review request SMS');
+      return false;
     }
 
     // Update status

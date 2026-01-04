@@ -148,11 +148,11 @@ export default function AdminExpensesPage() {
 
   function getStatusBadge(status: string) {
     const styles: Record<string, { bg: string; text: string; label: string }> = {
-      pending: { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Draft' },
-      submitted: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pending' },
-      approved: { bg: 'bg-green-100', text: 'text-green-700', label: 'Approved' },
-      rejected: { bg: 'bg-red-100', text: 'text-red-700', label: 'Rejected' },
-      reimbursed: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Reimbursed' },
+      pending: { bg: 'bg-muted', text: 'text-muted-foreground', label: 'Draft' },
+      submitted: { bg: 'bg-yellow-500/10', text: 'text-yellow-600 dark:text-yellow-400', label: 'Pending' },
+      approved: { bg: 'bg-green-500/10', text: 'text-green-600 dark:text-green-400', label: 'Approved' },
+      rejected: { bg: 'bg-red-500/10', text: 'text-red-600 dark:text-red-400', label: 'Rejected' },
+      reimbursed: { bg: 'bg-blue-500/10', text: 'text-blue-600 dark:text-blue-400', label: 'Reimbursed' },
     };
     const style = styles[status] || styles.pending;
     return (
@@ -431,6 +431,7 @@ export default function AdminExpensesPage() {
                           checked={selectedExpenses.size === expenses.length}
                           onChange={toggleAll}
                           className="rounded"
+                          aria-label="Select all expenses"
                         />
                       </th>
                       <th className="px-4 py-2 text-left font-medium">Date</th>
@@ -452,6 +453,7 @@ export default function AdminExpensesPage() {
                             checked={selectedExpenses.has(expense.id)}
                             onChange={() => toggleExpense(expense.id)}
                             className="rounded"
+                            aria-label={`Select expense from ${expense.vendor || 'unknown vendor'}`}
                           />
                         </td>
                         <td className="px-4 py-2">
@@ -559,15 +561,15 @@ export default function AdminExpensesPage() {
       {/* Receipt Modal */}
       {viewingReceipt && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in-0 duration-200"
           onClick={() => setViewingReceipt(null)}
         >
           <div
-            className="bg-white rounded-lg max-w-2xl max-h-[90vh] overflow-auto"
+            className="bg-background rounded-lg max-w-2xl max-h-[90vh] overflow-auto animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 border-b border-border flex items-center justify-between">
-              <h3 className="font-medium">Receipt</h3>
+              <h3 className="font-medium text-foreground">Receipt</h3>
               <Button variant="ghost" size="sm" onClick={() => setViewingReceipt(null)}>
                 <X className="h-4 w-4" />
               </Button>

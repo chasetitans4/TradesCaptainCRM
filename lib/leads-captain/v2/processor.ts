@@ -173,6 +173,31 @@ export async function processInboundMessage(
     options.is_missed_call
   );
 
+  // Check if conversation is muted (per-conversation kill switch, Section 7.3)
+  if (conversation.muted_until && new Date(conversation.muted_until) > new Date()) {
+    return {
+      response_content: null,
+      should_send: false,
+      requires_approval: false,
+      classification: {
+        intent: 'muted',
+        confidence: 100,
+        sentiment: 'neutral',
+        language: 'en',
+        entities: {},
+        is_compliance: false,
+      },
+      rule_matched: null,
+      template_used: null,
+      ai_used: false,
+      explanation: `Conversation is muted until ${conversation.muted_until}`,
+      decision_details: { muted_until: conversation.muted_until },
+      notifications: [],
+      conversation_updates: {},
+      should_escalate: false,
+    };
+  }
+
   // If conversation is blocked or opted out, don't respond
   if (conversation.status === 'blocked' || conversation.opted_out) {
     return {

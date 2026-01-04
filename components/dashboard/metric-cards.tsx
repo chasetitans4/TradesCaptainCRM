@@ -25,8 +25,8 @@ interface MetricCardProps {
 const colorMap = {
   primary: 'bg-primary/10 text-primary',
   secondary: 'bg-secondary/10 text-secondary',
-  success: 'bg-green-500/10 text-green-600',
-  warning: 'bg-amber-500/10 text-amber-600',
+  success: 'bg-green-500/10 text-green-600 dark:text-green-400',
+  warning: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
 };
 
 function MetricCard({
@@ -54,7 +54,7 @@ function MetricCard({
           <div
             className={cn(
               'flex items-center gap-1 text-sm font-medium',
-              isPositive ? 'text-green-600' : 'text-red-500'
+              isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'
             )}
           >
             {isPositive ? (

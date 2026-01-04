@@ -74,9 +74,9 @@ export function OnboardingList({
 
   const getPlanBadge = (track: string) => {
     const colors: Record<string, string> = {
-      nevermiss: 'bg-purple-100 text-purple-800',
-      gold: 'bg-yellow-100 text-yellow-800',
-      starter: 'bg-gray-100 text-gray-800',
+      nevermiss: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+      gold: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400',
+      starter: 'bg-muted text-muted-foreground',
     };
     return (
       <Badge variant="outline" className={colors[track] || colors.starter}>

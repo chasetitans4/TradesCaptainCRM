@@ -111,9 +111,10 @@ export function ConversationView({
             </Badge>
           ) : (
             <>
+              {/* Section 8.1: Avoid "AI Mode" - use clearer language */}
               <Badge variant="secondary" className="gap-1">
                 <Bot className="w-3 h-3" />
-                AI Mode
+                Suggestions Active
               </Badge>
               {onTakeover && (
                 <Button variant="outline" size="sm" onClick={onTakeover}>

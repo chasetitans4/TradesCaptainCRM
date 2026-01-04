@@ -7,6 +7,7 @@ import { createClient, getCurrentUserProfile } from '@/lib/supabase/client';
 import { hasPermission } from '@/lib/permissions';
 import { cn, formatPhoneNumber, formatCurrency } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -35,6 +36,7 @@ type SortOption = 'name' | 'recent' | 'jobs' | 'revenue';
 
 export default function CustomersPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [user, setUser] = useState<UserWithBusiness | null>(null);
   const [customers, setCustomers] = useState<CustomerWithStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +75,7 @@ export default function CustomersPage() {
       setCustomers((data as CustomerWithStats[]) || []);
     } catch (error) {
       console.error('Error loading customers:', error);
+      toast({ title: 'Error', description: 'Failed to load customers. Please try again.', variant: 'destructive' });
     } finally {
       setLoading(false);
       setRefreshing(false);

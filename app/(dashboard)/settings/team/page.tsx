@@ -23,6 +23,7 @@ import {
 import { createClient, getCurrentUserProfile } from '@/lib/supabase/client';
 import { cn, formatRelativeDate } from '@/lib/utils';
 import { hasPermission } from '@/lib/permissions';
+import { useToast } from '@/components/ui/use-toast';
 import type { UserWithBusiness } from '@/types';
 
 interface TeamMember {
@@ -53,6 +54,7 @@ const ROLE_CONFIG = {
 
 export default function TeamPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [user, setUser] = useState<UserWithBusiness | null>(null);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -107,12 +109,13 @@ export default function TeamPage() {
       if (response.ok) {
         setMembers(members.map(m => m.id === memberId ? { ...m, role: newRole } : m));
         setShowRoleModal(null);
+        toast({ title: 'Role updated', description: `Role changed to ${newRole}` });
       } else {
         const data = await response.json();
-        alert(data.error || 'Failed to change role');
+        toast({ title: 'Error', description: data.error || 'Failed to change role', variant: 'destructive' });
       }
     } catch (error) {
-      alert('Failed to change role');
+      toast({ title: 'Error', description: 'Failed to change role', variant: 'destructive' });
     } finally {
       setActionLoading(null);
     }
@@ -129,12 +132,13 @@ export default function TeamPage() {
 
       if (response.ok) {
         setMembers(members.map(m => m.id === memberId ? { ...m, status: 'deactivated' } : m));
+        toast({ title: 'Member deactivated', description: 'Team member has been deactivated' });
       } else {
         const data = await response.json();
-        alert(data.error || 'Failed to deactivate member');
+        toast({ title: 'Error', description: data.error || 'Failed to deactivate member', variant: 'destructive' });
       }
     } catch (error) {
-      alert('Failed to deactivate member');
+      toast({ title: 'Error', description: 'Failed to deactivate member', variant: 'destructive' });
     } finally {
       setActionLoading(null);
       setShowMenu(null);
@@ -150,12 +154,13 @@ export default function TeamPage() {
 
       if (response.ok) {
         setMembers(members.map(m => m.id === memberId ? { ...m, status: 'active' } : m));
+        toast({ title: 'Member reactivated', description: 'Team member is now active again' });
       } else {
         const data = await response.json();
-        alert(data.error || 'Failed to reactivate member');
+        toast({ title: 'Error', description: data.error || 'Failed to reactivate member', variant: 'destructive' });
       }
     } catch (error) {
-      alert('Failed to reactivate member');
+      toast({ title: 'Error', description: 'Failed to reactivate member', variant: 'destructive' });
     } finally {
       setActionLoading(null);
     }
@@ -169,13 +174,13 @@ export default function TeamPage() {
       });
 
       if (response.ok) {
-        alert('Invitation resent!');
+        toast({ title: 'Invitation resent', description: 'A new invitation email has been sent' });
       } else {
         const data = await response.json();
-        alert(data.error || 'Failed to resend invitation');
+        toast({ title: 'Error', description: data.error || 'Failed to resend invitation', variant: 'destructive' });
       }
     } catch (error) {
-      alert('Failed to resend invitation');
+      toast({ title: 'Error', description: 'Failed to resend invitation', variant: 'destructive' });
     } finally {
       setActionLoading(null);
     }
@@ -192,12 +197,13 @@ export default function TeamPage() {
 
       if (response.ok) {
         setInvitations(invitations.filter(i => i.id !== inviteId));
+        toast({ title: 'Invitation cancelled', description: 'The invitation has been cancelled' });
       } else {
         const data = await response.json();
-        alert(data.error || 'Failed to cancel invitation');
+        toast({ title: 'Error', description: data.error || 'Failed to cancel invitation', variant: 'destructive' });
       }
     } catch (error) {
-      alert('Failed to cancel invitation');
+      toast({ title: 'Error', description: 'Failed to cancel invitation', variant: 'destructive' });
     } finally {
       setActionLoading(null);
     }
@@ -215,28 +221,24 @@ export default function TeamPage() {
       });
 
       if (response.ok) {
-        alert('Ownership transferred successfully!');
+        toast({ title: 'Ownership transferred', description: 'You are now an Admin' });
         loadData();
         setShowTransferModal(false);
         setTransferConfirm('');
         setSelectedNewOwner(null);
       } else {
         const data = await response.json();
-        alert(data.error || 'Failed to transfer ownership');
+        toast({ title: 'Error', description: data.error || 'Failed to transfer ownership', variant: 'destructive' });
       }
     } catch (error) {
-      alert('Failed to transfer ownership');
+      toast({ title: 'Error', description: 'Failed to transfer ownership', variant: 'destructive' });
     } finally {
       setActionLoading(null);
     }
   };
 
   if (loading || !user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <TeamSkeleton />;
   }
 
   const canManageTeam = hasPermission(user.role as any, 'manage_team');
@@ -606,6 +608,68 @@ export default function TeamPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function TeamSkeleton() {
+  return (
+    <div className="min-h-screen bg-background pb-20">
+      {/* Header Skeleton */}
+      <header className="bg-card border-b border-border sticky top-0 z-10">
+        <div className="px-4 py-3 flex items-center gap-4">
+          <div className="h-10 w-10 bg-muted rounded-lg animate-pulse" />
+          <div className="h-7 w-32 bg-muted rounded animate-pulse" />
+        </div>
+      </header>
+
+      <div className="p-4 space-y-6">
+        {/* Summary Cards Skeleton */}
+        <div className="grid grid-cols-3 gap-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-card border border-border rounded-lg p-3 text-center">
+              <div className="h-8 w-8 mx-auto bg-muted rounded mb-2 animate-pulse" />
+              <div className="h-6 w-8 mx-auto bg-muted rounded mb-1 animate-pulse" />
+              <div className="h-3 w-16 mx-auto bg-muted rounded animate-pulse" />
+            </div>
+          ))}
+        </div>
+
+        {/* Section Header Skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="h-5 w-32 bg-muted rounded animate-pulse" />
+          <div className="h-10 w-28 bg-muted rounded-lg animate-pulse" />
+        </div>
+
+        {/* Team Members List Skeleton */}
+        <div className="space-y-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-card border border-border rounded-lg p-4 flex items-center gap-3">
+              <div className="h-12 w-12 bg-muted rounded-full animate-pulse" />
+              <div className="flex-1">
+                <div className="h-4 w-32 bg-muted rounded mb-1 animate-pulse" />
+                <div className="h-3 w-40 bg-muted rounded mb-1 animate-pulse" />
+                <div className="h-3 w-20 bg-muted rounded animate-pulse" />
+              </div>
+              <div className="h-8 w-8 bg-muted rounded animate-pulse" />
+            </div>
+          ))}
+        </div>
+
+        {/* Pending Invitations Skeleton */}
+        <div className="h-5 w-40 bg-muted rounded animate-pulse" />
+        <div className="space-y-2">
+          {[1, 2].map((i) => (
+            <div key={i} className="bg-card border border-border rounded-lg p-3 flex items-center gap-3">
+              <div className="h-10 w-10 bg-muted rounded-full animate-pulse" />
+              <div className="flex-1">
+                <div className="h-4 w-40 bg-muted rounded mb-1 animate-pulse" />
+                <div className="h-3 w-24 bg-muted rounded animate-pulse" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

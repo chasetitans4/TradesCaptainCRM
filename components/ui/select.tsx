@@ -11,23 +11,38 @@ const SelectGroup = SelectPrimitive.Group;
 
 const SelectValue = SelectPrimitive.Value;
 
+interface SelectTriggerProps
+  extends React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger> {
+  /** Whether the select has an error state */
+  error?: boolean;
+  /** Accessible label when no visible label exists */
+  'aria-label'?: string;
+}
+
 const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
->(({ className, children, ...props }, ref) => (
+  SelectTriggerProps
+>(({ className, children, error, ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
+    aria-invalid={error ? 'true' : undefined}
     className={cn(
-      'flex h-12 w-full items-center justify-between rounded-lg border border-border bg-background px-4 py-2 text-base',
-      'placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary',
+      'flex h-12 w-full items-center justify-between rounded-lg border bg-background px-4 py-2 text-base',
+      'placeholder:text-text-muted focus:outline-none focus:ring-2 focus:border-primary',
       'disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1',
+      // Touch target enforcement
+      'min-h-[44px]',
+      // Error state styling
+      error
+        ? 'border-destructive focus:ring-destructive'
+        : 'border-border focus:ring-primary',
       className
     )}
     {...props}
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 opacity-50" />
+      <ChevronDown className="h-4 w-4 opacity-50" aria-hidden="true" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));
@@ -43,9 +58,10 @@ const SelectScrollUpButton = React.forwardRef<
       'flex cursor-default items-center justify-center py-1',
       className
     )}
+    aria-label="Scroll up"
     {...props}
   >
-    <ChevronUp className="h-4 w-4" />
+    <ChevronUp className="h-4 w-4" aria-hidden="true" />
   </SelectPrimitive.ScrollUpButton>
 ));
 SelectScrollUpButton.displayName = SelectPrimitive.ScrollUpButton.displayName;
@@ -60,9 +76,10 @@ const SelectScrollDownButton = React.forwardRef<
       'flex cursor-default items-center justify-center py-1',
       className
     )}
+    aria-label="Scroll down"
     {...props}
   >
-    <ChevronDown className="h-4 w-4" />
+    <ChevronDown className="h-4 w-4" aria-hidden="true" />
   </SelectPrimitive.ScrollDownButton>
 ));
 SelectScrollDownButton.displayName =

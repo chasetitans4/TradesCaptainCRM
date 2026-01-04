@@ -170,11 +170,7 @@ export default function InvoicesPage() {
   };
 
   if (loading || !user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <InvoicesSkeleton />;
   }
 
   return (
@@ -336,6 +332,62 @@ export default function InvoicesPage() {
             );
           })
         )}
+      </div>
+    </div>
+  );
+}
+
+function InvoicesSkeleton() {
+  return (
+    <div className="min-h-screen bg-background pb-20">
+      {/* Header Skeleton */}
+      <header className="bg-card border-b border-border sticky top-0 z-10">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between mb-3">
+            <div className="h-7 w-24 bg-muted rounded animate-pulse" />
+            <div className="h-10 w-28 bg-muted rounded-lg animate-pulse" />
+          </div>
+
+          {/* Stats Cards Skeleton */}
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="bg-muted rounded-lg p-3">
+              <div className="h-3 w-16 bg-muted-foreground/20 rounded mb-2 animate-pulse" />
+              <div className="h-6 w-20 bg-muted-foreground/20 rounded animate-pulse" />
+            </div>
+            <div className="bg-muted rounded-lg p-3">
+              <div className="h-3 w-16 bg-muted-foreground/20 rounded mb-2 animate-pulse" />
+              <div className="h-6 w-20 bg-muted-foreground/20 rounded animate-pulse" />
+            </div>
+          </div>
+
+          {/* Search Skeleton */}
+          <div className="h-10 bg-muted rounded-lg mb-3 animate-pulse" />
+
+          {/* Filter Tabs Skeleton */}
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-8 w-16 bg-muted rounded-full animate-pulse shrink-0" />
+            ))}
+          </div>
+        </div>
+      </header>
+
+      {/* Invoice List Skeleton */}
+      <div className="divide-y divide-border">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="px-4 py-3 flex items-center gap-3">
+            <div className="w-10 h-10 bg-muted rounded-lg animate-pulse shrink-0" />
+            <div className="flex-1">
+              <div className="h-4 w-24 bg-muted rounded mb-1 animate-pulse" />
+              <div className="h-3 w-32 bg-muted rounded mb-1 animate-pulse" />
+              <div className="h-3 w-20 bg-muted rounded animate-pulse" />
+            </div>
+            <div className="text-right">
+              <div className="h-4 w-16 bg-muted rounded mb-1 animate-pulse" />
+              <div className="h-3 w-12 bg-muted rounded animate-pulse" />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -142,14 +142,14 @@ export default function AdminTimesheetsPage() {
 
   function getStatusBadge(status: string) {
     const variants: Record<string, { color: string; label: string }> = {
-      active: { color: 'bg-blue-100 text-blue-700', label: 'Active' },
-      completed: { color: 'bg-gray-100 text-gray-700', label: 'Completed' },
-      submitted: { color: 'bg-yellow-100 text-yellow-700', label: 'Pending' },
-      approved: { color: 'bg-green-100 text-green-700', label: 'Approved' },
-      rejected: { color: 'bg-red-100 text-red-700', label: 'Rejected' },
-      edited: { color: 'bg-orange-100 text-orange-700', label: 'Edited' },
+      active: { color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400', label: 'Active' },
+      completed: { color: 'bg-muted text-muted-foreground', label: 'Completed' },
+      submitted: { color: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400', label: 'Pending' },
+      approved: { color: 'bg-green-500/10 text-green-600 dark:text-green-400', label: 'Approved' },
+      rejected: { color: 'bg-red-500/10 text-red-600 dark:text-red-400', label: 'Rejected' },
+      edited: { color: 'bg-orange-500/10 text-orange-600 dark:text-orange-400', label: 'Edited' },
     };
-    const { color, label } = variants[status] || { color: 'bg-gray-100', label: status };
+    const { color, label } = variants[status] || { color: 'bg-muted text-muted-foreground', label: status };
     return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>{label}</span>;
   }
 
@@ -404,6 +404,7 @@ export default function AdminTimesheetsPage() {
                           checked={selectedEntries.size === entries.length}
                           onChange={toggleAll}
                           className="rounded"
+                          aria-label="Select all timesheet entries"
                         />
                       </th>
                       <th className="px-4 py-2 text-left font-medium">Employee</th>
@@ -425,6 +426,7 @@ export default function AdminTimesheetsPage() {
                             checked={selectedEntries.has(entry.id)}
                             onChange={() => toggleEntry(entry.id)}
                             className="rounded"
+                            aria-label={`Select timesheet for ${entry.user?.first_name || ''} ${entry.user?.last_name || ''}`}
                           />
                         </td>
                         <td className="px-4 py-2">

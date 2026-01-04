@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
 import { AddressLink } from '@/components/ui/address-link';
-import type { UserWithBusiness, Reminder, Job, Lead, Customer, UserRole } from '@/types';
+import type { UserWithBusiness, Reminder, Job, Lead, Customer, UserRole, SMSConversation, SMSMessage } from '@/types';
 import {
   Plus,
   Bell,
@@ -28,7 +28,10 @@ import {
   User,
   MapPin,
   RefreshCw,
+  Pause,
+  Play,
 } from 'lucide-react';
+import { GlobalPauseToggle } from '@/components/automation/global-pause-toggle';
 
 // Dashboard section types
 interface DashboardStats {
@@ -46,6 +49,11 @@ interface RecentLead extends Lead {
   customer?: Pick<Customer, 'id' | 'name' | 'phone'> | null;
 }
 
+interface UnrepliedConversation extends SMSConversation {
+  customer?: Pick<Customer, 'id' | 'name' | 'phone'> | null;
+  last_message?: Pick<SMSMessage, 'id' | 'body' | 'created_at'> | null;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<UserWithBusiness | null>(null);
@@ -53,9 +61,11 @@ export default function DashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [automationsPaused, setAutomationsPaused] = useState(false);
   const [todayJobs, setTodayJobs] = useState<TodayJob[]>([]);
   const [tomorrowJobs, setTomorrowJobs] = useState<TodayJob[]>([]);
   const [recentLeads, setRecentLeads] = useState<RecentLead[]>([]);
+  const [unrepliedMessages, setUnrepliedMessages] = useState<UnrepliedConversation[]>([]);
 
   // Load user profile
   useEffect(() => {
@@ -88,6 +98,17 @@ export default function DashboardPage() {
     tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
 
     try {
+      // Load Leads Captain pause status (for global pause toggle)
+      try {
+        const lcRes = await fetch('/api/leads-captain/v2/config');
+        if (lcRes.ok) {
+          const lcData = await lcRes.json();
+          setAutomationsPaused(lcData.config?.global_mode === 'paused');
+        }
+      } catch {
+        // Leads Captain may not be set up - ignore
+      }
+
       // Load reminders for current user
       const { data: remindersData } = await supabase
         .from('reminders')
@@ -155,7 +176,7 @@ export default function DashboardPage() {
       // Load stats and leads only for owners/admins
       if (hasPermission(user.role, 'view_leads')) {
         // Stats
-        const [newLeadsRes, activeJobsRes, unpaidInvoicesRes] = await Promise.all([
+        const [newLeadsRes, activeJobsRes, pastDueInvoicesRes] = await Promise.all([
           supabase
             .from('leads')
             .select('id', { count: 'exact', head: true })
@@ -164,16 +185,18 @@ export default function DashboardPage() {
             .from('jobs')
             .select('id', { count: 'exact', head: true })
             .in('status', ['scheduled', 'in_progress']),
+          // Past-due invoices: sent/unpaid AND due_date < today (Section 7.1)
           supabase
             .from('invoices')
             .select('id', { count: 'exact', head: true })
-            .eq('status', 'sent'),
+            .in('status', ['sent', 'pending'])
+            .lt('due_date', todayStart.toISOString()),
         ]);
 
         setStats({
           newLeadsToday: newLeadsRes.count || 0,
           activeJobs: activeJobsRes.count || 0,
-          unpaidInvoices: unpaidInvoicesRes.count || 0,
+          unpaidInvoices: pastDueInvoicesRes.count || 0,
           upcomingReminders: remindersData?.length || 0,
         });
 
@@ -192,6 +215,48 @@ export default function DashboardPage() {
           .limit(5);
 
         setRecentLeads((leadsData as RecentLead[]) || []);
+      }
+
+      // Load unreplied messages (for owners/admins - conversations needing response)
+      if (hasPermission(user.role, 'view_messages')) {
+        // Find conversations where last_customer_message_at > last business reply
+        // Using a simpler approach: get conversations and check last message direction
+        const { data: convos } = await supabase
+          .from('sms_conversations')
+          .select(`
+            *,
+            customer:customers (id, name, phone)
+          `)
+          .eq('business_id', user.business_id)
+          .not('last_customer_message_at', 'is', null)
+          .order('last_customer_message_at', { ascending: false })
+          .limit(10);
+
+        // For each, get last message to check if it needs reply
+        const unrepliedConvos: UnrepliedConversation[] = [];
+        for (const convo of convos || []) {
+          const { data: messages } = await supabase
+            .from('sms_messages')
+            .select('id, body, direction, created_at')
+            .eq('conversation_id', convo.id)
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          const lastMsg = messages?.[0];
+          // If last message was inbound (from customer), it needs a reply
+          if (lastMsg && lastMsg.direction === 'inbound') {
+            unrepliedConvos.push({
+              ...convo,
+              last_message: {
+                id: lastMsg.id,
+                body: lastMsg.body,
+                created_at: lastMsg.created_at,
+              },
+            });
+          }
+        }
+
+        setUnrepliedMessages(unrepliedConvos.slice(0, 5));
       }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -220,6 +285,25 @@ export default function DashboardPage() {
     return allowedSections.includes(section);
   };
 
+  // Global pause toggle handler - ≤2 taps accessible (Section 7.3)
+  const handleAutomationPauseToggle = async (paused: boolean) => {
+    try {
+      const res = await fetch('/api/leads-captain/v2/config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          global_mode: paused ? 'paused' : 'normal',
+        }),
+      });
+
+      if (res.ok) {
+        setAutomationsPaused(paused);
+      }
+    } catch (error) {
+      console.error('Error toggling automation pause:', error);
+    }
+  };
+
   if (loading || !user) {
     return <DashboardSkeleton />;
   }
@@ -236,6 +320,14 @@ export default function DashboardPage() {
             <p className="text-sm text-text-muted">{user.business?.name}</p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Global Pause Toggle - 1 tap accessible from dashboard (Section 7.3) */}
+            {hasPermission(user.role, 'view_leads') && (
+              <GlobalPauseToggle
+                isPaused={automationsPaused}
+                onToggle={handleAutomationPauseToggle}
+                variant="compact"
+              />
+            )}
             <Button
               variant="ghost"
               size="icon-sm"
@@ -275,10 +367,10 @@ export default function DashboardPage() {
               color="success"
             />
             <StatCard
-              label="Unpaid Invoices"
+              label="Past-Due Invoices"
               value={stats.unpaidInvoices}
               icon={DollarSign}
-              href="/invoices"
+              href="/invoices?filter=past_due"
               color="warning"
             />
             <StatCard
@@ -289,6 +381,22 @@ export default function DashboardPage() {
               color="info"
             />
           </div>
+        )}
+
+        {/* Needs Reply - Unreplied Messages */}
+        {shouldShowSection('messages') && unrepliedMessages.length > 0 && (
+          <Section
+            title="Needs Reply"
+            icon={MessageSquare}
+            href="/messages"
+            count={unrepliedMessages.length}
+          >
+            <div className="space-y-2">
+              {unrepliedMessages.map((convo) => (
+                <UnrepliedMessageCard key={convo.id} conversation={convo} />
+              ))}
+            </div>
+          </Section>
         )}
 
         {/* Today's Reminders */}
@@ -383,6 +491,14 @@ export default function DashboardPage() {
             )}
           </Section>
         )}
+
+        {/* You're Clear Today - shows when no actionable items */}
+        <ClearTodayState
+          hasUnrepliedMessages={unrepliedMessages.length > 0}
+          hasReminders={reminders.length > 0}
+          hasTodayJobs={todayJobs.length > 0}
+          hasUnpaidInvoices={(stats?.unpaidInvoices ?? 0) > 0}
+        />
       </div>
 
       {/* Floating Action Button */}
@@ -594,6 +710,67 @@ function LeadCard({ lead }: { lead: RecentLead }) {
         <p className="text-sm text-text-muted truncate">{lead.service_needed}</p>
         <p className="text-xs text-text-muted mt-1">
           {formatRelativeDate(lead.created_at)}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+interface ClearTodayStateProps {
+  hasUnrepliedMessages: boolean;
+  hasReminders: boolean;
+  hasTodayJobs: boolean;
+  hasUnpaidInvoices: boolean;
+}
+
+function ClearTodayState({
+  hasUnrepliedMessages,
+  hasReminders,
+  hasTodayJobs,
+  hasUnpaidInvoices,
+}: ClearTodayStateProps) {
+  // Only show when there's nothing actionable
+  const isClear = !hasUnrepliedMessages && !hasReminders && !hasTodayJobs && !hasUnpaidInvoices;
+
+  if (!isClear) return null;
+
+  return (
+    <div className="card p-8 flex flex-col items-center justify-center text-center bg-gradient-to-br from-success/5 to-success/10 border-success/20">
+      <div className="p-4 rounded-full bg-success/10 mb-4">
+        <CheckCircle2 className="h-10 w-10 text-success" />
+      </div>
+      <h3 className="text-xl font-semibold text-text mb-2">You're clear today</h3>
+      <p className="text-sm text-text-muted max-w-xs">
+        No messages need replies, no pending reminders, and no unpaid invoices. Take a moment to breathe.
+      </p>
+    </div>
+  );
+}
+
+function UnrepliedMessageCard({ conversation }: { conversation: UnrepliedConversation }) {
+  const name = conversation.customer?.name || conversation.phone || 'Unknown';
+  const lastMessage = conversation.last_message;
+
+  return (
+    <Link
+      href={`/messages/${conversation.id}`}
+      className="card p-3 flex items-start gap-3 active:scale-[0.98]"
+    >
+      <div className="p-2 rounded-full bg-warning/10">
+        <MessageSquare className="h-4 w-4 text-warning" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <p className="font-medium text-text truncate">{name}</p>
+          <Badge className="shrink-0 bg-warning/10 text-warning">
+            Awaiting reply
+          </Badge>
+        </div>
+        {lastMessage && (
+          <p className="text-sm text-text-muted truncate mt-0.5">{lastMessage.body}</p>
+        )}
+        <p className="text-xs text-text-muted mt-1">
+          {lastMessage ? formatRelativeDate(lastMessage.created_at) : ''}
         </p>
       </div>
     </Link>

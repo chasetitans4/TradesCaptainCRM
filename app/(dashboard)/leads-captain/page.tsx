@@ -23,7 +23,10 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
+  Pause,
+  Play,
 } from 'lucide-react';
+import { GlobalPauseToggle } from '@/components/automation/global-pause-toggle';
 import type { LeadsCaptainConfig, LeadsCaptainConversation } from '@/types/leads-captain';
 
 interface DashboardStats {
@@ -188,21 +191,47 @@ export default function LeadsCaptainDashboardPage() {
     );
   }
 
+  const handleGlobalPauseToggle = async (paused: boolean) => {
+    try {
+      const res = await fetch('/api/leads-captain/v2/config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          global_mode: paused ? 'paused' : 'normal',
+        }),
+      });
+
+      if (res.ok) {
+        setConfig((prev) => prev ? { ...prev, global_mode: paused ? 'paused' : 'normal' } : null);
+      }
+    } catch (error) {
+      console.error('Error toggling pause:', error);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Leads Captain</h1>
-          <p className="text-muted-foreground">
-            {config?.global_mode === 'paused' ? (
-              <span className="text-yellow-600">System is paused</span>
-            ) : config?.global_mode === 'templates_only' ? (
-              <span>Templates only mode</span>
-            ) : (
-              <span>AI + Rules active</span>
-            )}
-          </p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Leads Captain</h1>
+            <p className="text-muted-foreground">
+              {config?.global_mode === 'paused' ? (
+                <span className="text-yellow-600 dark:text-yellow-400">System is paused</span>
+              ) : config?.global_mode === 'templates_only' ? (
+                <span>Templates only mode</span>
+              ) : (
+                <span className="text-green-600 dark:text-green-400">AI + Rules active</span>
+              )}
+            </p>
+          </div>
+          {/* Global Pause Toggle - 1 tap accessible (Section 7.3) */}
+          <GlobalPauseToggle
+            isPaused={config?.global_mode === 'paused'}
+            onToggle={handleGlobalPauseToggle}
+            variant="button"
+          />
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => router.push('/leads-captain/settings')}>

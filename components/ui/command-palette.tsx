@@ -246,15 +246,15 @@ export function CommandPalette() {
   const getResultBadgeColor = (type: string) => {
     switch (type) {
       case 'customer':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-500/10 text-blue-600 dark:text-blue-400';
       case 'job':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-500/10 text-green-600 dark:text-green-400';
       case 'lead':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400';
       case 'invoice':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-purple-500/10 text-purple-600 dark:text-purple-400';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-muted-foreground';
     }
   };
 

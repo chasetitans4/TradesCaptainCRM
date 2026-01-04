@@ -75,11 +75,22 @@ export function AlertDialogContent({ children, className }: {
 
   return (
     <div className="fixed inset-0 z-50">
+      {/* Overlay with fade animation */}
       <div
-        className="fixed inset-0 bg-black/50"
+        className="fixed inset-0 bg-black/50 animate-in fade-in-0 duration-200"
         onClick={() => onOpenChange(false)}
+        aria-hidden="true"
       />
-      <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-white p-6 shadow-lg duration-200 sm:rounded-lg">
+      {/* Content with scale + fade animation */}
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        className={cn(
+          'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4',
+          'border bg-background p-6 shadow-lg sm:rounded-lg',
+          'animate-in fade-in-0 zoom-in-95 duration-200'
+        )}
+      >
         <div className={cn('grid gap-4', className)}>
           {children}
         </div>
@@ -126,7 +137,7 @@ export function AlertDialogDescription({ children, className }: {
   className?: string;
 }) {
   return (
-    <p className={cn('text-sm text-gray-500', className)}>
+    <p className={cn('text-sm text-muted-foreground', className)}>
       {children}
     </p>
   );

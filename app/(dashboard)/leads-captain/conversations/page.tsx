@@ -34,6 +34,11 @@ import {
   UserX,
   Ban,
   X,
+  VolumeX,
+  Volume2,
+  Info,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { LeadsCaptainConversation, LeadsCaptainMessage, ConversationDetailResponse } from '@/types/leads-captain';
@@ -51,6 +56,19 @@ export default function LeadsCaptainConversationsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [expandedAudit, setExpandedAudit] = useState<Set<string>>(new Set());
+
+  const toggleAudit = (messageId: string) => {
+    setExpandedAudit((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageId)) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     fetchConversations();
@@ -129,6 +147,31 @@ export default function LeadsCaptainConversationsPage() {
     } catch (error) {
       console.error('Error performing action:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to perform action');
+    }
+  };
+
+  // Per-conversation mute with duration (Section 7.3 - Kill Switches)
+  const performMuteAction = async (action: 'mute' | 'unmute', duration?: number) => {
+    if (!selectedConversation) return;
+
+    try {
+      const res = await fetch(`/api/leads-captain/v2/conversations/${selectedConversation.conversation.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, duration }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error);
+      }
+
+      toast.success(action === 'mute' ? `Muted for ${duration} hours` : 'Unmuted - AI responses enabled');
+      fetchConversationDetail(selectedConversation.conversation.id);
+      fetchConversations();
+    } catch (error) {
+      console.error('Error performing mute action:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update mute status');
     }
   };
 
@@ -313,27 +356,63 @@ export default function LeadsCaptainConversationsPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {/* Muted Until Badge */}
+                    {selectedConversation.conversation.muted_until && (
+                      <Badge variant="secondary" className="gap-1">
+                        <VolumeX className="h-3 w-3" />
+                        Muted until {new Date(selectedConversation.conversation.muted_until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                      </Badge>
+                    )}
+                    {/* Mute/Unmute - Quick toggle for AI responses (Section 7.3) */}
                     {selectedConversation.conversation.status === 'active' && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => performAction('takeover')}
+                        onClick={() => performMuteAction('mute', 24)}
+                        title="Mute AI for 24 hours - Stop automated responses for this conversation"
                       >
-                        <UserCheck className="mr-2 h-4 w-4" />
-                        Take Over
+                        <VolumeX className="mr-2 h-4 w-4" />
+                        Mute 24h
                       </Button>
                     )}
                     {selectedConversation.conversation.status === 'human_takeover' && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => performAction('release')}
+                        onClick={() => performMuteAction('unmute')}
+                        title="Unmute AI - Allow automated responses again"
                       >
-                        <UserX className="mr-2 h-4 w-4" />
-                        Release to AI
+                        <Volume2 className="mr-2 h-4 w-4" />
+                        Unmute AI
                       </Button>
                     )}
-                    {selectedConversation.conversation.status !== 'closed' && (
+                    {/* Block - Permanently stop messages */}
+                    {selectedConversation.conversation.status !== 'blocked' &&
+                     selectedConversation.conversation.status !== 'closed' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => performAction('block')}
+                        className="text-destructive hover:text-destructive"
+                        title="Block this number - No messages will be sent"
+                      >
+                        <Ban className="mr-2 h-4 w-4" />
+                        Block
+                      </Button>
+                    )}
+                    {selectedConversation.conversation.status === 'blocked' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => performAction('unblock')}
+                        title="Unblock this number"
+                      >
+                        <Ban className="mr-2 h-4 w-4" />
+                        Unblock
+                      </Button>
+                    )}
+                    {selectedConversation.conversation.status !== 'closed' &&
+                     selectedConversation.conversation.status !== 'blocked' && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -394,7 +473,53 @@ export default function LeadsCaptainConversationsPage() {
                               {msg.detected_intent}
                             </Badge>
                           )}
+                          {/* Audit Info Toggle - Show for outbound messages with decision info */}
+                          {msg.direction === 'outbound' && msg.decision_explanation && (
+                            <button
+                              onClick={() => toggleAudit(msg.id)}
+                              className="flex items-center gap-1 hover:opacity-80"
+                              title="Why was this sent?"
+                            >
+                              <Info className="h-3 w-3" />
+                              {expandedAudit.has(msg.id) ? (
+                                <ChevronUp className="h-3 w-3" />
+                              ) : (
+                                <ChevronDown className="h-3 w-3" />
+                              )}
+                            </button>
+                          )}
                         </div>
+                        {/* Audit Details Expandable */}
+                        {msg.direction === 'outbound' &&
+                          msg.decision_explanation &&
+                          expandedAudit.has(msg.id) && (
+                            <div
+                              className={`mt-2 pt-2 border-t text-xs ${
+                                msg.direction === 'outbound'
+                                  ? 'border-primary-foreground/20 text-primary-foreground/80'
+                                  : 'border-muted-foreground/20'
+                              }`}
+                            >
+                              <p className="font-medium mb-1">Why was this sent?</p>
+                              <p className="opacity-90">{msg.decision_explanation}</p>
+                              {msg.rule_matched && (
+                                <p className="mt-1 opacity-70">
+                                  Rule: {msg.rule_matched.slice(0, 8)}...
+                                </p>
+                              )}
+                              {msg.ai_used && msg.ai_confidence != null && (
+                                <p className="mt-1 opacity-70">
+                                  AI Confidence: {msg.ai_confidence}%
+                                </p>
+                              )}
+                              {msg.approval_status && (
+                                <p className="mt-1 opacity-70">
+                                  Approval: {msg.approval_status}
+                                  {msg.approved_by && ` by ${msg.approved_by}`}
+                                </p>
+                              )}
+                            </div>
+                          )}
                       </div>
                     </div>
                   ))}

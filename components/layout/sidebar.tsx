@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -16,6 +16,7 @@ import {
   Settings,
   HelpCircle,
   ChevronDown,
+  ChevronRight,
   Sparkles,
   Receipt,
   UserPlus,
@@ -31,93 +32,138 @@ import {
   DollarSign,
   Clock,
   Megaphone,
-  Phone,
-  Send,
-  GitBranch,
+  type LucideIcon,
 } from 'lucide-react';
 
-const navigation = [
+// Type definitions for navigation structure
+interface NavChild {
+  name: string;
+  href: string;
+  icon?: LucideIcon;
+}
+
+interface NavItem {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+  badge?: string;
+  badgeColor?: string;
+  children?: NavChild[];
+}
+
+interface NavGroup {
+  id: string;
+  label: string | null;
+  collapsible?: boolean;
+  defaultExpanded?: boolean;
+  items: NavItem[];
+}
+
+// Navigation structure with collapsible groups for progressive disclosure
+const navigationGroups: NavGroup[] = [
   {
-    name: 'Dashboard',
-    href: '/dashboard',
-    icon: LayoutDashboard,
-  },
-  {
-    name: 'Customers',
-    href: '/customers',
-    icon: Users,
-  },
-  {
-    name: 'Jobs',
-    href: '/jobs',
-    icon: Briefcase,
-    badge: '3',
-  },
-  {
-    name: 'Leads',
-    href: '/leads',
-    icon: UserPlus,
-    badge: '12',
-    badgeColor: 'bg-secondary',
-  },
-  {
-    name: 'Dispatch',
-    href: '/dispatch',
-    icon: Truck,
-  },
-  {
-    name: 'Calendar',
-    href: '/calendar',
-    icon: Calendar,
-  },
-  {
-    name: 'Messages',
-    href: '/messages',
-    icon: MessageSquare,
-    badge: '5',
-    badgeColor: 'bg-destructive',
-  },
-  {
-    name: 'Quotes & Invoices',
-    href: '/quotes',
-    icon: Receipt,
-    children: [
-      { name: 'Quotes', href: '/quotes' },
-      { name: 'Invoices', href: '/invoices' },
+    id: 'core',
+    label: null, // No label for core items - always visible
+    items: [
+      {
+        name: 'Dashboard',
+        href: '/dashboard',
+        icon: LayoutDashboard,
+      },
+      {
+        name: 'Calendar',
+        href: '/calendar',
+        icon: Calendar,
+      },
+      {
+        name: 'Messages',
+        href: '/messages',
+        icon: MessageSquare,
+        badge: '5',
+        badgeColor: 'bg-destructive',
+      },
     ],
   },
   {
-    name: 'Reports',
-    href: '/reports',
-    icon: BarChart3,
-  },
-  {
-    name: 'Outreach',
-    href: '/outreach',
-    icon: Megaphone,
-    badge: 'NEW',
-    badgeColor: 'bg-secondary',
-    children: [
-      { name: 'Dashboard', href: '/outreach' },
-      { name: 'Calls', href: '/outreach/calls' },
-      { name: 'Contacts', href: '/outreach/contacts' },
-      { name: 'Campaigns', href: '/outreach/campaigns' },
+    id: 'work',
+    label: 'Work',
+    collapsible: true,
+    defaultExpanded: true,
+    items: [
+      {
+        name: 'Jobs',
+        href: '/jobs',
+        icon: Briefcase,
+        badge: '3',
+      },
+      {
+        name: 'Customers',
+        href: '/customers',
+        icon: Users,
+      },
+      {
+        name: 'Dispatch',
+        href: '/dispatch',
+        icon: Truck,
+      },
+      {
+        name: 'Quotes & Invoices',
+        href: '/quotes',
+        icon: Receipt,
+        children: [
+          { name: 'Quotes', href: '/quotes' },
+          { name: 'Invoices', href: '/invoices' },
+        ],
+      },
     ],
   },
   {
-    name: 'Leads Captain',
-    href: '/leads-captain',
-    icon: PhoneCall,
-    badge: 'v2',
-    badgeColor: 'bg-primary',
-    children: [
-      { name: 'Dashboard', href: '/leads-captain' },
-      { name: 'Conversations', href: '/leads-captain/conversations' },
-      { name: 'Rules', href: '/leads-captain/rules' },
-      { name: 'Templates', href: '/leads-captain/templates' },
-      { name: 'Approvals', href: '/leads-captain/approvals' },
-      { name: 'Analytics', href: '/leads-captain/analytics' },
-      { name: 'Settings', href: '/leads-captain/settings' },
+    id: 'growth',
+    label: 'Growth',
+    collapsible: true,
+    defaultExpanded: false,
+    items: [
+      {
+        name: 'Leads',
+        href: '/leads',
+        icon: UserPlus,
+        badge: '12',
+        badgeColor: 'bg-secondary',
+      },
+      {
+        name: 'Leads Captain',
+        href: '/leads-captain',
+        icon: PhoneCall,
+        badge: 'v2',
+        badgeColor: 'bg-primary',
+        children: [
+          { name: 'Dashboard', href: '/leads-captain' },
+          { name: 'Conversations', href: '/leads-captain/conversations' },
+          { name: 'Rules', href: '/leads-captain/rules' },
+          { name: 'Templates', href: '/leads-captain/templates' },
+          { name: 'Approvals', href: '/leads-captain/approvals' },
+          { name: 'Analytics', href: '/leads-captain/analytics' },
+          { name: 'Settings', href: '/leads-captain/settings' },
+        ],
+      },
+      {
+        name: 'Outreach',
+        href: '/outreach',
+        icon: Megaphone,
+        badge: 'NEW',
+        badgeColor: 'bg-secondary',
+        children: [
+          { name: 'Dashboard', href: '/outreach' },
+          { name: 'Calls', href: '/outreach/calls' },
+          { name: 'Contacts', href: '/outreach/contacts' },
+          { name: 'Campaigns', href: '/outreach/campaigns' },
+        ],
+      },
+      {
+        name: 'Reports',
+        href: '/reports',
+        icon: BarChart3,
+      },
     ],
   },
 ];
@@ -153,6 +199,20 @@ interface SidebarProps {
 export function Sidebar({ className, businessName = 'Your Business', planName = 'Pro Plan' }: SidebarProps) {
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [expandedGroups, setExpandedGroups] = useState<string[]>(['core', 'work']);
+
+  // Auto-expand groups that contain active items
+  useEffect(() => {
+    navigationGroups.forEach((group) => {
+      const hasActiveItem = group.items.some(
+        (item) => pathname.startsWith(item.href) ||
+          item.children?.some((child) => pathname === child.href)
+      );
+      if (hasActiveItem && !expandedGroups.includes(group.id)) {
+        setExpandedGroups((prev) => [...prev, group.id]);
+      }
+    });
+  }, [pathname]);
 
   const toggleExpand = (name: string) => {
     setExpandedItems((prev) =>
@@ -160,9 +220,31 @@ export function Sidebar({ className, businessName = 'Your Business', planName = 
     );
   };
 
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups((prev) =>
+      prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId]
+    );
+  };
+
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === href;
     return pathname.startsWith(href);
+  };
+
+  // Generate data-tour attribute for nav items
+  const getTourId = (name: string) => {
+    const tourMap: Record<string, string> = {
+      'Dashboard': 'nav-dashboard',
+      'Calendar': 'nav-calendar',
+      'Messages': 'nav-messages',
+      'Jobs': 'nav-jobs',
+      'Customers': 'nav-customers',
+      'Dispatch': 'nav-dispatch',
+      'Leads': 'nav-leads',
+      'Leads Captain': 'nav-leads-captain',
+      'Reports': 'nav-reports',
+    };
+    return tourMap[name];
   };
 
   return (
@@ -172,6 +254,9 @@ export function Sidebar({ className, businessName = 'Your Business', planName = 
         'bg-gradient-to-b from-dark-800 to-dark-900 text-white',
         className
       )}
+      role="navigation"
+      aria-label="Main navigation"
+      data-tour="sidebar"
     >
       {/* Logo */}
       <div className="h-16 flex items-center px-6 border-b border-white/10">
@@ -182,101 +267,167 @@ export function Sidebar({ className, businessName = 'Your Business', planName = 
 
       {/* Business Selector */}
       <div className="px-3 py-4 border-b border-white/10">
-        <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
+        <button
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors min-h-[44px]"
+          aria-label={`Current business: ${businessName}`}
+          aria-haspopup="listbox"
+        >
           <div className="w-8 h-8 rounded-md bg-primary/20 flex items-center justify-center">
-            <Building2 className="w-4 h-4 text-primary-300" />
+            <Building2 className="w-4 h-4 text-primary-300" aria-hidden="true" />
           </div>
           <div className="flex-1 text-left">
             <p className="text-sm font-medium truncate">{businessName}</p>
             <p className="text-xs text-gray-400">{planName}</p>
           </div>
-          <ChevronDown className="w-4 h-4 text-gray-400" />
+          <ChevronDown className="w-4 h-4 text-gray-400" aria-hidden="true" />
         </button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3">
-        <ul className="space-y-1">
-          {navigation.map((item) => {
-            const active = isActive(item.href);
-            const expanded = expandedItems.includes(item.name);
-            const hasChildren = item.children && item.children.length > 0;
+      <nav className="flex-1 overflow-y-auto py-4 px-3" aria-label="Primary navigation">
+        {navigationGroups.map((group) => {
+          const isGroupExpanded = expandedGroups.includes(group.id);
+          const hasActiveItem = group.items.some(
+            (item) => isActive(item.href) ||
+              item.children?.some((child) => pathname === child.href)
+          );
 
-            return (
-              <li key={item.name}>
-                {hasChildren ? (
-                  <>
-                    <button
-                      onClick={() => toggleExpand(item.name)}
-                      className={cn(
-                        'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                        active
-                          ? 'bg-primary text-white'
-                          : 'text-gray-300 hover:bg-white/10 hover:text-white'
-                      )}
-                    >
-                      <item.icon className="w-5 h-5 flex-shrink-0" />
-                      <span className="flex-1 text-left">{item.name}</span>
-                      <ChevronDown
-                        className={cn('w-4 h-4 transition-transform', expanded && 'rotate-180')}
-                      />
-                    </button>
-
-                    {expanded && (
-                      <ul className="mt-1 ml-4 pl-4 border-l border-white/10 space-y-1">
-                        {item.children.map((child) => (
-                          <li key={child.name}>
-                            <Link
-                              href={child.href}
-                              className={cn(
-                                'block px-3 py-2 rounded-lg text-sm transition-colors',
-                                pathname === child.href
-                                  ? 'bg-white/10 text-white'
-                                  : 'text-gray-400 hover:bg-white/5 hover:text-white'
-                              )}
-                            >
-                              {child.name}
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </>
-                ) : (
-                  <Link
-                    href={item.href}
+          return (
+            <div key={group.id} className="mb-4">
+              {/* Group Header (if has label) */}
+              {group.label && (
+                <button
+                  onClick={() => toggleGroup(group.id)}
+                  className={cn(
+                    'w-full flex items-center gap-2 px-3 mb-2 text-xs font-semibold uppercase tracking-wider transition-colors',
+                    hasActiveItem ? 'text-gray-300' : 'text-gray-500 hover:text-gray-400'
+                  )}
+                  aria-expanded={isGroupExpanded}
+                  aria-controls={`nav-group-${group.id}`}
+                >
+                  <ChevronRight
                     className={cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                      active
-                        ? 'bg-primary text-white'
-                        : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                      'w-3 h-3 transition-transform',
+                      isGroupExpanded && 'rotate-90'
                     )}
-                  >
-                    <item.icon className="w-5 h-5 flex-shrink-0" />
-                    <span className="flex-1">{item.name}</span>
-                    {item.badge && (
-                      <span
-                        className={cn(
-                          'px-2 py-0.5 text-xs font-medium rounded-full',
-                          item.badgeColor || 'bg-white/20'
+                    aria-hidden="true"
+                  />
+                  {group.label}
+                  {!isGroupExpanded && hasActiveItem && (
+                    <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" aria-hidden="true" />
+                  )}
+                </button>
+              )}
+
+              {/* Group Items */}
+              {(isGroupExpanded || !group.label) && (
+                <ul
+                  id={group.label ? `nav-group-${group.id}` : undefined}
+                  className="space-y-1"
+                  role="list"
+                >
+                  {group.items.map((item) => {
+                    const active = isActive(item.href);
+                    const expanded = expandedItems.includes(item.name);
+                    const hasChildren = item.children && item.children.length > 0;
+
+                    return (
+                      <li key={item.name}>
+                        {hasChildren ? (
+                          <>
+                            <button
+                              onClick={() => toggleExpand(item.name)}
+                              className={cn(
+                                'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors min-h-[44px]',
+                                active
+                                  ? 'bg-primary text-white'
+                                  : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                              )}
+                              aria-expanded={expanded}
+                              aria-controls={`submenu-${item.name.replace(/\s+/g, '-')}`}
+                              data-tour={getTourId(item.name)}
+                            >
+                              <item.icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
+                              <span className="flex-1 text-left">{item.name}</span>
+                              {item.badge && (
+                                <span
+                                  className={cn(
+                                    'px-2 py-0.5 text-xs font-medium rounded-full',
+                                    item.badgeColor || 'bg-white/20'
+                                  )}
+                                >
+                                  {item.badge}
+                                </span>
+                              )}
+                              <ChevronDown
+                                className={cn('w-4 h-4 transition-transform', expanded && 'rotate-180')}
+                                aria-hidden="true"
+                              />
+                            </button>
+
+                            {expanded && item.children && (
+                              <ul
+                                id={`submenu-${item.name.replace(/\s+/g, '-')}`}
+                                className="mt-1 ml-4 pl-4 border-l border-white/10 space-y-1"
+                                role="list"
+                              >
+                                {item.children.map((child) => (
+                                  <li key={child.name}>
+                                    <Link
+                                      href={child.href}
+                                      className={cn(
+                                        'block px-3 py-2 rounded-lg text-sm transition-colors min-h-[40px] flex items-center',
+                                        pathname === child.href
+                                          ? 'bg-white/10 text-white'
+                                          : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                                      )}
+                                      aria-current={pathname === child.href ? 'page' : undefined}
+                                    >
+                                      {child.name}
+                                    </Link>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </>
+                        ) : (
+                          <Link
+                            href={item.href}
+                            className={cn(
+                              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors min-h-[44px]',
+                              active
+                                ? 'bg-primary text-white'
+                                : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                            )}
+                            aria-current={active ? 'page' : undefined}
+                            data-tour={getTourId(item.name)}
+                          >
+                            <item.icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
+                            <span className="flex-1">{item.name}</span>
+                            {item.badge && (
+                              <span
+                                className={cn(
+                                  'px-2 py-0.5 text-xs font-medium rounded-full',
+                                  item.badgeColor || 'bg-white/20'
+                                )}
+                              >
+                                {item.badge}
+                              </span>
+                            )}
+                          </Link>
                         )}
-                      >
-                        {item.badge}
-                      </span>
-                    )}
-                  </Link>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          );
+        })}
 
         {/* Admin Section */}
-        <div className="mt-6 pt-4 border-t border-white/10">
-          <p className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            Administration
-          </p>
-          <ul className="space-y-1">
+        <div className="mt-2 pt-4 border-t border-white/10">
+          <ul className="space-y-1" role="list">
             {adminNavigation.map((section) => {
               const expanded = expandedItems.includes(section.name);
               const hasActiveChild = section.children.some((child) =>
@@ -288,33 +439,41 @@ export function Sidebar({ className, businessName = 'Your Business', planName = 
                   <button
                     onClick={() => toggleExpand(section.name)}
                     className={cn(
-                      'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                      'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors min-h-[44px]',
                       hasActiveChild
                         ? 'bg-primary/20 text-primary-300'
                         : 'text-gray-300 hover:bg-white/10 hover:text-white'
                     )}
+                    aria-expanded={expanded}
+                    aria-controls="admin-submenu"
                   >
-                    <section.icon className="w-5 h-5 flex-shrink-0" />
+                    <section.icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
                     <span className="flex-1 text-left">{section.name}</span>
                     <ChevronDown
                       className={cn('w-4 h-4 transition-transform', expanded && 'rotate-180')}
+                      aria-hidden="true"
                     />
                   </button>
 
                   {expanded && (
-                    <ul className="mt-1 ml-4 pl-4 border-l border-white/10 space-y-1">
+                    <ul
+                      id="admin-submenu"
+                      className="mt-1 ml-4 pl-4 border-l border-white/10 space-y-1"
+                      role="list"
+                    >
                       {section.children.map((child) => (
                         <li key={child.name}>
                           <Link
                             href={child.href}
                             className={cn(
-                              'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors',
+                              'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors min-h-[40px]',
                               pathname.startsWith(child.href)
                                 ? 'bg-white/10 text-white'
                                 : 'text-gray-400 hover:bg-white/5 hover:text-white'
                             )}
+                            aria-current={pathname.startsWith(child.href) ? 'page' : undefined}
                           >
-                            <child.icon className="w-4 h-4" />
+                            <child.icon className="w-4 h-4" aria-hidden="true" />
                             {child.name}
                           </Link>
                         </li>
@@ -330,19 +489,20 @@ export function Sidebar({ className, businessName = 'Your Business', planName = 
 
       {/* Bottom Navigation */}
       <div className="p-3 border-t border-white/10">
-        <ul className="space-y-1">
+        <ul className="space-y-1" role="list">
           {bottomNavigation.map((item) => (
             <li key={item.name}>
               <Link
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px]',
                   pathname.startsWith(item.href)
                     ? 'bg-white/10 text-white'
                     : 'text-gray-400 hover:bg-white/5 hover:text-white'
                 )}
+                aria-current={pathname.startsWith(item.href) ? 'page' : undefined}
               >
-                <item.icon className="w-5 h-5" />
+                <item.icon className="w-5 h-5" aria-hidden="true" />
                 {item.name}
               </Link>
             </li>
@@ -352,13 +512,13 @@ export function Sidebar({ className, businessName = 'Your Business', planName = 
         {/* AI Assistant Promo */}
         <div className="mt-4 p-3 rounded-xl bg-gradient-to-br from-secondary-400/10 to-primary-600/10 border border-white/10">
           <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="w-4 h-4 text-secondary-400" />
+            <Sparkles className="w-4 h-4 text-secondary-400" aria-hidden="true" />
             <span className="text-sm font-medium">AI Assistant</span>
           </div>
           <p className="text-xs text-gray-400 mb-3">
             Let AI handle your customer messages automatically.
           </p>
-          <button className="w-full py-2 px-3 text-xs font-medium bg-gradient-to-r from-secondary-400/20 to-primary-600/20 hover:from-secondary-400/30 hover:to-primary-600/30 rounded-lg transition-colors border border-white/10">
+          <button className="w-full py-2 px-3 text-xs font-medium bg-gradient-to-r from-secondary-400/20 to-primary-600/20 hover:from-secondary-400/30 hover:to-primary-600/30 rounded-lg transition-colors border border-white/10 min-h-[36px]">
             Try it free
           </button>
         </div>

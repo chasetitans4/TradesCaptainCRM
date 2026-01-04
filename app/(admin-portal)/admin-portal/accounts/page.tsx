@@ -4,6 +4,18 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
   Building2,
   Search,
   Filter,
@@ -56,12 +68,12 @@ const planPrices: Record<string, number> = {
 };
 
 const statusColors: Record<string, { bg: string; text: string; label: string }> = {
-  active: { bg: 'bg-green-100', text: 'text-green-700', label: 'Active' },
-  trial: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Trial' },
-  founders: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Founders' },
-  cancelled: { bg: 'bg-red-100', text: 'text-red-700', label: 'Cancelled' },
-  expired: { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Expired' },
-  suspended: { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Suspended' },
+  active: { bg: 'bg-green-500/10', text: 'text-green-600 dark:text-green-400', label: 'Active' },
+  trial: { bg: 'bg-yellow-500/10', text: 'text-yellow-600 dark:text-yellow-400', label: 'Trial' },
+  founders: { bg: 'bg-purple-500/10', text: 'text-purple-600 dark:text-purple-400', label: 'Founders' },
+  cancelled: { bg: 'bg-red-500/10', text: 'text-red-600 dark:text-red-400', label: 'Cancelled' },
+  expired: { bg: 'bg-muted', text: 'text-muted-foreground', label: 'Expired' },
+  suspended: { bg: 'bg-orange-500/10', text: 'text-orange-600 dark:text-orange-400', label: 'Suspended' },
 };
 
 export default function AccountsPage() {
@@ -77,6 +89,11 @@ export default function AccountsPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Dialog states
+  const [extendTrialDialog, setExtendTrialDialog] = useState<{ open: boolean; accountId: string | null }>({ open: false, accountId: null });
+  const [cancelDialog, setCancelDialog] = useState<{ open: boolean; accountId: string | null; reason: string }>({ open: false, accountId: null, reason: '' });
+  const [errorDialog, setErrorDialog] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
 
   const perPage = 20;
   const totalPages = Math.ceil(total / perPage);
@@ -114,40 +131,49 @@ export default function AccountsPage() {
     fetchAccounts();
   }
 
-  async function handleExtendTrial(accountId: string) {
-    if (!confirm('Extend trial by 7 days?')) return;
+  function openExtendTrialDialog(accountId: string) {
+    setExtendTrialDialog({ open: true, accountId });
+    setActionMenuOpen(null);
+  }
+
+  async function confirmExtendTrial() {
+    if (!extendTrialDialog.accountId) return;
     setActionLoading(true);
     try {
-      await fetch(`/api/admin/accounts/${accountId}/extend-trial`, {
+      await fetch(`/api/admin/accounts/${extendTrialDialog.accountId}/extend-trial`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ days: 7 }),
       });
       fetchAccounts();
     } catch (err) {
-      alert('Failed to extend trial');
+      setErrorDialog({ open: true, message: 'Failed to extend trial' });
     } finally {
       setActionLoading(false);
-      setActionMenuOpen(null);
+      setExtendTrialDialog({ open: false, accountId: null });
     }
   }
 
-  async function handleCancelAccount(accountId: string) {
-    const reason = prompt('Enter cancellation reason (optional):');
-    if (reason === null) return;
+  function openCancelDialog(accountId: string) {
+    setCancelDialog({ open: true, accountId, reason: '' });
+    setActionMenuOpen(null);
+  }
+
+  async function confirmCancelAccount() {
+    if (!cancelDialog.accountId) return;
     setActionLoading(true);
     try {
-      await fetch(`/api/admin/accounts/${accountId}/cancel`, {
+      await fetch(`/api/admin/accounts/${cancelDialog.accountId}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify({ reason: cancelDialog.reason }),
       });
       fetchAccounts();
     } catch (err) {
-      alert('Failed to cancel account');
+      setErrorDialog({ open: true, message: 'Failed to cancel account' });
     } finally {
       setActionLoading(false);
-      setActionMenuOpen(null);
+      setCancelDialog({ open: false, accountId: null, reason: '' });
     }
   }
 
@@ -162,7 +188,7 @@ export default function AccountsPage() {
       // Open in new tab
       window.open(data.login_url, '_blank');
     } catch (err) {
-      alert('Failed to impersonate');
+      setErrorDialog({ open: true, message: 'Failed to impersonate account' });
     } finally {
       setActionLoading(false);
       setActionMenuOpen(null);
@@ -180,26 +206,26 @@ export default function AccountsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">CRM Accounts</h1>
-          <p className="text-gray-500">Manage all TradesCaptain CRM client accounts</p>
+          <h1 className="text-2xl font-bold text-foreground">CRM Accounts</h1>
+          <p className="text-muted-foreground">Manage all TradesCaptain CRM client accounts</p>
         </div>
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-muted-foreground">
           {total} total accounts
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <div className="bg-card rounded-xl border border-border p-4">
         <form onSubmit={handleSearch} className="flex flex-wrap items-center gap-3">
           {/* Search */}
           <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name, email..."
-              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+              className="w-full pl-9 pr-4 py-2 border border-input bg-background text-foreground rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
             />
           </div>
 
@@ -210,7 +236,7 @@ export default function AccountsPage() {
               setStatusFilter(e.target.value);
               setPage(1);
             }}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none bg-white"
+            className="px-3 py-2 border border-input bg-background text-foreground rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
           >
             <option value="all">All Status</option>
             <option value="active">Active</option>
@@ -227,7 +253,7 @@ export default function AccountsPage() {
               setPlanFilter(e.target.value);
               setPage(1);
             }}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none bg-white"
+            className="px-3 py-2 border border-input bg-background text-foreground rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
           >
             <option value="all">All Plans</option>
             <option value="blue_starter">Blue Starter</option>
@@ -237,7 +263,7 @@ export default function AccountsPage() {
 
           <button
             type="submit"
-            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
           >
             Search
           </button>
@@ -246,38 +272,38 @@ export default function AccountsPage() {
 
       {/* Error */}
       {error && (
-        <div className="p-4 bg-red-50 text-red-700 rounded-lg flex items-center gap-2">
+        <div className="p-4 bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg flex items-center gap-2">
           <AlertCircle className="h-5 w-5" />
           {error}
         </div>
       )}
 
       {/* Accounts Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : accounts.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <Building2 className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+          <div className="text-center py-12 text-muted-foreground">
+            <Building2 className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
             <p>No accounts found</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-muted/50 border-b border-border">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Business</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Owner</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Plan</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Period</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Created</th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-600">Actions</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Business</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Owner</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Plan</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Period</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Created</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-border">
                 {accounts.map((account) => {
                   const status = statusColors[account.plan_status] || statusColors.active;
                   const daysRemaining = account.plan_status === 'trial'
@@ -287,23 +313,23 @@ export default function AccountsPage() {
                     : null;
 
                   return (
-                    <tr key={account.id} className="hover:bg-gray-50">
+                    <tr key={account.id} className="hover:bg-muted/30">
                       <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{account.business_name}</div>
-                        <div className="text-xs text-gray-500">ID: {account.id.slice(0, 8)}</div>
+                        <div className="font-medium text-foreground">{account.business_name}</div>
+                        <div className="text-xs text-muted-foreground">ID: {account.id.slice(0, 8)}</div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-gray-900">{account.owner_name}</div>
-                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                        <div className="text-foreground">{account.owner_name}</div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-1">
                           <Mail className="h-3 w-3" />
                           {account.owner_email}
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">
+                        <div className="font-medium text-foreground">
                           {planNames[account.plan_type]}
                         </div>
-                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                        <div className="text-xs text-muted-foreground flex items-center gap-1">
                           <DollarSign className="h-3 w-3" />
                           ${planPrices[account.plan_type]}/mo
                         </div>
@@ -320,30 +346,30 @@ export default function AccountsPage() {
                       <td className="px-4 py-3">
                         {daysRemaining !== null ? (
                           <div>
-                            <div className={`text-sm font-medium ${daysRemaining <= 7 ? 'text-red-600' : 'text-gray-900'}`}>
+                            <div className={`text-sm font-medium ${daysRemaining <= 7 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>
                               {daysRemaining} days left
                             </div>
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-muted-foreground">
                               {account.plan_status === 'trial'
                                 ? `Ends ${format(new Date(account.trial_end_date!), 'MMM d')}`
                                 : `Ends ${format(new Date(account.founders_end_date!), 'MMM d')}`}
                             </div>
                           </div>
                         ) : account.plan_status === 'cancelled' ? (
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-muted-foreground">
                             Cancelled {account.cancelled_at
                               ? formatDistanceToNow(new Date(account.cancelled_at), { addSuffix: true })
                               : ''}
                           </div>
                         ) : (
-                          <span className="text-gray-400">-</span>
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-gray-900">
+                        <div className="text-foreground">
                           {format(new Date(account.created_at), 'MMM d, yyyy')}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(account.created_at), { addSuffix: true })}
                         </div>
                       </td>
@@ -351,9 +377,9 @@ export default function AccountsPage() {
                         <div className="relative flex justify-end">
                           <button
                             onClick={() => setActionMenuOpen(actionMenuOpen === account.id ? null : account.id)}
-                            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                            className="p-1.5 rounded-lg hover:bg-muted transition-colors"
                           >
-                            <MoreVertical className="h-4 w-4 text-gray-500" />
+                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
                           </button>
 
                           {actionMenuOpen === account.id && (
@@ -362,10 +388,10 @@ export default function AccountsPage() {
                                 className="fixed inset-0 z-40"
                                 onClick={() => setActionMenuOpen(null)}
                               />
-                              <div className="absolute right-0 top-8 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1">
+                              <div className="absolute right-0 top-8 w-48 bg-popover rounded-lg shadow-lg border border-border z-50 py-1">
                                 <Link
                                   href={`/admin-portal/accounts/${account.id}`}
-                                  className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                  className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted"
                                   onClick={() => setActionMenuOpen(null)}
                                 >
                                   <Eye className="h-4 w-4" />
@@ -373,7 +399,7 @@ export default function AccountsPage() {
                                 </Link>
                                 <button
                                   onClick={() => handleImpersonate(account.id)}
-                                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                  className="flex items-center gap-2 w-full px-4 py-2 text-sm text-foreground hover:bg-muted"
                                   disabled={actionLoading}
                                 >
                                   <UserCog className="h-4 w-4" />
@@ -381,8 +407,8 @@ export default function AccountsPage() {
                                 </button>
                                 {account.plan_status === 'trial' && (
                                   <button
-                                    onClick={() => handleExtendTrial(account.id)}
-                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                    onClick={() => openExtendTrialDialog(account.id)}
+                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-foreground hover:bg-muted"
                                     disabled={actionLoading}
                                   >
                                     <RefreshCw className="h-4 w-4" />
@@ -391,8 +417,8 @@ export default function AccountsPage() {
                                 )}
                                 {account.plan_status !== 'cancelled' && (
                                   <button
-                                    onClick={() => handleCancelAccount(account.id)}
-                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                                    onClick={() => openCancelDialog(account.id)}
+                                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-500/10"
                                     disabled={actionLoading}
                                   >
                                     <Ban className="h-4 w-4" />
@@ -414,25 +440,25 @@ export default function AccountsPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-sm text-gray-500">
+          <div className="px-4 py-3 border-t border-border flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
               Showing {((page - 1) * perPage) + 1} to {Math.min(page * perPage, total)} of {total}
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setPage(page - 1)}
                 disabled={page === 1}
-                className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-2 rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-muted-foreground">
                 Page {page} of {totalPages}
               </span>
               <button
                 onClick={() => setPage(page + 1)}
                 disabled={page === totalPages}
-                className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-2 rounded-lg hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -440,6 +466,67 @@ export default function AccountsPage() {
           </div>
         )}
       </div>
+
+      {/* Extend Trial Dialog */}
+      <AlertDialog open={extendTrialDialog.open} onOpenChange={(open) => !open && setExtendTrialDialog({ open: false, accountId: null })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Extend Trial</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will extend the trial period by 7 days. The customer will receive additional time to evaluate the platform.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmExtendTrial} disabled={actionLoading}>
+              {actionLoading ? 'Extending...' : 'Extend Trial'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel Account Dialog */}
+      <AlertDialog open={cancelDialog.open} onOpenChange={(open) => !open && setCancelDialog({ open: false, accountId: null, reason: '' })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Account</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will cancel the customer&apos;s account. They will lose access to the platform. This action can be undone by reactivating the account.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Label htmlFor="cancel-reason">Cancellation Reason (Optional)</Label>
+            <Input
+              id="cancel-reason"
+              value={cancelDialog.reason}
+              onChange={(e) => setCancelDialog({ ...cancelDialog, reason: e.target.value })}
+              placeholder="Enter reason for cancellation..."
+              className="mt-2"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmCancelAccount} disabled={actionLoading} className="bg-red-600 hover:bg-red-700">
+              {actionLoading ? 'Cancelling...' : 'Cancel Account'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Error Dialog */}
+      <AlertDialog open={errorDialog.open} onOpenChange={(open) => !open && setErrorDialog({ open: false, message: '' })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Error</AlertDialogTitle>
+            <AlertDialogDescription>{errorDialog.message}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setErrorDialog({ open: false, message: '' })}>
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

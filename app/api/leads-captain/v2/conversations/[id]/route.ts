@@ -100,7 +100,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     // Get existing conversation
     const { data: existing } = await supabase
       .from('leads_captain_conversations_v2')
-      .select('id, status')
+      .select('id, status, muted_until')
       .eq('id', id)
       .eq('config_id', config.id)
       .single();
@@ -163,6 +163,28 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       case 'unflag_hot_lead':
         updateData.is_hot_lead = false;
         auditAction = 'unflagged_hot_lead';
+        break;
+
+      case 'mute': {
+        // Time-based mute for per-conversation control (Section 7.3)
+        const duration = body.duration || 24; // Default 24 hours
+        const mutedUntil = new Date();
+        mutedUntil.setHours(mutedUntil.getHours() + duration);
+        updateData.muted_until = mutedUntil.toISOString();
+        updateData.status = 'human_takeover';
+        updateData.requires_human = true;
+        auditAction = 'muted';
+        break;
+      }
+
+      case 'unmute':
+        updateData.muted_until = null;
+        // Only switch back to active if currently in human_takeover
+        if (existing.status === 'human_takeover') {
+          updateData.status = 'active';
+          updateData.requires_human = false;
+        }
+        auditAction = 'unmuted';
         break;
 
       default:

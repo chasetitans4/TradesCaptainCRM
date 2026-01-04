@@ -62,6 +62,7 @@ export function getRoleDescription(role: UserRole): string {
 export const DASHBOARD_SECTIONS: Record<UserRole, string[]> = {
   owner: [
     'stats',
+    'messages',
     'reminders',
     'todayJobs',
     'tomorrowJobs',
@@ -71,6 +72,7 @@ export const DASHBOARD_SECTIONS: Record<UserRole, string[]> = {
   ],
   admin: [
     'stats',
+    'messages',
     'reminders',
     'todayJobs',
     'tomorrowJobs',

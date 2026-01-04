@@ -382,6 +382,24 @@ export async function suggestBulkAssignments(
 }
 
 /**
+ * Auto-assign the best technician for a job
+ * Wrapper for autoAssignJob with sensible defaults
+ */
+export async function autoAssignBestTechnician(
+  jobId: string,
+  businessId: string
+): Promise<{
+  success: boolean;
+  assignedTo?: TechnicianMatch;
+  reason?: string;
+}> {
+  return autoAssignJob(jobId, businessId, {
+    preferLeastBusy: true,
+    preferClosest: true,
+  });
+}
+
+/**
  * Get workload distribution across technicians
  */
 export async function getWorkloadDistribution(

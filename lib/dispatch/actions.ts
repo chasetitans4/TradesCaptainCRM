@@ -4,6 +4,7 @@
 // =====================================================
 
 import { createClient } from '@/lib/supabase/server';
+import { sendSMS } from '@/lib/twilio/sms';
 
 /**
  * Assign job to technician
@@ -60,7 +61,6 @@ export async function assignJob(
 
   // Send notifications if requested
   if (options?.notifyTechnician !== false) {
-    // Queue notification to technician
     try {
       const { data: tech } = await supabase
         .from('users')
@@ -68,9 +68,20 @@ export async function assignJob(
         .eq('id', technicianId)
         .single();
 
-      // TODO: Integrate with notification system
-    } catch {
-      // Ignore notification errors
+      if (tech?.phone) {
+        const scheduleInfo = options?.scheduledDate
+          ? ` for ${new Date(options.scheduledDate).toLocaleDateString()}${options?.scheduledTime ? ` at ${options.scheduledTime}` : ''}`
+          : '';
+
+        await sendSMS({
+          to: tech.phone,
+          body: `New job assigned: ${job.title}${scheduleInfo}. Check your dashboard for details.`,
+          businessId: job.business_id,
+        });
+      }
+    } catch (e) {
+      // Log but don't fail the assignment
+      console.error('Failed to notify technician:', e);
     }
   }
 
@@ -88,9 +99,20 @@ export async function assignJob(
         .eq('id', technicianId)
         .single();
 
-      // TODO: Integrate with SMS system
-    } catch {
-      // Ignore notification errors
+      if (customer?.phone) {
+        const scheduleInfo = options?.scheduledDate
+          ? ` on ${new Date(options.scheduledDate).toLocaleDateString()}${options?.scheduledTime ? ` at ${options.scheduledTime}` : ''}`
+          : ' soon';
+
+        await sendSMS({
+          to: customer.phone,
+          body: `Hi ${customer.name?.split(' ')[0] || 'there'}, your service has been scheduled${scheduleInfo}. ${tech?.name || 'Your technician'} will be assisting you.`,
+          businessId: job.business_id,
+        });
+      }
+    } catch (e) {
+      // Log but don't fail the assignment
+      console.error('Failed to notify customer:', e);
     }
   }
 
@@ -223,7 +245,50 @@ export async function rescheduleJob(
     scheduled_time: newTime || job.scheduled_time,
   });
 
-  // TODO: Send notifications for reschedule
+  // Send reschedule notifications
+  const formattedDate = new Date(newDate).toLocaleDateString();
+  const timeInfo = newTime || job.scheduled_time;
+  const scheduleText = timeInfo ? `${formattedDate} at ${timeInfo}` : formattedDate;
+
+  if (options?.notifyTechnician && job.assigned_user_id) {
+    try {
+      const { data: tech } = await supabase
+        .from('users')
+        .select('phone')
+        .eq('id', job.assigned_user_id)
+        .single();
+
+      if (tech?.phone) {
+        await sendSMS({
+          to: tech.phone,
+          body: `Job rescheduled to ${scheduleText}. Check your dashboard for details.`,
+          businessId: job.business_id,
+        });
+      }
+    } catch (e) {
+      console.error('Failed to notify technician of reschedule:', e);
+    }
+  }
+
+  if (options?.notifyCustomer && job.customer_id) {
+    try {
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('phone, name')
+        .eq('id', job.customer_id)
+        .single();
+
+      if (customer?.phone) {
+        await sendSMS({
+          to: customer.phone,
+          body: `Hi ${customer.name?.split(' ')[0] || 'there'}, your service has been rescheduled to ${scheduleText}. We apologize for any inconvenience.`,
+          businessId: job.business_id,
+        });
+      }
+    } catch (e) {
+      console.error('Failed to notify customer of reschedule:', e);
+    }
+  }
 
   return { success: true };
 }

@@ -9,6 +9,7 @@ import { cn, formatRelativeDate, formatPhoneNumber, formatDate, formatTime, form
 import { getSmartNavigationUrl } from '@/lib/utils/navigation';
 import { AddressLink } from '@/components/ui/address-link';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import type { UserWithBusiness, Job, Customer, JobStatus, User } from '@/types';
@@ -56,6 +57,7 @@ const STATUS_COLORS: Record<JobStatus, string> = {
 export default function JobsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
   const [user, setUser] = useState<UserWithBusiness | null>(null);
   const [jobs, setJobs] = useState<JobWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
@@ -157,6 +159,7 @@ export default function JobsPage() {
       setJobs((data as JobWithDetails[]) || []);
     } catch (error) {
       console.error('Error loading jobs:', error);
+      toast({ title: 'Error', description: 'Failed to load jobs. Please try again.', variant: 'destructive' });
     } finally {
       setLoading(false);
       setRefreshing(false);

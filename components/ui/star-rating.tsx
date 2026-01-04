@@ -57,7 +57,7 @@ export function StarRating({
                 'transition-colors',
                 filled
                   ? 'fill-amber-400 text-amber-400'
-                  : 'fill-transparent text-gray-300'
+                  : 'fill-transparent text-muted-foreground/40'
               )}
             />
           </button>
