@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getClientSmsHistory, updateClientSmsCap } from '@/lib/admin/sms-usage';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
   request: NextRequest,
@@ -25,10 +26,10 @@ export async function GET(
     const history = await getClientSmsHistory(clientId, months);
 
     return NextResponse.json({ history });
-  } catch (error: any) {
-    console.error('Get SMS history error:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Get SMS history error', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch SMS history' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch SMS history' },
       { status: 500 }
     );
   }
@@ -59,10 +60,10 @@ export async function PATCH(
     await updateClientSmsCap(clientId, soft_cap);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Update SMS cap error:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Update SMS cap error', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update SMS cap' },
+      { error: error instanceof Error ? error.message : 'Failed to update SMS cap' },
       { status: 500 }
     );
   }

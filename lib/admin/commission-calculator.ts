@@ -143,6 +143,7 @@ const PLAN_PRICING: Record<string, { monthly: number; annual: number | null; nam
   gold_enterprise: { monthly: 59800, annual: 538200, name: 'Gold Enterprise' },
   local_seo_starter: { monthly: 9900, annual: 89100, name: 'Local SEO Starter' },
   local_seo_pro: { monthly: 19900, annual: 179100, name: 'Local SEO Pro' },
+  local_seo_enterprise: { monthly: 24900, annual: 224100, name: 'Local SEO Enterprise' },
 };
 
 // =====================================================

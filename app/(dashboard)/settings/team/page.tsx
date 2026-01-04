@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
   Plus,
   User,
+  Users,
   Crown,
   Shield,
   Wrench,
@@ -19,8 +20,9 @@ import {
   UserX,
   UserCheck,
   ArrowRightLeft,
+  AlertCircle,
 } from 'lucide-react';
-import { createClient, getCurrentUserProfile } from '@/lib/supabase/client';
+import { getCurrentUserProfile } from '@/lib/supabase/client';
 import { cn, formatRelativeDate } from '@/lib/utils';
 import { hasPermission } from '@/lib/permissions';
 import { useToast } from '@/components/ui/use-toast';
@@ -46,6 +48,16 @@ interface Invitation {
   inviter: { name: string } | null;
 }
 
+interface UserPricingInfo {
+  businessId: string;
+  planTier: 'starter' | 'pro' | 'enterprise';
+  billableUserCount: number;
+  includedUsers: number;
+  additionalUsers: number;
+  perUserPrice: number;
+  monthlyUserCharge: number;
+}
+
 const ROLE_CONFIG = {
   owner: { label: 'Owner', icon: Crown, color: 'text-amber-600 bg-amber-100 dark:bg-amber-900/30' },
   admin: { label: 'Admin', icon: Shield, color: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30' },
@@ -65,12 +77,9 @@ export default function TeamPage() {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferConfirm, setTransferConfirm] = useState('');
   const [selectedNewOwner, setSelectedNewOwner] = useState<string | null>(null);
+  const [userPricing, setUserPricing] = useState<UserPricingInfo | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     const profile = await getCurrentUserProfile();
     if (!profile) {
       router.push('/login');
@@ -94,8 +103,19 @@ export default function TeamPage() {
       }
     }
 
+    // Load user pricing info
+    const pricingRes = await fetch('/api/billing/user-pricing');
+    if (pricingRes.ok) {
+      const data = await pricingRes.json();
+      setUserPricing(data);
+    }
+
     setLoading(false);
-  };
+  }, [router]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleChangeRole = async (memberId: string, newRole: 'admin' | 'technician') => {
     setActionLoading(memberId);
@@ -114,7 +134,7 @@ export default function TeamPage() {
         const data = await response.json();
         toast({ title: 'Error', description: data.error || 'Failed to change role', variant: 'destructive' });
       }
-    } catch (error) {
+    } catch (_error) {
       toast({ title: 'Error', description: 'Failed to change role', variant: 'destructive' });
     } finally {
       setActionLoading(null);
@@ -137,7 +157,7 @@ export default function TeamPage() {
         const data = await response.json();
         toast({ title: 'Error', description: data.error || 'Failed to deactivate member', variant: 'destructive' });
       }
-    } catch (error) {
+    } catch (_error) {
       toast({ title: 'Error', description: 'Failed to deactivate member', variant: 'destructive' });
     } finally {
       setActionLoading(null);
@@ -159,7 +179,7 @@ export default function TeamPage() {
         const data = await response.json();
         toast({ title: 'Error', description: data.error || 'Failed to reactivate member', variant: 'destructive' });
       }
-    } catch (error) {
+    } catch (_error) {
       toast({ title: 'Error', description: 'Failed to reactivate member', variant: 'destructive' });
     } finally {
       setActionLoading(null);
@@ -179,7 +199,7 @@ export default function TeamPage() {
         const data = await response.json();
         toast({ title: 'Error', description: data.error || 'Failed to resend invitation', variant: 'destructive' });
       }
-    } catch (error) {
+    } catch (_error) {
       toast({ title: 'Error', description: 'Failed to resend invitation', variant: 'destructive' });
     } finally {
       setActionLoading(null);
@@ -202,7 +222,7 @@ export default function TeamPage() {
         const data = await response.json();
         toast({ title: 'Error', description: data.error || 'Failed to cancel invitation', variant: 'destructive' });
       }
-    } catch (error) {
+    } catch (_error) {
       toast({ title: 'Error', description: 'Failed to cancel invitation', variant: 'destructive' });
     } finally {
       setActionLoading(null);
@@ -230,7 +250,7 @@ export default function TeamPage() {
         const data = await response.json();
         toast({ title: 'Error', description: data.error || 'Failed to transfer ownership', variant: 'destructive' });
       }
-    } catch (error) {
+    } catch (_error) {
       toast({ title: 'Error', description: 'Failed to transfer ownership', variant: 'destructive' });
     } finally {
       setActionLoading(null);
@@ -246,6 +266,7 @@ export default function TeamPage() {
   const activeMembers = members.filter(m => m.status === 'active');
   const inactiveMembers = members.filter(m => m.status === 'deactivated');
   const eligibleNewOwners = activeMembers.filter(m => m.id !== user.id && m.role !== 'owner');
+  const isAtUserLimit = userPricing ? userPricing.billableUserCount >= userPricing.includedUsers : false;
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -259,7 +280,7 @@ export default function TeamPage() {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <h1 className="text-lg font-semibold flex-1">Team</h1>
-          {canManageTeam && (
+          {canManageTeam && !isAtUserLimit && (
             <Link
               href="/settings/team/invite"
               className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
@@ -268,10 +289,64 @@ export default function TeamPage() {
               <span className="text-sm font-medium">Invite</span>
             </Link>
           )}
+          {canManageTeam && isAtUserLimit && (
+            <Link
+              href="/settings/billing"
+              className="flex items-center gap-2 px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="text-sm font-medium">Add Users</span>
+            </Link>
+          )}
         </div>
       </div>
 
       <div className="p-4 space-y-6 max-w-2xl mx-auto">
+        {/* User Limit Banner */}
+        {userPricing && (
+          <div className={cn(
+            "rounded-xl border p-4",
+            isAtUserLimit
+              ? "bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800"
+              : "bg-card border-border"
+          )}>
+            <div className="flex items-center gap-4">
+              <div className={cn(
+                "w-10 h-10 rounded-full flex items-center justify-center",
+                isAtUserLimit ? "bg-amber-100 dark:bg-amber-900/40" : "bg-primary/10"
+              )}>
+                <Users className={cn("h-5 w-5", isAtUserLimit ? "text-amber-600" : "text-primary")} />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium">
+                  {userPricing.billableUserCount} of {userPricing.includedUsers} users
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {userPricing.planTier.charAt(0).toUpperCase() + userPricing.planTier.slice(1)} plan
+                  {userPricing.additionalUsers > 0 && (
+                    <span className="text-amber-600"> • {userPricing.additionalUsers} extra @ ${userPricing.perUserPrice}/mo</span>
+                  )}
+                </p>
+              </div>
+              {isAtUserLimit && (
+                <Link
+                  href="/settings/billing"
+                  className="text-sm font-medium text-amber-600 hover:text-amber-700"
+                >
+                  + Add Users
+                </Link>
+              )}
+            </div>
+            {isAtUserLimit && (
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-amber-200 dark:border-amber-800">
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+                <p className="text-sm text-amber-700 dark:text-amber-400">
+                  User limit reached. Add extra users at ${userPricing.perUserPrice}/mo each in Billing settings.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
         {/* Active Members */}
         <div>
           <h2 className="text-sm font-medium text-muted-foreground mb-3">

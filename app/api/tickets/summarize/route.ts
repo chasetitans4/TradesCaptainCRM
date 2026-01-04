@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { summarizeIssue } from '@/lib/tickets';
+import { apiLogger } from '@/lib/logger';
 
 // POST /api/tickets/summarize - Generate AI summary for ticket
 export async function POST(request: NextRequest) {
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(summary);
   } catch (error) {
-    console.error('Error summarizing issue:', error);
+    apiLogger.error({ error, message: 'Error summarizing issue' });
     return NextResponse.json(
       { error: 'Failed to summarize issue' },
       { status: 500 }

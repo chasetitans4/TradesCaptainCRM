@@ -13,6 +13,7 @@ import {
   getPendingClaims,
   getWarrantyStats,
 } from '@/lib/warranties';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -54,10 +55,10 @@ export async function GET(request: NextRequest) {
 
     const warranties = await getCustomerWarranties(customerId, includeExpired);
     return NextResponse.json(warranties);
-  } catch (error: any) {
-    console.error('Error fetching warranties:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error fetching warranties' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch warranties' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch warranties' },
       { status: 500 }
     );
   }
@@ -109,10 +110,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(warranty);
-  } catch (error: any) {
-    console.error('Error creating warranty:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error creating warranty' });
     return NextResponse.json(
-      { error: error.message || 'Failed to create warranty' },
+      { error: error instanceof Error ? error.message : 'Failed to create warranty' },
       { status: 500 }
     );
   }

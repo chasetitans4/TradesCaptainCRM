@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPendingAdminCalls } from '@/lib/outreach/scheduling';
+import { apiLogger } from '@/lib/logger';
 
 /**
  * GET /api/outreach/calls/pending-admin
@@ -14,7 +15,7 @@ export async function GET() {
       total: calls.length,
     });
   } catch (error) {
-    console.error('Error getting pending admin calls:', error);
+    apiLogger.error({ message: 'Error getting pending admin calls', error });
     return NextResponse.json(
       { error: 'Failed to get pending calls' },
       { status: 500 }

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { extractReceiptData, processReceiptToExpense, isOCRConfigured } from '@/lib/ocr';
 import { isFeatureEnabled } from '@/lib/features';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -78,10 +79,10 @@ export async function POST(request: NextRequest) {
       success: true,
       data: result.data,
     });
-  } catch (error: any) {
-    console.error('Error in OCR API:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'OCR API' });
     return NextResponse.json(
-      { error: error.message || 'OCR processing failed' },
+      { error: error instanceof Error ? error.message : 'OCR processing failed' },
       { status: 500 }
     );
   }

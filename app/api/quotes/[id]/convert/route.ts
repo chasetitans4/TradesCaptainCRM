@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
 import { convertQuoteToJob, convertQuoteToInvoice } from '@/lib/quotes';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -48,10 +49,10 @@ export async function POST(
       try {
         const jobId = await convertQuoteToJob(id, profile.id, scheduled_date, scheduled_time);
         result.job_id = jobId;
-      } catch (error: any) {
-        console.error('Error converting to job:', error);
+      } catch (error) {
+        apiLogger.error({ error, context: 'converting to job' });
         return NextResponse.json(
-          { error: error.message || 'Failed to create job' },
+          { error: error instanceof Error ? error.message : 'Failed to create job' },
           { status: 500 }
         );
       }
@@ -61,10 +62,10 @@ export async function POST(
       try {
         const invoiceId = await convertQuoteToInvoice(id, profile.id);
         result.invoice_id = invoiceId;
-      } catch (error: any) {
-        console.error('Error converting to invoice:', error);
+      } catch (error) {
+        apiLogger.error({ error, context: 'converting to invoice' });
         return NextResponse.json(
-          { error: error.message || 'Failed to create invoice' },
+          { error: error instanceof Error ? error.message : 'Failed to create invoice' },
           { status: 500 }
         );
       }
@@ -72,7 +73,7 @@ export async function POST(
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error in convert quote API:', error);
+    apiLogger.error({ error, context: 'convert quote API' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

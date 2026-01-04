@@ -519,9 +519,9 @@ async function createTaskFollowUp(
  * Send notification follow-up
  */
 async function sendNotificationFollowUp(
-  rule: any,
-  instance: any,
-  entity: any
+  _rule: any,
+  _instance: any,
+  _entity: any
 ): Promise<{ success: boolean; error?: string }> {
   // TODO: Integrate with push notifications
   return { success: true };

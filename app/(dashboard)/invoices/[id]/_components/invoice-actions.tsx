@@ -1,6 +1,6 @@
 'use client';
 
-import { Send, CreditCard, Banknote, Loader2 } from 'lucide-react';
+import { Send, CreditCard, Banknote, Loader2, RotateCcw } from 'lucide-react';
 import type { Invoice } from './types';
 
 interface InvoiceActionsProps {
@@ -10,6 +10,7 @@ interface InvoiceActionsProps {
   onSend: () => void;
   onGeneratePaymentLink: () => void;
   onRecordPayment: () => void;
+  onRefund?: () => void;
 }
 
 export function InvoiceActions({
@@ -19,11 +20,13 @@ export function InvoiceActions({
   onSend,
   onGeneratePaymentLink,
   onRecordPayment,
+  onRefund,
 }: InvoiceActionsProps) {
   if (invoice.status === 'void') return null;
 
   const canSend = ['draft', 'sent', 'viewed'].includes(invoice.status) && invoice.status !== 'void';
   const canRecordPayment = invoice.amount_due > 0 && invoice.status !== 'void';
+  const canRefund = invoice.amount_paid > 0 && invoice.payments.length > 0;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border p-4">
@@ -62,6 +65,15 @@ export function InvoiceActions({
               Record Payment
             </button>
           </>
+        )}
+        {canRefund && onRefund && (
+          <button
+            onClick={onRefund}
+            className="flex items-center justify-center gap-2 px-4 py-3 border border-amber-500 text-amber-600 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
+          >
+            <RotateCcw className="h-5 w-5" />
+            Refund
+          </button>
         )}
       </div>
     </div>

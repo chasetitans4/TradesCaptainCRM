@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 // GET - Fetch phone settings
 export async function GET() {
@@ -34,7 +35,7 @@ export async function GET() {
       .single();
 
     if (error) {
-      console.error('Error fetching phone settings:', error);
+      apiLogger.error({ error, context: 'Error fetching phone settings' });
       return NextResponse.json(
         { error: 'Failed to fetch phone settings' },
         { status: 500 }
@@ -55,7 +56,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error('Error fetching phone settings:', error);
+    apiLogger.error({ error, context: 'Error fetching phone settings' });
     return NextResponse.json(
       { error: 'Failed to fetch phone settings' },
       { status: 500 }
@@ -121,7 +122,7 @@ export async function PUT(request: NextRequest) {
       .eq('id', profile.business_id);
 
     if (error) {
-      console.error('Error updating phone settings:', error);
+      apiLogger.error({ error, context: 'Error updating phone settings' });
       return NextResponse.json(
         { error: 'Failed to update phone settings' },
         { status: 500 }
@@ -130,7 +131,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error updating phone settings:', error);
+    apiLogger.error({ error, context: 'Error updating phone settings' });
     return NextResponse.json(
       { error: 'Failed to update phone settings' },
       { status: 500 }

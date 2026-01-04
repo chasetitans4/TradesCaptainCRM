@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import {
   assignJob,
   unassignJob,
@@ -12,7 +13,7 @@ import { autoAssignJob } from '@/lib/dispatch/routing';
 
 // GET /api/dispatch/jobs/[id] - Get job dispatch history
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -29,9 +30,9 @@ export async function GET(
     const history = await getJobDispatchHistory(id);
 
     return NextResponse.json({ history });
-  } catch (error: any) {
-    console.error('Error fetching dispatch history:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ error, route: 'GET /api/dispatch/jobs/[id]' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to fetch dispatch history' }, { status: 500 });
   }
 }
 
@@ -132,8 +133,8 @@ export async function POST(
     }
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Error with dispatch action:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ error, route: 'POST /api/dispatch/jobs/[id]' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Dispatch action failed' }, { status: 500 });
   }
 }

@@ -12,6 +12,7 @@ import {
   getOrganizationStatus,
   getDailyMetrics,
 } from '@/lib/admin/leads-captain-support';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,10 +48,10 @@ export async function GET(request: NextRequest) {
       organization_status: status,
       metrics,
     });
-  } catch (error: any) {
-    console.error('Error in GET /api/admin/support/settings:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error in GET /api/admin/support/settings', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to get settings' },
+      { error: error instanceof Error ? error.message : 'Failed to get settings' },
       { status: 500 }
     );
   }
@@ -99,10 +100,10 @@ export async function PATCH(request: NextRequest) {
           { status: 400 }
         );
     }
-  } catch (error: any) {
-    console.error('Error in PATCH /api/admin/support/settings:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error in PATCH /api/admin/support/settings', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update settings' },
+      { error: error instanceof Error ? error.message : 'Failed to update settings' },
       { status: 500 }
     );
   }

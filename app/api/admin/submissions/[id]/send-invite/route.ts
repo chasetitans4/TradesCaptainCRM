@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { createClient } from '@/lib/supabase/server';
 import { markInviteSent, logEmail, logAdminActivity } from '@/lib/admin';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -96,10 +97,10 @@ export async function POST(
       registration_url: registrationUrl,
       message: `Invite sent to ${submission.client_email}`,
     });
-  } catch (error: any) {
-    console.error('Error in POST /api/admin/submissions/[id]/send-invite:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error in POST /api/admin/submissions/[id]/send-invite', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to send invite' },
+      { error: error instanceof Error ? error.message : 'Failed to send invite' },
       { status: 400 }
     );
   }

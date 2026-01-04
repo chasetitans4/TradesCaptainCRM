@@ -6,8 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getLeadsCaptainAlerts } from '@/lib/admin/leads-captain-dashboard';
+import { apiLogger } from '@/lib/logger';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const auth = await requireAgentOrHigher();
     if (!auth) {
@@ -26,10 +27,13 @@ export async function GET(request: NextRequest) {
         total: alerts.length,
       },
     });
-  } catch (error: any) {
-    console.error('Leads Captain alerts error:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Leads Captain alerts error',
+      error,
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch alerts' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch alerts' },
       { status: 500 }
     );
   }

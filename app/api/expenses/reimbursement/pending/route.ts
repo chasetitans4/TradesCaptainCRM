@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import { getPendingReimbursements } from '@/lib/expenses';
 
 export async function GET(request: NextRequest) {
@@ -39,10 +40,10 @@ export async function GET(request: NextRequest) {
     const result = await getPendingReimbursements(profile.business_id, targetUserId);
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Error in GET /api/expenses/reimbursement/pending:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'GET /api/expenses/reimbursement/pending' });
     return NextResponse.json(
-      { error: error.message || 'Failed to get pending reimbursements' },
+      { error: error instanceof Error ? error.message : 'Failed to get pending reimbursements' },
       { status: 500 }
     );
   }

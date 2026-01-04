@@ -4,6 +4,7 @@ import {
   takeOverConversation,
   closeConversation,
 } from '@/lib/outreach/sms';
+import { apiLogger } from '@/lib/logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -13,7 +14,7 @@ interface RouteParams {
  * GET /api/outreach/conversations/[id]
  * Get a conversation with messages
  */
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const data = await getConversationWithMessages(id);
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error getting conversation:', error);
+    apiLogger.error({ message: 'Error getting conversation', error });
     return NextResponse.json(
       { error: 'Failed to get conversation' },
       { status: 500 }
@@ -83,7 +84,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         );
     }
   } catch (error) {
-    console.error('Error updating conversation:', error);
+    apiLogger.error({ message: 'Error updating conversation', error });
     return NextResponse.json(
       { error: 'Failed to update conversation' },
       { status: 500 }

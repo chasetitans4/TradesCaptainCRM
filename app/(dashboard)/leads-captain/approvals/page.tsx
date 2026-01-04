@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ApprovalQueueItem } from '@/types/leads-captain';
+import { logger } from '@/lib/logger';
 
 export default function LeadsCaptainApprovalsPage() {
   const router = useRouter();
@@ -41,6 +42,7 @@ export default function LeadsCaptainApprovalsPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editedContent, setEditedContent] = useState('');
   const [processing, setProcessing] = useState(false);
+  const lcApprovalsLogger = logger.child({ context: 'leads-captain.approvals' });
 
   useEffect(() => {
     fetchApprovals();
@@ -55,7 +57,10 @@ export default function LeadsCaptainApprovalsPage() {
       const data = await res.json();
       setItems(data.items || []);
     } catch (error) {
-      console.error('Error fetching approvals:', error);
+      lcApprovalsLogger.error({
+        msg: 'Error fetching approvals',
+        error: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setLoading(false);
     }
@@ -89,7 +94,12 @@ export default function LeadsCaptainApprovalsPage() {
       setSelectedItem(null);
       fetchApprovals();
     } catch (error) {
-      console.error('Error processing approval:', error);
+      lcApprovalsLogger.error({
+        msg: 'Error processing approval',
+        error: error instanceof Error ? error.message : String(error),
+        action: editedContent ? 'edit' : action,
+        messageId: item.message.id,
+      });
       toast.error(error instanceof Error ? error.message : 'Failed to process');
     } finally {
       setProcessing(false);

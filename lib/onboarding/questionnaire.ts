@@ -141,7 +141,12 @@ export async function processQuestionnaireResponses(
     .upsert(featureSettings, { onConflict: 'business_id' });
 
   if (error) {
-    console.error('Error saving feature settings:', error);
+    const { logger } = await import('@/lib/logger');
+    const onboardingLogger = logger.child({ context: 'onboarding.questionnaire' });
+    onboardingLogger.error({
+      msg: 'Error saving feature settings',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to save feature preferences');
   }
 

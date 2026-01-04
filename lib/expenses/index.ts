@@ -4,7 +4,7 @@
 // =====================================================
 
 import { createClient } from '@/lib/supabase/server';
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
+import { format } from 'date-fns';
 
 // =====================================================
 // TYPES

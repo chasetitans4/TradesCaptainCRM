@@ -6,8 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getOnboardingsInProgress } from '@/lib/admin/onboarding';
+import { apiLogger } from '@/lib/logger';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const auth = await requireAgentOrHigher();
     if (!auth) {
@@ -17,10 +18,10 @@ export async function GET(request: NextRequest) {
     const onboardings = await getOnboardingsInProgress(auth.id);
 
     return NextResponse.json({ onboardings });
-  } catch (error: any) {
-    console.error('Get onboardings error:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Get onboardings error', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch onboardings' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch onboardings' },
       { status: 500 }
     );
   }

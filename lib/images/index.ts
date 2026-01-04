@@ -197,7 +197,7 @@ export async function addWatermark(
   // Resize watermark
   const resizedWatermark = await sharp(watermarkBuffer)
     .resize(watermarkWidth, null)
-    .ensureAlpha()
+    .ensureAlpha(opacity)
     .modulate({ lightness: 1, saturation: 1 })
     .toBuffer();
 
@@ -355,7 +355,7 @@ export async function validateImage(
     }
 
     return { valid: true };
-  } catch (error) {
+  } catch (_error) {
     return {
       valid: false,
       error: 'Invalid or corrupted image file',

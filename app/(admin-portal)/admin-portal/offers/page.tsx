@@ -23,6 +23,8 @@ import {
   Bell,
 } from 'lucide-react';
 import type { Offer, OfferApprovalRequest } from '@/lib/pricing/offers';
+import { logger } from '@/lib/logger';
+const adminOffersLogger = logger.child({ context: 'admin.offers' });
 
 export default function OfferManagementPage() {
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -53,7 +55,10 @@ export default function OfferManagementPage() {
         setPendingApprovals(data.pending_requests || []);
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      adminOffersLogger.error({
+        msg: 'Error fetching offers/approvals',
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
     } finally {
       setLoading(false);
     }
@@ -77,7 +82,12 @@ export default function OfferManagementPage() {
         setSelectedApproval(null);
       }
     } catch (error) {
-      console.error('Error processing approval:', error);
+      adminOffersLogger.error({
+        msg: 'Error processing approval',
+        requestId,
+        action,
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
     }
   };
 

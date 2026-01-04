@@ -13,6 +13,7 @@ import {
   getAgreementStats,
   getUpcomingServices,
 } from '@/lib/agreements';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -45,10 +46,10 @@ export async function GET(request: NextRequest) {
 
     const agreements = await getActiveAgreements(profile.business_id);
     return NextResponse.json(agreements);
-  } catch (error: any) {
-    console.error('Error fetching agreements:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error fetching agreements' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch agreements' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch agreements' },
       { status: 500 }
     );
   }
@@ -72,7 +73,6 @@ export async function POST(request: NextRequest) {
       endDate,
       pricePerService: price,
       description,
-      terms,
       equipmentIds,
       autoRenew,
       reminderDays,
@@ -100,10 +100,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(agreement);
-  } catch (error: any) {
-    console.error('Error creating agreement:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error creating agreement' });
     return NextResponse.json(
-      { error: error.message || 'Failed to create agreement' },
+      { error: error instanceof Error ? error.message : 'Failed to create agreement' },
       { status: 500 }
     );
   }

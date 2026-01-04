@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { startJobTimer, getClockStatus } from '@/lib/timesheets';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -66,10 +67,13 @@ export async function POST(
     );
 
     return NextResponse.json({ jobTimeEntry }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error in POST /api/jobs/[id]/time/start:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error in POST /api/jobs/[id]/time/start',
+      error,
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to start job timer' },
+      { error: error instanceof Error ? error.message : 'Failed to start job timer' },
       { status: 400 }
     );
   }

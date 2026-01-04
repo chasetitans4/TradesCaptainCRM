@@ -4,6 +4,8 @@
 // =====================================================
 
 import { createClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
+const referralsLogger = logger.child({ context: 'referrals' });
 
 // Generate a random alphanumeric code
 function generateCode(length: number = 8): string {
@@ -108,7 +110,11 @@ export async function upsertReferralSettings(
 
     return { success: true, settings: transformSettings(data) };
   } catch (error: any) {
-    console.error('Error updating referral settings:', error);
+    referralsLogger.error({
+      msg: 'Error updating referral settings',
+      businessId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }
@@ -233,7 +239,12 @@ export async function createReferral(
 
     return { success: true, referral: transformReferral(referral) };
   } catch (error: any) {
-    console.error('Error creating referral:', error);
+    referralsLogger.error({
+      msg: 'Error creating referral',
+      businessId,
+      referralCode,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }
@@ -297,7 +308,13 @@ export async function convertReferral(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Error converting referral:', error);
+    referralsLogger.error({
+      msg: 'Error converting referral',
+      referralId,
+      jobId,
+      jobValue,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }
@@ -381,7 +398,15 @@ export async function addCustomerCredit(
 
     return { success: true, newBalance };
   } catch (error: any) {
-    console.error('Error adding customer credit:', error);
+    referralsLogger.error({
+      msg: 'Error adding customer credit',
+      customerId,
+      businessId,
+      amount,
+      type,
+      referralId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, newBalance: 0, error: error.message };
   }
 }
@@ -432,7 +457,14 @@ export async function redeemCredit(
 
     return { success: true, amountRedeemed: amountToRedeem, newBalance };
   } catch (error: any) {
-    console.error('Error redeeming credit:', error);
+    referralsLogger.error({
+      msg: 'Error redeeming credit',
+      customerId,
+      businessId,
+      amount,
+      invoiceId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, amountRedeemed: 0, newBalance: 0, error: error.message };
   }
 }

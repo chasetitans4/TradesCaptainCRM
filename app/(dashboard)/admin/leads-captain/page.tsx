@@ -24,6 +24,7 @@ import {
   LeadsCaptainConversationViewer,
 } from '@/components/admin/leads-captain';
 import { useAgentOrHigher } from '@/hooks/useAdminAuth';
+import { logger } from '@/lib/logger';
 
 const PERIODS = [
   { value: 'this_month', label: 'This Month' },
@@ -67,6 +68,7 @@ interface Alert {
 
 export default function LeadsCaptainDashboardPage() {
   const { loading: authLoading, isAuthorized } = useAgentOrHigher();
+  const adminLeadsCaptainLogger = logger.child({ context: 'admin.leads-captain' });
   const [period, setPeriod] = useState('this_month');
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [clients, setClients] = useState<ClientSummary[]>([]);
@@ -102,7 +104,11 @@ export default function LeadsCaptainDashboardPage() {
         setAlerts(data.alerts || []);
       }
     } catch (error) {
-      console.error('Failed to fetch dashboard:', error);
+      adminLeadsCaptainLogger.error({
+        msg: 'Failed to fetch admin dashboard',
+        error: error instanceof Error ? error.message : String(error),
+        period,
+      });
     } finally {
       setLoading(false);
     }
@@ -127,7 +133,11 @@ export default function LeadsCaptainDashboardPage() {
         setConversations(data.conversations || []);
       }
     } catch (error) {
-      console.error('Failed to fetch client detail:', error);
+      adminLeadsCaptainLogger.error({
+        msg: 'Failed to fetch client detail',
+        error: error instanceof Error ? error.message : String(error),
+        clientId,
+      });
     } finally {
       setDetailLoading(false);
     }
@@ -167,12 +177,18 @@ export default function LeadsCaptainDashboardPage() {
 
   const handleSuggestUpgrade = (clientId: string) => {
     // In production, this would open an upgrade suggestion modal/flow
-    console.log('Suggest upgrade for client:', clientId);
+    adminLeadsCaptainLogger.info({
+      msg: 'Suggest upgrade for client',
+      clientId,
+    });
   };
 
   const handleScheduleCheckIn = (clientId: string) => {
     // In production, this would open a scheduling modal
-    console.log('Schedule check-in for client:', clientId);
+    adminLeadsCaptainLogger.info({
+      msg: 'Schedule check-in for client',
+      clientId,
+    });
   };
 
   // Show client detail view
@@ -183,14 +199,24 @@ export default function LeadsCaptainDashboardPage() {
           data={clientDetail}
           loading={detailLoading}
           onBack={handleBackToList}
-          onContactClient={() => console.log('Contact client')}
+          onContactClient={() =>
+            adminLeadsCaptainLogger.info({
+              msg: 'Contact client action',
+              clientId: selectedClientId || undefined,
+            })
+          }
           onSuggestUpgrade={() => handleSuggestUpgrade(selectedClientId)}
         />
 
         <LeadsCaptainConversationViewer
           conversations={conversations}
           loading={detailLoading}
-          onViewAll={() => console.log('View all conversations')}
+          onViewAll={() =>
+            adminLeadsCaptainLogger.info({
+              msg: 'View all conversations action',
+              clientId: selectedClientId || undefined,
+            })
+          }
         />
       </div>
     );
@@ -237,7 +263,12 @@ export default function LeadsCaptainDashboardPage() {
         onSuggestUpgrade={handleSuggestUpgrade}
         onScheduleCheckIn={handleScheduleCheckIn}
         onReviewConversations={handleClientSelect}
-        onFlagForSupport={(clientId) => console.log('Flag for support:', clientId)}
+        onFlagForSupport={(clientId) =>
+          adminLeadsCaptainLogger.info({
+            msg: 'Flag for support',
+            clientId,
+          })
+        }
       />
 
       {/* Client List */}

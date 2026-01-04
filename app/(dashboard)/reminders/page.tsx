@@ -6,19 +6,17 @@ import { useRouter } from 'next/navigation';
 import { createClient, getCurrentUserProfile } from '@/lib/supabase/client';
 import { cn, formatRelativeDate, formatDate, getUrgencyColor } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/use-toast';
 import type { UserWithBusiness, Reminder, Customer, Job, Lead } from '@/types';
 import {
   Plus,
   Bell,
   Check,
   Clock,
-  Calendar,
   ChevronRight,
   RefreshCw,
   User,
   Briefcase,
-  Filter,
 } from 'lucide-react';
 
 interface ReminderWithRelations extends Reminder {
@@ -36,6 +34,7 @@ export default function RemindersPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterOption>('all');
+  const { toast } = useToast();
 
   // Load user
   useEffect(() => {
@@ -70,13 +69,17 @@ export default function RemindersPage() {
 
       if (error) throw error;
       setReminders((data as ReminderWithRelations[]) || []);
-    } catch (error) {
-      console.error('Error loading reminders:', error);
+    } catch (_error) {
+      toast({
+        title: 'Failed to load reminders',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user]);
+  }, [user, toast]);
 
   useEffect(() => {
     if (user) {
@@ -113,8 +116,12 @@ export default function RemindersPage() {
             : r
         )
       );
-    } catch (error) {
-      console.error('Error updating reminder:', error);
+    } catch (_error) {
+      toast({
+        title: 'Failed to update reminder',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
     }
   };
 

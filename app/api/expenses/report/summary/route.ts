@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import { getExpenseSummary } from '@/lib/expenses';
 import { parseISO, startOfMonth, endOfMonth } from 'date-fns';
 
@@ -51,10 +52,10 @@ export async function GET(request: NextRequest) {
     );
 
     return NextResponse.json({ summary });
-  } catch (error: any) {
-    console.error('Error in GET /api/expenses/report/summary:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'GET /api/expenses/report/summary' });
     return NextResponse.json(
-      { error: error.message || 'Failed to get expense summary' },
+      { error: error instanceof Error ? error.message : 'Failed to get expense summary' },
       { status: 500 }
     );
   }

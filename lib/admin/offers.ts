@@ -5,13 +5,15 @@
 // =====================================================
 
 import { createAdminClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
 import type {
   OfferCode,
   OfferUsage,
   OfferValidation,
   OfferDiscountType,
-  OfferCommissionImpact,
 } from './types';
+
+const adminLogger = logger.child({ context: 'admin.offers' });
 
 // =====================================================
 // OFFER CODE MANAGEMENT
@@ -253,7 +255,12 @@ export async function applyOfferCode(
     .eq('id', offer.id);
 
   if (updateError) {
-    console.error('Failed to update usage count:', updateError);
+    adminLogger.error({
+      msg: 'Failed to update usage count',
+      error: updateError instanceof Error
+        ? { name: updateError.name, message: updateError.message, stack: updateError.stack }
+        : { message: String(updateError) },
+    });
   }
 
   return usage;

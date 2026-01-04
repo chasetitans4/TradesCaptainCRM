@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getAvailableOffers } from '@/lib/admin/offers';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,10 +28,10 @@ export async function GET(request: NextRequest) {
     const offers = await getAvailableOffers(planSlug);
 
     return NextResponse.json(offers);
-  } catch (error: any) {
-    console.error('Get available offers error:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Get available offers error', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch available offers' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch available offers' },
       { status: 500 }
     );
   }

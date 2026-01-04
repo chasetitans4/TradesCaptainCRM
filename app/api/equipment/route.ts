@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import { createEquipment, getCustomerEquipment, getEquipmentWithExpiringWarranties } from '@/lib/equipment';
 
 function mapEquipmentToUi(row: any) {
@@ -53,10 +54,10 @@ export async function GET(request: NextRequest) {
     const equipment = (await getCustomerEquipment(customerId)).map(mapEquipmentToUi);
 
     return NextResponse.json(equipment);
-  } catch (error: any) {
-    console.error('Error fetching equipment:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'GET /api/equipment' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch equipment' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch equipment' },
       { status: 500 }
     );
   }
@@ -94,10 +95,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(mapEquipmentToUi(inserted));
-  } catch (error: any) {
-    console.error('Error creating equipment:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'POST /api/equipment' });
     return NextResponse.json(
-      { error: error.message || 'Failed to create equipment' },
+      { error: error instanceof Error ? error.message : 'Failed to create equipment' },
       { status: 500 }
     );
   }

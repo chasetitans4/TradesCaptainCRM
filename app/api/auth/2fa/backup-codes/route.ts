@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import {
   regenerateBackupCodes,
   getRemainingBackupCodesCount,
@@ -25,9 +26,9 @@ export async function GET() {
       warningThreshold: 3,
       shouldWarn: count > 0 && count <= 3,
     });
-  } catch (error: any) {
-    console.error('Get backup codes count error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'Get backup codes count error', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }
 
@@ -55,8 +56,8 @@ export async function POST() {
       message:
         'Save these codes in a safe place. Each code can only be used once.',
     });
-  } catch (error: any) {
-    console.error('Regenerate backup codes error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'Regenerate backup codes error', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }

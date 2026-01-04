@@ -12,6 +12,7 @@ import {
   getBillingPreview,
   canAddUser,
 } from '@/lib/billing/per-user';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -45,16 +46,16 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(response);
-  } catch (error: any) {
-    console.error('Error fetching user pricing:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error fetching user pricing', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch user pricing' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch user pricing' },
       { status: 500 }
     );
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const profile = await getServerUserProfile();
 
@@ -79,10 +80,10 @@ export async function POST(request: NextRequest) {
       userCount: newCount,
       pricing: pricingInfo,
     });
-  } catch (error: any) {
-    console.error('Error updating user count:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error updating user count', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update user count' },
+      { error: error instanceof Error ? error.message : 'Failed to update user count' },
       { status: 500 }
     );
   }

@@ -7,9 +7,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
 import { sendPaymentReminder } from '@/lib/invoices';
 import { isEmailConfigured } from '@/lib/email';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -65,15 +66,15 @@ export async function POST(
     try {
       await sendPaymentReminder(id);
       return NextResponse.json({ success: true });
-    } catch (error: any) {
-      console.error('Error sending reminder:', error);
+    } catch (error) {
+      apiLogger.error({ message: 'Error sending reminder', error });
       return NextResponse.json(
-        { error: error.message || 'Failed to send reminder' },
+        { error: error instanceof Error ? error.message : 'Failed to send reminder' },
         { status: 500 }
       );
     }
   } catch (error) {
-    console.error('Error in reminder API:', error);
+    apiLogger.error({ message: 'Error in reminder API', error });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

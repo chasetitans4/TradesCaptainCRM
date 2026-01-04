@@ -9,6 +9,7 @@ import {
   getNotificationLogs,
   getNotificationQueue,
 } from '@/lib/admin/leads-captain-support';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -64,10 +65,10 @@ export async function GET(request: NextRequest) {
           { status: 400 }
         );
     }
-  } catch (error: any) {
-    console.error('Error in GET /api/admin/support/notifications:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error in GET /api/admin/support/notifications', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to get notification data' },
+      { error: error instanceof Error ? error.message : 'Failed to get notification data' },
       { status: 500 }
     );
   }

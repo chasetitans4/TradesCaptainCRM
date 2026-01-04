@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { requestOfferApproval } from '@/lib/admin/offers';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,10 +39,10 @@ export async function POST(request: NextRequest) {
       status: result.status,
       message: 'Approval request submitted. You will be notified when reviewed.',
     });
-  } catch (error: any) {
-    console.error('Request approval error:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Request approval error', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to submit approval request' },
+      { error: error instanceof Error ? error.message : 'Failed to submit approval request' },
       { status: 500 }
     );
   }

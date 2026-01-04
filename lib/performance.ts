@@ -127,6 +127,8 @@ export function measurePerformance(name: string): () => void {
     return () => {};
   }
 
+  const { logger } = require('@/lib/logger');
+  const perfLogger = logger.child({ context: 'perf' });
   const startMark = `${name}-start`;
   const endMark = `${name}-end`;
   const measureName = `${name}-duration`;
@@ -139,7 +141,11 @@ export function measurePerformance(name: string): () => void {
       performance.measure(measureName, startMark, endMark);
       const measure = performance.getEntriesByName(measureName)[0];
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[Perf] ${name}: ${measure.duration.toFixed(2)}ms`);
+        perfLogger.debug({
+          msg: 'Performance measure',
+          name,
+          durationMs: Number(measure.duration.toFixed(2)),
+        });
       }
     } catch {
       // Ignore measurement errors

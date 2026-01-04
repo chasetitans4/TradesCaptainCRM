@@ -6,8 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { releasePhoneNumber } from '@/lib/twilio';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const profile = await getServerUserProfile();
 
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error releasing phone number:', error);
+    apiLogger.error({ error, context: 'Error releasing phone number' });
     return NextResponse.json(
       { error: 'Failed to release phone number' },
       { status: 500 }

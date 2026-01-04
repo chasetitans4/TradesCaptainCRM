@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { validateTwilioSignature, updateMessageStatus } from '@/lib/twilio';
+import { smsLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
       const url = request.url;
 
       if (!validateTwilioSignature(signature, url, params)) {
-        console.error('Invalid Twilio signature');
+        smsLogger.warn('Invalid Twilio signature', 'Invalid Twilio signature');
         return new NextResponse('Forbidden', { status: 403 });
       }
     }
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
 
     return new NextResponse('OK', { status: 200 });
   } catch (error) {
-    console.error('Error processing status webhook:', error);
+    smsLogger.error({ msg: 'Error processing status webhook', error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) } });
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }

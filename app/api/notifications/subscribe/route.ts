@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { subscribeToPush, unsubscribeFromPush } from '@/lib/notifications/push';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,10 +31,10 @@ export async function POST(request: NextRequest) {
     await subscribeToPush(profile.id, sub);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error subscribing to push:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error subscribing to push', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to subscribe to push notifications' },
+      { error: error instanceof Error ? error.message : 'Failed to subscribe to push notifications' },
       { status: 500 }
     );
   }
@@ -60,10 +61,10 @@ export async function DELETE(request: NextRequest) {
     await unsubscribeFromPush(profile.id, endpoint);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error unsubscribing from push:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error unsubscribing from push', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to unsubscribe from push notifications' },
+      { error: error instanceof Error ? error.message : 'Failed to unsubscribe from push notifications' },
       { status: 500 }
     );
   }

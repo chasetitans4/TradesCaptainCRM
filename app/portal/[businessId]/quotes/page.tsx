@@ -11,9 +11,11 @@ import {
   Clock,
   AlertCircle,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { logger } from '@/lib/logger';
+const portalQuotesLogger = logger.child({ context: 'portal.quotes' });
 
 interface Quote {
   id: string;
@@ -40,7 +42,11 @@ export default function QuotesPage() {
         const data = await response.json();
         setQuotes(data || []);
       } catch (error) {
-        console.error('Error loading quotes:', error);
+        portalQuotesLogger.error({
+          msg: 'Error loading quotes',
+          businessId,
+          error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+        });
       } finally {
         setLoading(false);
       }

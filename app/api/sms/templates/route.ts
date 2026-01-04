@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
 import type { CreateSMSTemplateInput } from '@/types';
+import { apiLogger } from '@/lib/logger';
 
 // GET - List templates
 export async function GET() {
@@ -26,7 +27,7 @@ export async function GET() {
       .order('name');
 
     if (error) {
-      console.error('Error fetching templates:', error);
+      apiLogger.error({ error, context: 'fetching templates' });
       return NextResponse.json(
         { error: 'Failed to fetch templates' },
         { status: 500 }
@@ -35,7 +36,7 @@ export async function GET() {
 
     return NextResponse.json({ templates: templates || [] });
   } catch (error) {
-    console.error('Error fetching templates:', error);
+    apiLogger.error({ error, context: 'fetching templates' });
     return NextResponse.json(
       { error: 'Failed to fetch templates' },
       { status: 500 }
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Error creating template:', error);
+      apiLogger.error({ error, context: 'creating template' });
       return NextResponse.json(
         { error: 'Failed to create template' },
         { status: 500 }
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ template });
   } catch (error) {
-    console.error('Error creating template:', error);
+    apiLogger.error({ error, context: 'creating template' });
     return NextResponse.json(
       { error: 'Failed to create template' },
       { status: 500 }

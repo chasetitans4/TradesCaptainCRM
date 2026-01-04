@@ -5,6 +5,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { encrypt, decrypt } from '@/lib/crypto';
+import { syncLogger } from '@/lib/logger';
 
 // QuickBooks API base URLs
 const SANDBOX_BASE_URL = 'https://sandbox-quickbooks.api.intuit.com';
@@ -70,7 +71,7 @@ export async function exchangeCodeForTokens(
 
   if (!response.ok) {
     const error = await response.text();
-    console.error('QuickBooks token exchange failed:', error);
+    syncLogger.error({ msg: 'QuickBooks token exchange failed', error });
     throw new Error('Failed to exchange code for tokens');
   }
 
@@ -225,7 +226,7 @@ export async function qbApiCall<T = any>(
 
   if (!response.ok) {
     const error = await response.text();
-    console.error('QuickBooks API error:', error);
+    syncLogger.error({ msg: 'QuickBooks API error', error });
     throw new Error(`QuickBooks API error: ${response.status}`);
   }
 

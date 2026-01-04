@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import { getEquipment, updateEquipment, deleteEquipment } from '@/lib/equipment';
 
 function mapEquipmentToUi(row: any) {
@@ -30,7 +31,7 @@ function mapEquipmentToUi(row: any) {
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -48,10 +49,10 @@ export async function GET(
     }
 
     return NextResponse.json(mapEquipmentToUi(equipment));
-  } catch (error: any) {
-    console.error('Error fetching equipment:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'GET /api/equipment/[id]' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch equipment' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch equipment' },
       { status: 500 }
     );
   }
@@ -82,17 +83,17 @@ export async function PATCH(
     });
 
     return NextResponse.json(mapEquipmentToUi(equipment));
-  } catch (error: any) {
-    console.error('Error updating equipment:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'PATCH /api/equipment/[id]' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update equipment' },
+      { error: error instanceof Error ? error.message : 'Failed to update equipment' },
       { status: 500 }
     );
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -107,10 +108,10 @@ export async function DELETE(
     await deleteEquipment(id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error deleting equipment:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'DELETE /api/equipment/[id]' });
     return NextResponse.json(
-      { error: error.message || 'Failed to delete equipment' },
+      { error: error instanceof Error ? error.message : 'Failed to delete equipment' },
       { status: 500 }
     );
   }

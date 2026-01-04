@@ -10,6 +10,7 @@ import {
   consumeFreeBenefit,
   getExpiringMemberships,
 } from '@/lib/memberships/subscriptions';
+import { apiLogger } from '@/lib/logger';
 
 // GET /api/memberships/subscriptions - Get memberships
 export async function GET(request: NextRequest) {
@@ -54,9 +55,9 @@ export async function GET(request: NextRequest) {
     // Get all business memberships
     const memberships = await getBusinessMemberships(userData.business_id, status || undefined);
     return NextResponse.json({ memberships });
-  } catch (error: any) {
-    console.error('Error fetching memberships:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ message: 'Error fetching memberships', error });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to fetch memberships' }, { status: 500 });
   }
 }
 
@@ -131,8 +132,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Error with membership action:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ message: 'Error with membership action', error });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to process membership action' }, { status: 500 });
   }
 }

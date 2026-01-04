@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { generateTOTPSecret, verifyTOTPSetup } from '@/lib/auth/totp';
+import { apiLogger } from '@/lib/logger';
 
 // GET - Generate TOTP secret and QR code
 export async function GET() {
@@ -29,9 +30,9 @@ export async function GET() {
       qrCode: result.qrCodeUrl,
       manualKey: result.manualEntryKey,
     });
-  } catch (error: any) {
-    console.error('TOTP setup error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'TOTP setup error', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }
 
@@ -66,8 +67,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-  } catch (error: any) {
-    console.error('TOTP verify error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'TOTP verify error', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }

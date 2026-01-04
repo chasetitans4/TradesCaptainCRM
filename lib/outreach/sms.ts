@@ -559,7 +559,7 @@ export async function qualifyContact(
 export async function generateAIResponse(
   contactId: string,
   conversationId: string,
-  inboundMessage: string
+  _inboundMessage: string
 ): Promise<string | null> {
   // Get conversation context
   const conversationData = await getConversationWithMessages(conversationId);

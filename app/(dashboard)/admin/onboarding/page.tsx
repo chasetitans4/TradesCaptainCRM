@@ -10,6 +10,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { ClipboardCheck, Loader2 } from 'lucide-react';
 import { OnboardingList, OnboardingDetail } from '@/components/admin/onboarding';
 import { useAgentOrHigher } from '@/hooks/useAdminAuth';
+import { logger } from '@/lib/logger';
+const adminOnboardingLogger = logger.child({ context: 'admin.onboarding' });
 
 interface OnboardingTask {
   id: string;
@@ -54,7 +56,10 @@ export default function OnboardingPage() {
         setOnboardings(data.onboardings || []);
       }
     } catch (error) {
-      console.error('Failed to fetch onboardings:', error);
+      adminOnboardingLogger.error({
+        msg: 'Failed to fetch onboardings',
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
     } finally {
       setLoading(false);
     }
@@ -70,7 +75,11 @@ export default function OnboardingPage() {
         setSelectedOnboarding(data);
       }
     } catch (error) {
-      console.error('Failed to fetch client onboarding:', error);
+      adminOnboardingLogger.error({
+        msg: 'Failed to fetch client onboarding',
+        clientId,
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
     } finally {
       setDetailLoading(false);
     }
@@ -125,7 +134,13 @@ export default function OnboardingPage() {
         fetchClientOnboarding(selectedClientId);
       }
     } catch (error) {
-      console.error('Failed to update task:', error);
+      adminOnboardingLogger.error({
+        msg: 'Failed to update onboarding task',
+        clientId: selectedClientId,
+        taskId,
+        status,
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
     }
   };
 

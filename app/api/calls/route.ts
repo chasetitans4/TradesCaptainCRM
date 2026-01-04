@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { recordCall, getCallLogs, getCallStats } from '@/lib/calls';
 import type { CallDirection, CallOutcome } from '@/types';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -72,7 +73,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error in GET /api/calls:', error);
+    apiLogger.error({ error, context: 'Error in GET /api/calls' });
     return NextResponse.json(
       { error: 'Failed to fetch calls' },
       { status: 500 }
@@ -128,7 +129,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(call, { status: 201 });
   } catch (error) {
-    console.error('Error in POST /api/calls:', error);
+    apiLogger.error({ error, context: 'Error in POST /api/calls' });
     return NextResponse.json(
       { error: 'Failed to record call' },
       { status: 500 }

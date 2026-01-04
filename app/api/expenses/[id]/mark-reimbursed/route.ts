@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getExpense, markReimbursed } from '@/lib/expenses';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -67,10 +68,10 @@ export async function POST(
     const updatedExpense = await markReimbursed(id, amount);
 
     return NextResponse.json({ expense: updatedExpense });
-  } catch (error: any) {
-    console.error('Error in POST /api/expenses/[id]/mark-reimbursed:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error in POST /api/expenses/[id]/mark-reimbursed', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to mark expense as reimbursed' },
+      { error: error instanceof Error ? error.message : 'Failed to mark expense as reimbursed' },
       { status: 400 }
     );
   }

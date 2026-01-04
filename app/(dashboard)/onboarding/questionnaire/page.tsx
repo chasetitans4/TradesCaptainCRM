@@ -26,6 +26,7 @@ import {
   Bell,
   FileText,
 } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface Question {
   id: string;
@@ -54,6 +55,7 @@ export default function QuestionnairePage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [responses, setResponses] = useState<Record<string, any>>({});
   const [error, setError] = useState<string | null>(null);
+  const onboardingQuestionnaireLogger = logger.child({ context: 'onboarding-questionnaire' });
 
   useEffect(() => {
     fetchQuestions();
@@ -67,7 +69,10 @@ export default function QuestionnairePage() {
       setQuestions(data.questions);
       setRecommendations(data.recommendations);
     } catch (err) {
-      console.error('Error fetching questionnaire:', err);
+      onboardingQuestionnaireLogger.error({
+        msg: 'Error fetching questionnaire',
+        error: err instanceof Error ? err.message : String(err),
+      });
       setError('Failed to load questionnaire');
     } finally {
       setLoading(false);
@@ -130,7 +135,12 @@ export default function QuestionnairePage() {
 
       router.push('/dashboard?setup=complete');
     } catch (err: any) {
-      console.error('Error saving questionnaire:', err);
+      onboardingQuestionnaireLogger.error({
+        msg: 'Error saving questionnaire',
+        error: err instanceof Error ? err.message : String(err),
+        currentStep,
+        responsesCount: Object.keys(responses).length,
+      });
       setError(err.message || 'Failed to save preferences');
     } finally {
       setSaving(false);

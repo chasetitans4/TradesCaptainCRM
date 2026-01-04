@@ -6,6 +6,7 @@ import {
   pauseCampaign,
   completeCampaign,
 } from '@/lib/outreach/campaigns';
+import { apiLogger } from '@/lib/logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -15,7 +16,7 @@ interface RouteParams {
  * GET /api/outreach/campaigns/[id]
  * Get a specific campaign
  */
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const campaign = await getCampaign(id);
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json(campaign);
   } catch (error) {
-    console.error('Error getting campaign:', error);
+    apiLogger.error({ message: 'Error getting campaign', error });
     return NextResponse.json(
       { error: 'Failed to get campaign' },
       { status: 500 }
@@ -90,7 +91,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       }
     }
   } catch (error) {
-    console.error('Error updating campaign:', error);
+    apiLogger.error({ message: 'Error updating campaign', error });
     return NextResponse.json(
       { error: 'Failed to update campaign' },
       { status: 500 }

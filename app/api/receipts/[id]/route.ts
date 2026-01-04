@@ -9,9 +9,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { getReceipt, updateReceipt, deleteReceipt, reviewReceipt } from '@/lib/receipts';
 import { isFeatureEnabled } from '@/lib/features';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -46,10 +47,10 @@ export async function GET(
     }
 
     return NextResponse.json({ receipt });
-  } catch (error: any) {
-    console.error('Error fetching receipt:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'fetching receipt' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch receipt' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch receipt' },
       { status: 500 }
     );
   }
@@ -127,17 +128,17 @@ export async function PUT(
     });
 
     return NextResponse.json({ receipt: updatedReceipt });
-  } catch (error: any) {
-    console.error('Error updating receipt:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'updating receipt' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update receipt' },
+      { error: error instanceof Error ? error.message : 'Failed to update receipt' },
       { status: 500 }
     );
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -182,10 +183,10 @@ export async function DELETE(
     await deleteReceipt(id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error deleting receipt:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'deleting receipt' });
     return NextResponse.json(
-      { error: error.message || 'Failed to delete receipt' },
+      { error: error instanceof Error ? error.message : 'Failed to delete receipt' },
       { status: 500 }
     );
   }

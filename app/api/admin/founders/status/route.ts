@@ -6,8 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getFoundersStatus } from '@/lib/admin';
+import { apiLogger } from '@/lib/logger';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const admin = await requireAgentOrHigher();
 
@@ -24,10 +25,14 @@ export async function GET(request: NextRequest) {
       is_open: status.is_open,
       closed_at: status.closed_at,
     });
-  } catch (error: any) {
-    console.error('Error in GET /api/admin/founders/status:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Get founders status error',
+      path: '/api/admin/founders/status',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to get founders status' },
+      { error: error instanceof Error ? error.message : 'Failed to get founders status' },
       { status: 500 }
     );
   }

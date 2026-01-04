@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Star,
   MessageSquare,
@@ -10,12 +10,10 @@ import {
   ThumbsDown,
   MoreHorizontal,
   Loader2,
-  Filter,
   Search,
-  TrendingUp,
   AlertCircle,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -44,6 +42,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AvatarRoot, AvatarFallback } from '@/components/ui/avatar';
+import { useToast } from '@/components/ui/use-toast';
 
 interface Review {
   id: string;
@@ -94,12 +93,9 @@ export default function ReviewsPage() {
   const [filterPlatform, setFilterPlatform] = useState<string>('all');
   const [filterRating, setFilterRating] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const { toast } = useToast();
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const [reviewsRes, requestsRes] = await Promise.all([
         fetch('/api/reviews'),
@@ -115,13 +111,21 @@ export default function ReviewsPage() {
         const data = await requestsRes.json();
         setRequests(data.requests || []);
       }
-    } catch (error) {
-      console.error('Error loading data:', error);
+    } catch (_error) {
+      toast({
+        title: 'Failed to load reviews data',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
       setError('Failed to load reviews data');
     } finally {
       setLoading(false);
     }
-  }
+  }, [toast]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const openResponseDialog = (review: Review) => {
     setSelectedReview(review);
@@ -161,23 +165,16 @@ export default function ReviewsPage() {
         body: JSON.stringify({ status }),
       });
       loadData();
-    } catch (error) {
-      console.error('Error updating review:', error);
+    } catch (_error) {
+      toast({
+        title: 'Failed to update review',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
     }
   };
 
-  const handleSendReviewRequest = async (customerId: string, jobId?: string) => {
-    try {
-      await fetch('/api/reviews/requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customer_id: customerId, job_id: jobId }),
-      });
-      loadData();
-    } catch (error) {
-      console.error('Error sending request:', error);
-    }
-  };
+  // handleSendReviewRequest intentionally removed as not used
 
   const renderStars = (rating: number) => {
     return (

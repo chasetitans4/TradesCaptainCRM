@@ -5,6 +5,8 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { startOfWeek, endOfWeek, startOfDay, endOfDay, format, differenceInMinutes } from 'date-fns';
+import { logger } from '@/lib/logger';
+const timesheetsLogger = logger.child({ context: 'timesheets' });
 
 // =====================================================
 // TYPES
@@ -156,7 +158,13 @@ export async function clockIn(
     .single();
 
   if (error) {
-    console.error('Clock in error:', error);
+    timesheetsLogger.error({
+      msg: 'Clock in error',
+      userId,
+      businessId,
+      jobId: options?.jobId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to clock in');
   }
 
@@ -205,7 +213,12 @@ export async function clockOut(
     .single();
 
   if (error) {
-    console.error('Clock out error:', error);
+    timesheetsLogger.error({
+      msg: 'Clock out error',
+      userId,
+      breakMinutes: options?.breakMinutes,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to clock out');
   }
 
@@ -312,7 +325,12 @@ export async function getTimeEntries(
   const { data, error } = await query;
 
   if (error) {
-    console.error('Error fetching time entries:', error);
+    timesheetsLogger.error({
+      msg: 'Error fetching time entries',
+      businessId,
+      options,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to fetch time entries');
   }
 
@@ -424,7 +442,13 @@ export async function addTimeEntry(
     .single();
 
   if (error) {
-    console.error('Error adding time entry:', error);
+    timesheetsLogger.error({
+      msg: 'Error adding time entry',
+      userId,
+      businessId,
+      data,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to add time entry');
   }
 
@@ -465,7 +489,12 @@ export async function updateTimeEntry(
     .single();
 
   if (error) {
-    console.error('Error updating time entry:', error);
+    timesheetsLogger.error({
+      msg: 'Error updating time entry',
+      entryId,
+      updates: updateData,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to update time entry');
   }
 
@@ -484,7 +513,11 @@ export async function deleteTimeEntry(entryId: string): Promise<void> {
     .eq('id', entryId);
 
   if (error) {
-    console.error('Error deleting time entry:', error);
+    timesheetsLogger.error({
+      msg: 'Error deleting time entry',
+      entryId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to delete time entry');
   }
 }
@@ -538,7 +571,14 @@ export async function approveTimesheet(
     }, { onConflict: 'user_id,week_start' });
 
   if (error) {
-    console.error('Error approving timesheet:', error);
+    timesheetsLogger.error({
+      msg: 'Error approving timesheet',
+      userId,
+      businessId,
+      weekStart: weekStart.toISOString(),
+      approvedBy,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to approve timesheet');
   }
 }
@@ -612,7 +652,12 @@ export async function startBreak(
     .single();
 
   if (error) {
-    console.error('Error starting break:', error);
+    timesheetsLogger.error({
+      msg: 'Error starting break',
+      timeEntryId,
+      breakType,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to start break');
   }
 
@@ -657,7 +702,11 @@ export async function endBreak(breakId: string): Promise<BreakEntry> {
     .single();
 
   if (error) {
-    console.error('Error ending break:', error);
+    timesheetsLogger.error({
+      msg: 'Error ending break',
+      breakId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to end break');
   }
 
@@ -709,7 +758,11 @@ export async function getBreaks(timeEntryId: string): Promise<BreakEntry[]> {
     .order('start_time', { ascending: true });
 
   if (error) {
-    console.error('Error fetching breaks:', error);
+    timesheetsLogger.error({
+      msg: 'Error fetching breaks',
+      timeEntryId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return [];
   }
 
@@ -771,7 +824,14 @@ export async function startJobTimer(
     .single();
 
   if (error) {
-    console.error('Error starting job timer:', error);
+    timesheetsLogger.error({
+      msg: 'Error starting job timer',
+      jobId,
+      userId,
+      businessId,
+      isTravel,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to start job timer');
   }
 
@@ -813,7 +873,11 @@ export async function stopJobTimer(entryId: string): Promise<JobTimeEntry> {
     .single();
 
   if (error) {
-    console.error('Error stopping job timer:', error);
+    timesheetsLogger.error({
+      msg: 'Error stopping job timer',
+      entryId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to stop job timer');
   }
 
@@ -855,7 +919,11 @@ export async function getJobTimeEntries(jobId: string): Promise<JobTimeEntry[]> 
     .order('start_time', { ascending: true });
 
   if (error) {
-    console.error('Error fetching job time entries:', error);
+    timesheetsLogger.error({
+      msg: 'Error fetching job time entries',
+      jobId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return [];
   }
 
@@ -913,7 +981,11 @@ export async function submitTimesheet(entryId: string): Promise<TimeEntry> {
     .single();
 
   if (error) {
-    console.error('Error submitting timesheet:', error);
+    timesheetsLogger.error({
+      msg: 'Error submitting timesheet',
+      entryId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to submit timesheet');
   }
 
@@ -943,7 +1015,12 @@ export async function approveTimeEntry(
     .single();
 
   if (error) {
-    console.error('Error approving time entry:', error);
+    timesheetsLogger.error({
+      msg: 'Error approving time entry',
+      entryId,
+      approverId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to approve time entry');
   }
 
@@ -972,7 +1049,12 @@ export async function rejectTimeEntry(
     .single();
 
   if (error) {
-    console.error('Error rejecting time entry:', error);
+    timesheetsLogger.error({
+      msg: 'Error rejecting time entry',
+      entryId,
+      reason,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to reject time entry');
   }
 
@@ -1001,7 +1083,12 @@ export async function bulkApproveTimeEntries(
     .select('id');
 
   if (error) {
-    console.error('Error bulk approving time entries:', error);
+    timesheetsLogger.error({
+      msg: 'Error bulk approving time entries',
+      entryIds,
+      approverId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to approve time entries');
   }
 

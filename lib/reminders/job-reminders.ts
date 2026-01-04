@@ -4,6 +4,8 @@
 // =====================================================
 
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
+const remindersLogger = logger.child({ context: 'reminders.jobs' });
 
 interface ScheduleRemindersOptions {
   jobId: string;
@@ -34,7 +36,6 @@ export async function scheduleJobReminders(options: ScheduleRemindersOptions) {
     customerPhone,
     scheduledDate,
     scheduledTime,
-    serviceTitle,
   } = options;
 
   if (!customerPhone || !scheduledDate) {
@@ -105,7 +106,14 @@ export async function scheduleJobReminders(options: ScheduleRemindersOptions) {
   );
 
   if (error) {
-    console.error('Error scheduling reminders:', error);
+    remindersLogger.error({
+      msg: 'Error scheduling reminders',
+      jobId,
+      businessId,
+      customerId,
+      phone: customerPhone.slice(-4),
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: 'Failed to schedule reminders' };
   }
 
@@ -126,7 +134,11 @@ export async function cancelJobReminders(jobId: string) {
     .eq('status', 'pending');
 
   if (error) {
-    console.error('Error cancelling reminders:', error);
+    remindersLogger.error({
+      msg: 'Error cancelling reminders',
+      jobId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: 'Failed to cancel reminders' };
   }
 
@@ -147,7 +159,11 @@ export async function getJobReminders(jobId: string) {
     .order('scheduled_for', { ascending: true });
 
   if (error) {
-    console.error('Error fetching reminders:', error);
+    remindersLogger.error({
+      msg: 'Error fetching reminders',
+      jobId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: 'Failed to fetch reminders' };
   }
 

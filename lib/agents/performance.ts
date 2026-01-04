@@ -542,7 +542,6 @@ export async function getMonthlyAlertRules(): Promise<AlertRule[]> {
         const current = monthlyPerformance.get(key);
         const actual = current?.sales_count ?? 0;
         const remainingDays = daysInMonth - daysPassed;
-        const remainingNeeded = Math.max(0, target - actual);
         return actual + remainingDays < target || (actual < expected - 1 && daysPassed >= Math.ceil(daysInMonth * 0.5));
       },
     };
@@ -595,7 +594,6 @@ export async function getPerformanceDashboard(
   quarter: Quarter
 ): Promise<PerformanceDashboardData> {
   const activeAgents = await getActiveAgents();
-  const { end: quarterEnd } = getQuarterDates(year, quarter);
   const now = new Date();
 
   let meeting_quota = 0;

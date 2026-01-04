@@ -1,16 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import { getCurrentUserProfile, createClient } from '@/lib/supabase/client';
+import { getCurrentUserProfile } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import type { UserWithBusiness, CalendarConnection, ScheduleBlock, WorkingHours } from '@/types';
+import type { UserWithBusiness, CalendarConnection, ScheduleBlock } from '@/types';
 import {
   ArrowLeft,
   CalendarDays,
@@ -21,12 +20,12 @@ import {
   Coffee,
   Loader2,
   Plus,
-  Settings,
   Trash2,
   Unlink,
   Car,
   AlertCircle,
 } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const SHORT_DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -50,6 +49,7 @@ export default function CalendarSettingsPage() {
   const [user, setUser] = useState<UserWithBusiness | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
 
   // Calendar connection
   const [connection, setConnection] = useState<(CalendarConnection & { provider_name?: string }) | null>(null);
@@ -78,11 +78,52 @@ export default function CalendarSettingsPage() {
   const successMessage = searchParams.get('success');
   const errorMessage = searchParams.get('error');
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const loadCalendarConnection = useCallback(async () => {
+    try {
+      const response = await fetch('/api/calendar/connection');
+      const data = await response.json();
+      if (data.connected) {
+        setConnection(data.connection);
+      }
+    } catch (_error) {
+      toast({ title: 'Failed to load calendar connection', description: 'Please try again', variant: 'destructive' });
+    }
+  }, [toast]);
 
-  async function loadData() {
+  const loadWorkingHours = useCallback(async () => {
+    try {
+      const response = await fetch('/api/calendar/working-hours');
+      const data = await response.json();
+      setWorkingHours(data.hours);
+      setWorkingHoursSource(data.source);
+    } catch (_error) {
+      toast({ title: 'Failed to load working hours', description: 'Using defaults', variant: 'destructive' });
+      setWorkingHours(generateDefaultHours());
+    }
+  }, [toast]);
+
+  const loadScheduleBlocks = useCallback(async () => {
+    try {
+      const response = await fetch('/api/calendar/schedule-blocks');
+      const data = await response.json();
+      setScheduleBlocks(data.blocks || []);
+    } catch (_error) {
+      toast({ title: 'Failed to load schedule blocks', description: 'Please try again', variant: 'destructive' });
+    }
+  }, [toast]);
+
+  const loadDriveTimeSettings = useCallback(async (_businessId: string) => {
+    try {
+      const response = await fetch('/api/calendar/drive-time');
+      const data = await response.json();
+      setDriveTimeEnabled(data.enabled ?? true);
+      setDriveTimeMinutes(data.default_minutes ?? 30);
+    } catch (_error) {
+      toast({ title: 'Failed to load drive time settings', description: 'Please try again', variant: 'destructive' });
+    }
+  }, [toast]);
+
+  const loadData = useCallback(async () => {
     const profile = await getCurrentUserProfile();
     if (!profile) {
       router.push('/login');
@@ -90,7 +131,6 @@ export default function CalendarSettingsPage() {
     }
     setUser(profile as UserWithBusiness);
 
-    // Load all data in parallel
     await Promise.all([
       loadCalendarConnection(),
       loadWorkingHours(),
@@ -99,53 +139,19 @@ export default function CalendarSettingsPage() {
     ]);
 
     setLoading(false);
-  }
+  }, [router, loadCalendarConnection, loadWorkingHours, loadScheduleBlocks, loadDriveTimeSettings]);
 
-  async function loadCalendarConnection() {
-    try {
-      const response = await fetch('/api/calendar/connection');
-      const data = await response.json();
-      if (data.connected) {
-        setConnection(data.connection);
-      }
-    } catch (error) {
-      console.error('Error loading calendar connection:', error);
-    }
-  }
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-  async function loadWorkingHours() {
-    try {
-      const response = await fetch('/api/calendar/working-hours');
-      const data = await response.json();
-      setWorkingHours(data.hours);
-      setWorkingHoursSource(data.source);
-    } catch (error) {
-      console.error('Error loading working hours:', error);
-      // Set default hours
-      setWorkingHours(generateDefaultHours());
-    }
-  }
+  
 
-  async function loadScheduleBlocks() {
-    try {
-      const response = await fetch('/api/calendar/schedule-blocks');
-      const data = await response.json();
-      setScheduleBlocks(data.blocks || []);
-    } catch (error) {
-      console.error('Error loading schedule blocks:', error);
-    }
-  }
+  
 
-  async function loadDriveTimeSettings(businessId: string) {
-    try {
-      const response = await fetch('/api/calendar/drive-time');
-      const data = await response.json();
-      setDriveTimeEnabled(data.enabled ?? true);
-      setDriveTimeMinutes(data.default_minutes ?? 30);
-    } catch (error) {
-      console.error('Error loading drive time settings:', error);
-    }
-  }
+  
+
+  
 
   function generateDefaultHours(): WorkingHoursData[] {
     return [
@@ -173,8 +179,8 @@ export default function CalendarSettingsPage() {
       if (response.ok) {
         setConnection(null);
       }
-    } catch (error) {
-      console.error('Error disconnecting calendar:', error);
+    } catch (_error) {
+      toast({ title: 'Failed to disconnect calendar', description: 'Please try again', variant: 'destructive' });
     } finally {
       setDisconnecting(false);
     }
@@ -189,8 +195,8 @@ export default function CalendarSettingsPage() {
         body: JSON.stringify({ hours: workingHours, scope: 'business' }),
       });
       if (!response.ok) throw new Error('Failed to save');
-    } catch (error) {
-      console.error('Error saving working hours:', error);
+    } catch (_error) {
+      toast({ title: 'Failed to save working hours', description: 'Please try again', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -227,8 +233,8 @@ export default function CalendarSettingsPage() {
       await loadScheduleBlocks();
       setShowAddBlock(false);
       setNewBlock({ label: '', days: [], start_time: '12:00', end_time: '13:00' });
-    } catch (error) {
-      console.error('Error adding schedule block:', error);
+    } catch (_error) {
+      toast({ title: 'Failed to add block', description: 'Please try again', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -238,8 +244,8 @@ export default function CalendarSettingsPage() {
     try {
       await fetch(`/api/calendar/schedule-blocks/${blockId}`, { method: 'DELETE' });
       setScheduleBlocks((prev) => prev.filter((b) => b.id !== blockId));
-    } catch (error) {
-      console.error('Error deleting schedule block:', error);
+    } catch (_error) {
+      toast({ title: 'Failed to delete block', description: 'Please try again', variant: 'destructive' });
     }
   }
 
@@ -254,8 +260,8 @@ export default function CalendarSettingsPage() {
           default_minutes: driveTimeMinutes,
         }),
       });
-    } catch (error) {
-      console.error('Error saving drive time settings:', error);
+    } catch (_error) {
+      toast({ title: 'Failed to save drive time settings', description: 'Please try again', variant: 'destructive' });
     } finally {
       setSaving(false);
     }

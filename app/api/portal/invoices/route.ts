@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePortalSession } from '@/lib/portal/session';
 import { getCustomerInvoices } from '@/lib/portal/data';
+import { apiLogger } from '@/lib/logger';
 
 // GET /api/portal/invoices - Get customer invoices
 export async function GET(request: NextRequest) {
@@ -13,11 +14,11 @@ export async function GET(request: NextRequest) {
     const invoices = await getCustomerInvoices(session.customerId, status);
 
     return NextResponse.json({ invoices });
-  } catch (error: any) {
-    if (error.message === 'Portal authentication required') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Portal authentication required') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    console.error('Portal invoices error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    apiLogger.error({ error, context: 'Portal invoices error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
   }
 }

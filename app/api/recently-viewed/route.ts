@@ -13,6 +13,7 @@ import {
   clearRecentlyViewed,
   type EntityType,
 } from '@/lib/favorites';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ items });
   } catch (error) {
-    console.error('Error in GET /api/recently-viewed:', error);
+    apiLogger.error({ error, context: 'GET /api/recently-viewed' });
     return NextResponse.json(
       { error: 'Failed to fetch recently viewed' },
       { status: 500 }
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error in POST /api/recently-viewed:', error);
+    apiLogger.error({ error, context: 'POST /api/recently-viewed' });
     return NextResponse.json(
       { error: 'Failed to record view' },
       { status: 500 }
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE(request: NextRequest) {
+export async function DELETE(_request: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -126,7 +127,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error in DELETE /api/recently-viewed:', error);
+    apiLogger.error({ error, context: 'DELETE /api/recently-viewed' });
     return NextResponse.json(
       { error: 'Failed to clear history' },
       { status: 500 }

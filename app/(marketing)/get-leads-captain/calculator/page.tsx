@@ -1,12 +1,11 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, Suspense } from 'react';
 import { ROICalculator } from '@/components/leads-captain/roi-calculator';
 
 function ROICalculatorPageContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   useEffect(() => {
     if (typeof window !== 'undefined' && (window as unknown as { gtag?: (...args: unknown[]) => void }).gtag) {

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { clockIn, clockOut, getClockStatus } from '@/lib/timesheets';
 import { isFeatureEnabled } from '@/lib/features';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET() {
   try {
@@ -29,10 +30,10 @@ export async function GET() {
     const status = await getClockStatus(profile.id);
 
     return NextResponse.json(status);
-  } catch (error: any) {
-    console.error('Error getting clock status:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error getting clock status' });
     return NextResponse.json(
-      { error: error.message || 'Failed to get clock status' },
+      { error: error instanceof Error ? error.message : 'Failed to get clock status' },
       { status: 500 }
     );
   }
@@ -91,10 +92,10 @@ export async function POST(request: NextRequest) {
       status,
       message: action === 'clock_in' ? 'Clocked in successfully' : 'Clocked out successfully',
     });
-  } catch (error: any) {
-    console.error('Error clocking in/out:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error clocking in/out' });
     return NextResponse.json(
-      { error: error.message || 'Failed to clock in/out' },
+      { error: error instanceof Error ? error.message : 'Failed to clock in/out' },
       { status: 500 }
     );
   }

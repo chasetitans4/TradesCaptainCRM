@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getDocumentTemplates } from '@/lib/admin/documents';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET() {
   try {
@@ -17,10 +18,13 @@ export async function GET() {
     const templates = await getDocumentTemplates();
 
     return NextResponse.json({ templates });
-  } catch (error: any) {
-    console.error('Get templates error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Get templates error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch templates' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch templates' },
       { status: 500 }
     );
   }

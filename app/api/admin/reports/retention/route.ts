@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getRetentionReport } from '@/lib/admin/reports';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET() {
   try {
@@ -17,10 +18,13 @@ export async function GET() {
     const report = await getRetentionReport(admin.id);
 
     return NextResponse.json(report);
-  } catch (error: any) {
-    console.error('Get retention report error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Get retention report error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch retention report' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch retention report' },
       { status: 500 }
     );
   }

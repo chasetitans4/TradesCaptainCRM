@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { canAccessFeature } from '@/lib/leads-captain/v2/features';
+import { apiLogger } from '@/lib/logger';
 import type { AnalyticsOverviewResponse, RuleAnalyticsResponse } from '@/types/leads-captain';
 
 export async function GET(request: NextRequest) {
@@ -50,8 +51,11 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(await getOverviewAnalytics(supabase, config.id, startDate, days));
-  } catch (error: unknown) {
-    console.error('Error fetching analytics:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error fetching analytics',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch analytics' },
       { status: 500 }

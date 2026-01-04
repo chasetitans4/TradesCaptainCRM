@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { getFeatureSettings, updateFeatureSettings, FeatureSettings } from '@/lib/features';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET() {
   try {
@@ -19,10 +20,10 @@ export async function GET() {
     const settings = await getFeatureSettings(profile.business_id);
 
     return NextResponse.json({ settings });
-  } catch (error: any) {
-    console.error('Error fetching feature settings:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error fetching feature settings', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch feature settings' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch feature settings' },
       { status: 500 }
     );
   }
@@ -57,10 +58,10 @@ export async function PUT(request: NextRequest) {
     await updateFeatureSettings(profile.business_id, settings);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error updating feature settings:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error updating feature settings', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to update feature settings' },
+      { error: error instanceof Error ? error.message : 'Failed to update feature settings' },
       { status: 500 }
     );
   }

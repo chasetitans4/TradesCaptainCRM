@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { verify2FA, send2FACode, getTwoFactorStatus } from '@/lib/auth/two-factor';
-import { cookies } from 'next/headers';
 import { check2FAVerifyRateLimit, check2FASendRateLimit } from '@/lib/rate-limit';
+import { apiLogger } from '@/lib/logger';
 
 // GET - Get 2FA status
 export async function GET() {
@@ -18,9 +18,9 @@ export async function GET() {
 
     const status = await getTwoFactorStatus(user.id);
     return NextResponse.json(status);
-  } catch (error: any) {
-    console.error('Get 2FA status error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'Get 2FA status error', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }
 
@@ -80,9 +80,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-  } catch (error: any) {
-    console.error('2FA verify error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: '2FA verify error', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }
 
@@ -138,8 +138,8 @@ export async function PUT(request: NextRequest) {
       success: true,
       message: `Code sent via ${method}`,
     });
-  } catch (error: any) {
-    console.error('Send 2FA code error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'Send 2FA code error', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }

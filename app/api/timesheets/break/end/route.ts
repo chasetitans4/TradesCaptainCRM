@@ -6,8 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { endBreak, getClockStatus, getActiveBreak } from '@/lib/timesheets';
+import { apiLogger } from '@/lib/logger';
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -51,10 +52,10 @@ export async function POST(request: NextRequest) {
     const breakEntry = await endBreak(activeBreak.id);
 
     return NextResponse.json({ break: breakEntry });
-  } catch (error: any) {
-    console.error('Error in POST /api/timesheets/break/end:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error in POST /api/timesheets/break/end' });
     return NextResponse.json(
-      { error: error.message || 'Failed to end break' },
+      { error: error instanceof Error ? error.message : 'Failed to end break' },
       { status: 400 }
     );
   }

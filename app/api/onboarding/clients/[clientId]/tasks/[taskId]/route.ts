@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { updateOnboardingTask } from '@/lib/admin/onboarding';
 import type { OnboardingTaskStatus } from '@/lib/admin/types';
+import { apiLogger } from '@/lib/logger';
 
 export async function PATCH(
   request: NextRequest,
@@ -29,10 +30,10 @@ export async function PATCH(
     });
 
     return NextResponse.json({ task });
-  } catch (error: any) {
-    console.error('Update task error:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Update task error', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to update task' },
+      { error: error instanceof Error ? error.message : 'Failed to update task' },
       { status: 500 }
     );
   }

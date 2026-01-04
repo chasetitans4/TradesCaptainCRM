@@ -14,6 +14,7 @@ import {
   isAddOnAvailableForPlan,
   type PlanTrack,
 } from '@/lib/pricing/plans';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Error fetching plans:', error);
+    apiLogger.error({ error, context: 'Error fetching plans' });
     return NextResponse.json(
       { error: 'Failed to fetch plans' },
       { status: 500 }

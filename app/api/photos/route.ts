@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { uploadJobPhoto, getJobPhotos } from '@/lib/photos';
 import { checkUploadRateLimit } from '@/lib/rate-limit';
+import { apiLogger } from '@/lib/logger';
 
 // Allowed image types
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -31,10 +32,10 @@ export async function GET(request: NextRequest) {
     const photos = await getJobPhotos(jobId);
 
     return NextResponse.json(photos);
-  } catch (error: any) {
-    console.error('Error fetching photos:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error fetching photos' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch photos' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch photos' },
       { status: 500 }
     );
   }
@@ -104,10 +105,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ id: photoId, success: true });
-  } catch (error: any) {
-    console.error('Error uploading photo:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error uploading photo' });
     return NextResponse.json(
-      { error: error.message || 'Failed to upload photo' },
+      { error: error instanceof Error ? error.message : 'Failed to upload photo' },
       { status: 500 }
     );
   }

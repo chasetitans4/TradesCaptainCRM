@@ -5,8 +5,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { apiLogger } from '@/lib/logger';
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const cookieStore = await cookies();
 
@@ -15,8 +16,11 @@ export async function POST(request: NextRequest) {
     cookieStore.delete('admin_refresh_token');
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Admin logout error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Admin logout error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
       { error: 'Logout failed' },
       { status: 500 }

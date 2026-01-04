@@ -6,9 +6,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSurveyByToken, submitSurvey, markGoogleReviewClicked } from '@/lib/surveys';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
   try {
@@ -27,10 +28,10 @@ export async function GET(
       businessName: survey.business?.name,
       jobTitle: survey.job?.title,
     });
-  } catch (error: any) {
-    console.error('Error fetching survey:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'fetching survey' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch survey' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch survey' },
       { status: 500 }
     );
   }
@@ -83,10 +84,10 @@ export async function POST(
     });
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Error submitting survey:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'submitting survey' });
     return NextResponse.json(
-      { error: error.message || 'Failed to submit survey' },
+      { error: error instanceof Error ? error.message : 'Failed to submit survey' },
       { status: 500 }
     );
   }

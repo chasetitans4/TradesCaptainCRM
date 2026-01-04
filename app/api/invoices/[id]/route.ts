@@ -8,9 +8,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
 import { calculateInvoiceTotals } from '@/lib/invoices';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -40,7 +41,7 @@ export async function GET(
 
     return NextResponse.json({ invoice });
   } catch (error) {
-    console.error('Error fetching invoice:', error);
+    apiLogger.error({ message: 'Error fetching invoice', error });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -130,20 +131,20 @@ export async function PATCH(
         .eq('id', id);
 
       if (updateError) {
-        console.error('Error updating invoice:', updateError);
+        apiLogger.error({ message: 'Error updating invoice', error: updateError });
         return NextResponse.json({ error: 'Failed to update invoice' }, { status: 500 });
       }
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error updating invoice:', error);
+    apiLogger.error({ message: 'Error updating invoice', error });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -182,13 +183,13 @@ export async function DELETE(
       .eq('id', id);
 
     if (deleteError) {
-      console.error('Error deleting invoice:', deleteError);
+      apiLogger.error({ message: 'Error deleting invoice', error: deleteError });
       return NextResponse.json({ error: 'Failed to delete invoice' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting invoice:', error);
+    apiLogger.error({ message: 'Error deleting invoice', error });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

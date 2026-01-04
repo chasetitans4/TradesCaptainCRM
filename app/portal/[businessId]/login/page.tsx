@@ -32,7 +32,7 @@ export default function PortalLoginPage() {
         }
 
         setBusiness(data);
-      } catch (err) {
+      } catch (_err) {
         setError('Unable to load business information');
       } finally {
         setLoading(false);

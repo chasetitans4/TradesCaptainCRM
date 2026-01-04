@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendMonth3Audit, getRetentionTracking } from '@/lib/admin/commissions';
 import { verifyAdminAuth } from '@/lib/admin/auth';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -34,10 +35,10 @@ export async function POST(
     await sendMonth3Audit(trackingId);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Send month 3 audit error:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Send month 3 audit error', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to send month 3 audit' },
+      { error: error instanceof Error ? error.message : 'Failed to send month 3 audit' },
       { status: 500 }
     );
   }

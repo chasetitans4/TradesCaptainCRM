@@ -11,6 +11,10 @@ global.Request = class {};
 global.Response = class {};
 global.Headers = class {};
 
+// Provide default secrets for tests
+process.env.JWT_SECRET = process.env.JWT_SECRET || '0123456789abcdef0123456789abcdef';
+process.env.ADMIN_IMPERSONATION_SECRET = process.env.ADMIN_IMPERSONATION_SECRET || process.env.JWT_SECRET;
+
 jest.mock('jose', () => ({
   jwtVerify: jest.fn(async () => {
     throw new Error('jwtVerify mock');

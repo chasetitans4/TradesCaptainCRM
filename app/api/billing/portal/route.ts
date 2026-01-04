@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { createCustomerPortalSession } from '@/lib/stripe/subscriptions';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST() {
   try {
@@ -26,10 +27,10 @@ export async function POST() {
     const url = await createCustomerPortalSession(profile.business_id);
 
     return NextResponse.json({ url });
-  } catch (error: any) {
-    console.error('Error creating portal session:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error creating portal session', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to create portal session' },
+      { error: error instanceof Error ? error.message : 'Failed to create portal session' },
       { status: 400 }
     );
   }

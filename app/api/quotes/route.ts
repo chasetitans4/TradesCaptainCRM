@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
 import { generateQuoteNumber, generateAccessToken, calculateQuoteTotals, sendQuoteViaSms } from '@/lib/quotes';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (quoteError || !quote) {
-      console.error('Error creating quote:', quoteError);
+      apiLogger.error({ error: quoteError, context: 'creating quote' });
       return NextResponse.json({ error: 'Failed to create quote' }, { status: 500 });
     }
 
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
     const { error: itemsError } = await supabase.from('quote_items').insert(lineItems);
 
     if (itemsError) {
-      console.error('Error creating quote items:', itemsError);
+      apiLogger.error({ error: itemsError, context: 'creating quote items' });
       // Clean up the quote if items failed
       await supabase.from('quotes').delete().eq('id', quote.id);
       return NextResponse.json({ error: 'Failed to create quote items' }, { status: 500 });
@@ -107,14 +108,14 @@ export async function POST(request: NextRequest) {
       try {
         await sendQuoteViaSms(quote.id);
       } catch (error) {
-        console.error('Error sending quote:', error);
+        apiLogger.error({ error, context: 'sending quote' });
         // Quote was created, just failed to send
       }
     }
 
     return NextResponse.json({ quote: { id: quote.id, quote_number: quoteNumber } });
   } catch (error) {
-    console.error('Error in quotes API:', error);
+    apiLogger.error({ error, context: 'quotes API' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { validateOfferCode } from '@/lib/admin/offers';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -32,10 +33,10 @@ export async function POST(
     const validation = await validateOfferCode(code, plan_slug, monthly_price_cents);
 
     return NextResponse.json(validation);
-  } catch (error: any) {
-    console.error('Validate offer error:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Validate offer error', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to validate offer' },
+      { error: error instanceof Error ? error.message : 'Failed to validate offer' },
       { status: 500 }
     );
   }

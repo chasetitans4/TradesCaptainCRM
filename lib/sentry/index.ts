@@ -238,7 +238,7 @@ export function withErrorTracking<T extends (...args: any[]) => Promise<any>>(
 export function handleErrorBoundary(
   error: Error,
   componentStack: string,
-  eventId: string
+  _eventId: string
 ) {
   Sentry.withScope((scope) => {
     scope.setExtra('componentStack', componentStack);

@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 // Verify cron secret to prevent unauthorized access
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
     // SECURITY: Verify authorization - require CRON_SECRET to be configured
     const authHeader = request.headers.get('authorization');
     if (!CRON_SECRET) {
-      console.error('CRON_SECRET not configured - denying cron access');
+      apiLogger.error({ msg: 'CRON_SECRET not configured - denying cron access' });
       return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
     }
     if (authHeader !== `Bearer ${CRON_SECRET}`) {
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
       .limit(50); // Process in batches
 
     if (fetchError) {
-      console.error('Error fetching scheduled messages:', fetchError);
+      apiLogger.error({ msg: 'Error fetching scheduled messages', error: fetchError.message });
       return NextResponse.json(
         { error: 'Failed to fetch scheduled messages' },
         { status: 500 }
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
         twilioClient = twilio.default(accountSid, authToken);
       }
     } catch (e) {
-      console.error('Twilio not configured:', e);
+      apiLogger.error({ msg: 'Twilio not configured', error: e instanceof Error ? e.message : 'Unknown error' });
     }
 
     if (!twilioClient) {
@@ -173,10 +174,10 @@ export async function GET(request: NextRequest) {
         }
 
         results.sent++;
-      } catch (sendError: any) {
-        console.error(`Error sending message ${message.id}:`, sendError);
+      } catch (sendError) {
+        apiLogger.error({ msg: `Error sending message ${message.id}`, error: sendError instanceof Error ? sendError.message : 'Unknown error' });
         results.failed++;
-        results.errors.push(`Message ${message.id}: ${sendError.message}`);
+        results.errors.push(`Message ${message.id}: ${sendError instanceof Error ? sendError.message : 'Unknown error'}`);
 
         // Mark as failed
         await supabase
@@ -194,7 +195,7 @@ export async function GET(request: NextRequest) {
       ...results,
     });
   } catch (error) {
-    console.error('Error in send-reminders cron:', error);
+    apiLogger.error({ msg: 'Error in send-reminders cron', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

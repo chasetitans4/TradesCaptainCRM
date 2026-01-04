@@ -4,6 +4,8 @@
 // =====================================================
 
 import { createClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
+const favoritesLogger = logger.child({ context: 'favorites' });
 
 export type EntityType = 'customer' | 'job' | 'lead' | 'invoice' | 'quote';
 
@@ -79,7 +81,13 @@ export async function addFavorite(
     .single();
 
   if (error) {
-    console.error('Error adding favorite:', error);
+    favoritesLogger.error({
+      msg: 'Error adding favorite',
+      userId,
+      entityType,
+      entityId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to add favorite');
   }
 
@@ -104,7 +112,13 @@ export async function removeFavorite(
     .eq('entity_id', entityId);
 
   if (error) {
-    console.error('Error removing favorite:', error);
+    favoritesLogger.error({
+      msg: 'Error removing favorite',
+      userId,
+      entityType,
+      entityId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to remove favorite');
   }
 }
@@ -180,7 +194,12 @@ export async function getFavorites(
   const { data, error } = await query;
 
   if (error) {
-    console.error('Error fetching favorites:', error);
+    favoritesLogger.error({
+      msg: 'Error fetching favorites',
+      userId,
+      entityType,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to fetch favorites');
   }
 
@@ -271,7 +290,13 @@ export async function recordView(
 
   if (error) {
     // Silently fail - this is not critical
-    console.error('Error recording view:', error);
+    favoritesLogger.warn({
+      msg: 'Error recording view',
+      userId,
+      entityType,
+      entityId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
   }
 
   // Clean up old entries (keep last 50 per user)
@@ -302,7 +327,13 @@ export async function getRecentlyViewed(
   const { data, error } = await query;
 
   if (error) {
-    console.error('Error fetching recently viewed:', error);
+    favoritesLogger.error({
+      msg: 'Error fetching recently viewed',
+      userId,
+      entityType,
+      limit,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return [];
   }
 

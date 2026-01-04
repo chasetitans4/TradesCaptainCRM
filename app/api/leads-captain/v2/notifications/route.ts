@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { checkPlanLimit } from '@/lib/leads-captain/v2/features';
+import { apiLogger } from '@/lib/logger';
 import type { CreateNotificationRecipientRequest, UpdateNotificationRecipientRequest } from '@/types/leads-captain';
 
 export async function GET() {
@@ -49,8 +50,11 @@ export async function GET() {
       total: recipients?.length || 0,
       limits: limitInfo,
     });
-  } catch (error: unknown) {
-    console.error('Error fetching notification recipients:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error fetching notification recipients',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch recipients' },
       { status: 500 }
@@ -138,8 +142,11 @@ export async function POST(request: NextRequest) {
     if (error) throw error;
 
     return NextResponse.json({ recipient }, { status: 201 });
-  } catch (error: unknown) {
-    console.error('Error creating notification recipient:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error creating notification recipient',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to create recipient' },
       { status: 500 }
@@ -215,8 +222,11 @@ export async function PUT(request: NextRequest) {
     if (error) throw error;
 
     return NextResponse.json({ recipient });
-  } catch (error: unknown) {
-    console.error('Error updating notification recipient:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error updating notification recipient',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to update recipient' },
       { status: 500 }
@@ -271,8 +281,11 @@ export async function DELETE(request: NextRequest) {
     if (error) throw error;
 
     return NextResponse.json({ success: true });
-  } catch (error: unknown) {
-    console.error('Error deleting notification recipient:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error deleting notification recipient',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to delete recipient' },
       { status: 500 }

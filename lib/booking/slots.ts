@@ -7,6 +7,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { getBookingSettings, BookingSettings } from './settings';
+import { logger } from '@/lib/logger';
+const bookingLogger = logger.child({ context: 'booking.slots' });
 
 // Slot hold duration in minutes
 const SLOT_HOLD_DURATION_MINUTES = 5;
@@ -437,7 +439,10 @@ export async function createSlotHold(
     if (error.code === '23505') {
       return { success: false, reason: 'slot_unavailable' };
     }
-    console.error('Error creating slot hold:', error);
+    bookingLogger.error({
+      msg: 'Error creating slot hold',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, reason: error.message };
   }
 

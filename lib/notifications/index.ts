@@ -6,7 +6,6 @@
 import { createAdminClient } from '@/lib/supabase/server';
 import { sendEmail, isEmailConfigured } from '@/lib/email';
 import * as emailTemplates from '@/lib/email';
-import { sendPushNotification } from './push';
 
 export type NotificationType =
   | 'job_confirmed'

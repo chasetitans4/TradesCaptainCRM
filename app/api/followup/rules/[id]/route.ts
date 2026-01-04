@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { updateFollowUpRule, deleteFollowUpRule } from '@/lib/followup/engine';
+import { apiLogger } from '@/lib/logger';
 
 // PUT /api/followup/rules/[id] - Update follow-up rule
 export async function PUT(
@@ -56,15 +57,15 @@ export async function PUT(
     });
 
     return NextResponse.json({ rule: updated });
-  } catch (error: any) {
-    console.error('Error updating follow-up rule:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ message: 'Error updating follow-up rule', error });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to update follow-up rule' }, { status: 500 });
   }
 }
 
 // DELETE /api/followup/rules/[id] - Delete follow-up rule
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -98,8 +99,8 @@ export async function DELETE(
     await deleteFollowUpRule(id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error deleting follow-up rule:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ message: 'Error deleting follow-up rule', error });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to delete follow-up rule' }, { status: 500 });
   }
 }

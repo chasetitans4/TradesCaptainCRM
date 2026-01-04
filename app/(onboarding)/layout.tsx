@@ -1,9 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Progress } from '@/components/ui';
-
 export default function OnboardingLayout({
   children,
 }: {

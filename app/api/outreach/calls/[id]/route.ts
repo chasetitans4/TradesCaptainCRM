@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { rescheduleCall, completeCall, markNoShow } from '@/lib/outreach/scheduling';
+import { apiLogger } from '@/lib/logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -10,7 +11,7 @@ interface RouteParams {
  * GET /api/outreach/calls/[id]
  * Get a specific call
  */
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const supabase = await createClient();
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Error getting call:', error);
+    apiLogger.error({ message: 'Error getting call', error });
     return NextResponse.json(
       { error: 'Failed to get call' },
       { status: 500 }
@@ -149,7 +150,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         );
     }
   } catch (error) {
-    console.error('Error updating call:', error);
+    apiLogger.error({ message: 'Error updating call', error });
     return NextResponse.json(
       { error: 'Failed to update call' },
       { status: 500 }
@@ -161,7 +162,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
  * DELETE /api/outreach/calls/[id]
  * Cancel a call
  */
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const supabase = await createClient();
@@ -177,7 +178,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error cancelling call:', error);
+    apiLogger.error({ message: 'Error cancelling call', error });
     return NextResponse.json(
       { error: 'Failed to cancel call' },
       { status: 500 }

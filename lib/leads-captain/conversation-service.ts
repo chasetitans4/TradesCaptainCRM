@@ -9,14 +9,13 @@ import {
   ConversationState,
   ExtractedInfo,
   CapturedLead,
-  UrgencyLevel,
-  TERMINAL_STATES
 } from './types';
 import {
   createEmptyExtractedInfo,
-  generateGreeting,
   isAfterHours
 } from './conversation-engine';
+import { logger } from '@/lib/logger';
+const lcLogger = logger.child({ context: 'leads-captain.service' });
 
 /**
  * Get business settings for Leads Captain
@@ -32,7 +31,10 @@ export async function getBusinessSettings(businessId: string): Promise<BusinessS
     .single();
 
   if (settingsError || !settings) {
-    console.error('Failed to get Leads Captain settings:', settingsError);
+    lcLogger.error({
+      msg: 'Failed to get Leads Captain settings',
+      error: settingsError instanceof Error ? { name: settingsError.name, message: settingsError.message, stack: settingsError.stack } : { message: String(settingsError) },
+    });
     return null;
   }
 
@@ -44,7 +46,10 @@ export async function getBusinessSettings(businessId: string): Promise<BusinessS
     .single();
 
   if (businessError || !business) {
-    console.error('Failed to get business:', businessError);
+    lcLogger.error({
+      msg: 'Failed to get business',
+      error: businessError instanceof Error ? { name: businessError.name, message: businessError.message, stack: businessError.stack } : { message: String(businessError) },
+    });
     return null;
   }
 
@@ -440,7 +445,7 @@ export async function removeFromSuppressionList(
  */
 export async function createCapturedLead(
   conversation: Conversation,
-  settings: BusinessSettings
+  _settings: BusinessSettings
 ): Promise<CapturedLead> {
   // Calculate conversation duration
   const endTime = new Date();
@@ -572,7 +577,10 @@ export async function logWebhookEvent(
   }
 
   if (error) {
-    console.error('Failed to log webhook event:', error);
+    lcLogger.error({
+      msg: 'Failed to log webhook event',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw error;
   }
 
@@ -607,7 +615,10 @@ export async function markEventProcessed(
   const { error } = await query;
 
   if (error) {
-    console.error('Failed to mark event processed:', error);
+    lcLogger.error({
+      msg: 'Failed to mark event processed',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
   }
 }
 
@@ -671,7 +682,10 @@ export async function createJobFromLead(
     .single();
 
   if (error || !data) {
-    console.error('Failed to create job from lead:', error);
+    lcLogger.error({
+      msg: 'Failed to create job from lead',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return null;
   }
 

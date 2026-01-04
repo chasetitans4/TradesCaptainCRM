@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getBusinessForPortal, getCustomerProfile } from '@/lib/portal/data';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -85,7 +86,7 @@ export async function GET(request: NextRequest) {
       business,
     });
   } catch (error) {
-    console.error('Error in GET /api/portal/session:', error);
+    apiLogger.error({ error, context: 'Error in GET /api/portal/session' });
     return NextResponse.json(
       { error: 'Failed to get session' },
       { status: 500 }

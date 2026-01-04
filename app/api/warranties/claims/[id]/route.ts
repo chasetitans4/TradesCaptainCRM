@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { updateWarrantyClaim } from '@/lib/warranties';
+import { apiLogger } from '@/lib/logger';
 
 export async function PATCH(
   request: NextRequest,
@@ -30,10 +31,10 @@ export async function PATCH(
     });
 
     return NextResponse.json(claim);
-  } catch (error: any) {
-    console.error('Error updating warranty claim:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error updating warranty claim' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update warranty claim' },
+      { error: error instanceof Error ? error.message : 'Failed to update warranty claim' },
       { status: 500 }
     );
   }

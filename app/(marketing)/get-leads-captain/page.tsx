@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ROICalculator, ROICalculatorWidget } from '@/components/leads-captain/roi-calculator';
+import { ROICalculator } from '@/components/leads-captain/roi-calculator';
 import {
   Phone,
   MessageSquare,

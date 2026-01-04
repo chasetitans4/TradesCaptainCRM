@@ -7,6 +7,7 @@ import {
   deleteMembershipPlan,
   getPlanStatistics,
 } from '@/lib/memberships/plans';
+import { apiLogger } from '@/lib/logger';
 
 // GET /api/memberships/plans - Get all plans
 export async function GET(request: NextRequest) {
@@ -41,9 +42,9 @@ export async function GET(request: NextRequest) {
 
     const plans = await getMembershipPlans(userData.business_id, includeInactive);
     return NextResponse.json({ plans });
-  } catch (error: any) {
-    console.error('Error fetching membership plans:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ message: 'Error fetching membership plans', error });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to fetch membership plans' }, { status: 500 });
   }
 }
 
@@ -103,8 +104,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Error with membership plan action:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ message: 'Error with membership plan action', error });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to process membership plan action' }, { status: 500 });
   }
 }

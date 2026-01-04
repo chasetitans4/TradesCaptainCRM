@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sendMagicLink, verifyMagicLink, verifyPassword } from '@/lib/portal/auth';
 import { createPortalSession, destroyPortalSession, getPortalSession } from '@/lib/portal/session';
 import { checkLoginRateLimit, checkSimpleRateLimit } from '@/lib/rate-limit';
+import { apiLogger } from '@/lib/logger';
 
 // POST /api/portal/auth - Handle portal authentication
 export async function POST(request: NextRequest) {
@@ -143,9 +144,9 @@ export async function POST(request: NextRequest) {
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
-  } catch (error: any) {
-    console.error('Portal auth error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ error, context: 'Portal auth error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -165,8 +166,8 @@ export async function GET() {
           }
         : null,
     });
-  } catch (error: any) {
-    console.error('Portal auth check error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ error, context: 'Portal auth check error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
   }
 }

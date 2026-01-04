@@ -6,6 +6,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { addDays } from 'date-fns';
 import { sendSMS } from '@/lib/twilio/sms';
+import { logger } from '@/lib/logger';
 
 export interface ReviewRequest {
   id: string;
@@ -75,7 +76,10 @@ export async function createReviewRequest(
     .single();
 
   if (jobError || !job) {
-    console.error('Job not found:', jobError);
+    logger.error({
+      msg: 'Job not found for review request',
+      error: jobError ? { message: jobError.message, code: jobError.code, details: jobError.details } : undefined,
+    });
     return null;
   }
 
@@ -122,7 +126,10 @@ export async function createReviewRequest(
     .single();
 
   if (error) {
-    console.error('Error creating review request:', error);
+    logger.error({
+      msg: 'Error creating review request',
+      error: error ? { message: error.message, code: error.code, details: error.details } : undefined,
+    });
     return null;
   }
 
@@ -153,7 +160,7 @@ export async function sendReviewRequest(requestId: string): Promise<boolean> {
     .single();
 
   if (!request) {
-    console.error('Review request not found');
+    logger.error({ msg: 'Review request not found' });
     return false;
   }
 
@@ -179,12 +186,12 @@ export async function sendReviewRequest(requestId: string): Promise<boolean> {
     } else if (customer?.email) {
       // Email sending would go here if Resend is configured
       // For now, skip email-only requests
-      console.log('Email review requests not yet implemented');
+      logger.info({ msg: 'Email review requests not yet implemented' });
       return false;
     }
 
     if (!sent && request.send_method === 'sms') {
-      console.error('Failed to send review request SMS');
+      logger.error({ msg: 'Failed to send review request SMS' });
       return false;
     }
 
@@ -199,7 +206,10 @@ export async function sendReviewRequest(requestId: string): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error('Error sending review request:', error);
+    logger.error({
+      msg: 'Error sending review request',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error),
+    });
     return false;
   }
 }
@@ -281,7 +291,10 @@ export async function getReviewRequests(
   const { data, error } = await query;
 
   if (error) {
-    console.error('Error fetching review requests:', error);
+    logger.error({
+      msg: 'Error fetching review requests',
+      error: error ? { message: error.message, code: error.code, details: error.details } : undefined,
+    });
     return [];
   }
 

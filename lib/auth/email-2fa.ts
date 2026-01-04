@@ -79,7 +79,13 @@ export async function sendEmail2FACode(
   } catch (error) {
     // Email sending failed - code was still stored in database
     // In production, this should trigger an alert to ops team
-    console.error('Failed to send email 2FA code:', error instanceof Error ? error.message : 'Unknown error');
+    const { emailLogger } = await import('@/lib/logger');
+    emailLogger.error({
+      msg: 'Failed to send email 2FA code',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      userId,
+      email,
+    });
   }
 }
 

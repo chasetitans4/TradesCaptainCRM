@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { verifyAdminAuth } from '@/lib/admin/auth';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   const auth = await verifyAdminAuth(request);
@@ -55,10 +56,10 @@ export async function GET(request: NextRequest) {
       page,
       limit,
     });
-  } catch (error: any) {
-    console.error('Error fetching web customers:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error fetching web customers', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch web customers' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch web customers' },
       { status: 500 }
     );
   }
@@ -133,10 +134,10 @@ export async function POST(request: NextRequest) {
       customer,
       message: 'Web customer created successfully',
     });
-  } catch (error: any) {
-    console.error('Error creating web customer:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error creating web customer', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to create web customer' },
+      { error: error instanceof Error ? error.message : 'Failed to create web customer' },
       { status: 500 }
     );
   }

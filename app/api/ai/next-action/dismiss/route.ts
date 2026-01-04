@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,9 +20,10 @@ export async function POST(request: NextRequest) {
 
     // For now, just log the dismissal
     // In the future, this could be stored to learn user preferences
-    console.log(
-      `[AI Next Action] User ${profile.id} dismissed suggestion type: ${suggestion_type}`
-    );
+    apiLogger.info({
+      message: `User ${profile.id} dismissed suggestion type: ${suggestion_type}`,
+      context: 'AI Next Action'
+    });
 
     // Could store in a dismissals table for ML improvements:
     // await supabase.from('ai_suggestion_dismissals').insert({
@@ -32,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error tracking dismissal:', error);
+    apiLogger.error({ error, context: 'Error tracking dismissal' });
     return NextResponse.json(
       { error: 'Failed to track dismissal' },
       { status: 500 }

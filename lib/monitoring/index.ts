@@ -5,6 +5,8 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { checkRedisHealth } from '@/lib/redis/client';
+import { logger } from '@/lib/logger';
+const monitoringLogger = logger.child({ context: 'monitoring' });
 
 /**
  * Health check status
@@ -227,7 +229,7 @@ export const performance = {
   /**
    * Create a performance marker
    */
-  mark(name: string): () => number {
+  mark(_name: string): () => number {
     const start = Date.now();
     return () => Date.now() - start;
   },
@@ -275,7 +277,11 @@ export async function checkAlertRules(rules: AlertRule[]): Promise<void> {
         });
       }
     } catch (error) {
-      console.error(`Error checking alert rule ${rule.id}:`, error);
+      monitoringLogger.error({
+        msg: 'Error checking alert rule',
+        ruleId: rule.id,
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
     }
   }
 }

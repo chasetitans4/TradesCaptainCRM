@@ -369,7 +369,11 @@ export async function incrementSMSUsage(
 
   // Check soft caps (in background, don't block)
   checkSoftCaps(businessId).catch(err => {
-    console.error('Error checking soft caps:', err);
+    const { smsLogger } = require('@/lib/logger');
+    smsLogger.error({
+      msg: 'Error checking soft caps',
+      error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { message: String(err) },
+    });
   });
 }
 
@@ -573,7 +577,6 @@ import {
   isAfterHours,
   hasRequiredFields,
   hasExceededMaxMessages,
-  hasTooManyUnansweredMessages,
 } from './conversation-engine';
 
 import {
@@ -595,7 +598,6 @@ import {
 } from './notifications';
 
 import type {
-  ConversationMessage,
   TwilioInboundSmsPayload,
   TwilioMissedCallPayload,
 } from './types';
@@ -677,7 +679,7 @@ export async function handleMissedCall(
     });
 
     // Save the greeting message
-    const savedMessage = await saveMessage(
+    await saveMessage(
       conversation,
       {
         role: 'assistant',
@@ -703,7 +705,11 @@ export async function handleMissedCall(
 
     return { success: true, conversationId: conversation.id };
   } catch (error) {
-    console.error('Error handling missed call:', error);
+    const { smsLogger } = require('@/lib/logger');
+    smsLogger.error({
+      msg: 'Error handling missed call',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -806,7 +812,7 @@ export async function handleLeadsCaptainInboundSMS(
     }
 
     // Generate AI response
-    const { response: aiResponse, success: aiSuccess, error: aiError } = await generateAIResponse(
+    const { response: aiResponse } = await generateAIResponse(
       conversation,
       Body,
       settings
@@ -907,7 +913,11 @@ export async function handleLeadsCaptainInboundSMS(
 
     return { success: true, replySent: true };
   } catch (error) {
-    console.error('Error handling Leads Captain inbound SMS:', error);
+    const { smsLogger } = require('@/lib/logger');
+    smsLogger.error({
+      msg: 'Error handling Leads Captain inbound SMS',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return {
       success: false,
       replySent: false,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 /**
  * GET /api/outreach/conversations
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
       has_more: (count || 0) > page * pageSize,
     });
   } catch (error) {
-    console.error('Error getting conversations:', error);
+    apiLogger.error({ message: 'Error getting conversations', error });
     return NextResponse.json(
       { error: 'Failed to get conversations' },
       { status: 500 }

@@ -8,9 +8,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getLeadTasks, createTask } from '@/lib/admin/pipeline';
 import type { LeadTaskType } from '@/lib/admin/types';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ leadId: string }> }
 ) {
   try {
@@ -20,16 +21,16 @@ export async function GET(
     }
 
     const { leadId } = await params;
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = new URL(_request.url);
     const includeCompleted = searchParams.get('include_completed') === 'true';
 
     const tasks = await getLeadTasks(leadId, includeCompleted);
 
     return NextResponse.json({ tasks });
-  } catch (error: any) {
-    console.error('Get tasks error:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Get tasks error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch tasks' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch tasks' },
       { status: 500 }
     );
   }
@@ -55,10 +56,10 @@ export async function POST(
     });
 
     return NextResponse.json({ task }, { status: 201 });
-  } catch (error: any) {
-    console.error('Create task error:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Create task error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to create task' },
+      { error: error instanceof Error ? error.message : 'Failed to create task' },
       { status: 500 }
     );
   }

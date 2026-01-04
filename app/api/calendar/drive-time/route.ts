@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 // GET - Fetch drive time settings
 export async function GET() {
@@ -28,7 +29,7 @@ export async function GET() {
       default_minutes: business?.drive_time_default_minutes ?? 30,
     });
   } catch (error) {
-    console.error('Error fetching drive time settings:', error);
+    apiLogger.error({ error, context: 'Error fetching drive time settings' });
     return NextResponse.json(
       { error: 'Failed to fetch drive time settings' },
       { status: 500 }
@@ -79,7 +80,7 @@ export async function PUT(request: NextRequest) {
       .eq('id', profile.business_id);
 
     if (error) {
-      console.error('Error updating drive time settings:', error);
+      apiLogger.error({ error, context: 'Error updating drive time settings' });
       return NextResponse.json(
         { error: 'Failed to update drive time settings' },
         { status: 500 }
@@ -88,7 +89,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, ...updates });
   } catch (error) {
-    console.error('Error updating drive time settings:', error);
+    apiLogger.error({ error, context: 'Error updating drive time settings' });
     return NextResponse.json(
       { error: 'Failed to update drive time settings' },
       { status: 500 }

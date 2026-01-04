@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Building2,
@@ -65,7 +64,6 @@ const plans = [
 
 export default function RegistrationPage({ params }: { params: Promise<{ token: string }> }) {
   const resolvedParams = use(params);
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +91,7 @@ export default function RegistrationPage({ params }: { params: Promise<{ token: 
 
         setInviteData(data);
         setSelectedPlan(data.plan.type);
-      } catch (err) {
+      } catch (_err) {
         setError('Failed to validate invitation');
       } finally {
         setLoading(false);

@@ -11,6 +11,7 @@ import { searchArticles, ARTICLES } from '@/lib/knowledge-base/articles';
 import { NAVIGATION_MAP, findBestRoute } from '@/lib/knowledge-base/navigation-map';
 import { AVAILABLE_ACTIONS, findAction } from '@/lib/knowledge-base/actions';
 import { checkAIRateLimit } from '@/lib/rate-limit';
+import { apiLogger } from '@/lib/logger';
 
 // Lazy initialization of OpenAI client to avoid build-time errors
 let openai: OpenAI | null = null;
@@ -214,8 +215,8 @@ export async function POST(request: NextRequest) {
         totalTokens: completion.usage?.total_tokens,
       },
     });
-  } catch (error: any) {
-    console.error('AI Assistant error:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'AI Assistant error' });
 
     // Fallback to local knowledge base on error
     const body = await request.clone().json().catch(() => ({}));
@@ -224,7 +225,7 @@ export async function POST(request: NextRequest) {
 }
 
 // Handle queries without OpenAI (fallback)
-function handleLocalFallback(message: string, currentPath: string) {
+function handleLocalFallback(message: string, _currentPath: string) {
   // Search knowledge base
   const articles = searchArticles(message);
 

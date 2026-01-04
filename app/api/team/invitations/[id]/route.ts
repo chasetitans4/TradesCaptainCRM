@@ -7,9 +7,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { cancelInvitation } from '@/lib/team';
 import { hasPermission } from '@/lib/permissions';
+import { apiLogger } from '@/lib/logger';
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -27,10 +28,10 @@ export async function DELETE(
     await cancelInvitation(id, profile.id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error cancelling invitation:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error cancelling invitation' });
     return NextResponse.json(
-      { error: error.message || 'Failed to cancel invitation' },
+      { error: error instanceof Error ? error.message : 'Failed to cancel invitation' },
       { status: 400 }
     );
   }

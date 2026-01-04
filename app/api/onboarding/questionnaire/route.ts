@@ -11,6 +11,7 @@ import {
   processQuestionnaireResponses,
   getRecommendedFeatures,
 } from '@/lib/onboarding/questionnaire';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET() {
   try {
@@ -30,10 +31,10 @@ export async function GET() {
       questions: QUESTIONNAIRE_QUESTIONS,
       recommendations,
     });
-  } catch (error: any) {
-    console.error('Error fetching questionnaire:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error fetching questionnaire', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch questionnaire' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch questionnaire' },
       { status: 500 }
     );
   }
@@ -63,10 +64,10 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Questionnaire completed successfully',
     });
-  } catch (error: any) {
-    console.error('Error saving questionnaire:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error saving questionnaire', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to save questionnaire' },
+      { error: error instanceof Error ? error.message : 'Failed to save questionnaire' },
       { status: 500 }
     );
   }

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLead, logLeadContact } from '@/lib/admin/leads';
 import { verifyAdminAuth } from '@/lib/admin/auth';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -44,10 +45,13 @@ export async function POST(
     await logLeadContact(leadId, auth.user.id, contact_type, notes, next_followup_at);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Log lead contact error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Log lead contact error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to log contact' },
+      { error: error instanceof Error ? error.message : 'Failed to log contact' },
       { status: 500 }
     );
   }

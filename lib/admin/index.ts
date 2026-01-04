@@ -4,7 +4,7 @@
 // =====================================================
 
 import { createClient } from '@/lib/supabase/server';
-import { format, addDays, addMonths, differenceInDays } from 'date-fns';
+import { format, addDays, addMonths } from 'date-fns';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 

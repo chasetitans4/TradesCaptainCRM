@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { applyOfferCode, validateOfferCode } from '@/lib/admin/offers';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -53,10 +54,10 @@ export async function POST(
       offer: validation.offer,
       commission_impact: validation.commission_impact,
     });
-  } catch (error: any) {
-    console.error('Apply offer error:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Apply offer error', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to apply offer' },
+      { error: error instanceof Error ? error.message : 'Failed to apply offer' },
       { status: 500 }
     );
   }

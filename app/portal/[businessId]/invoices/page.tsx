@@ -3,19 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import {
-  Receipt,
-  CreditCard,
-  Download,
-  ExternalLink,
-  CheckCircle,
-  Clock,
-  AlertCircle,
-} from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Receipt, CreditCard, ExternalLink, CheckCircle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { logger } from '@/lib/logger';
+const portalInvoicesLogger = logger.child({ context: 'portal.invoices' });
 
 interface Invoice {
   id: string;
@@ -50,7 +44,11 @@ export default function InvoicesPage() {
         setUnpaid(data.unpaid || []);
         setPaid(data.paid || []);
       } catch (error) {
-        console.error('Error loading invoices:', error);
+        portalInvoicesLogger.error({
+          msg: 'Error loading invoices',
+          businessId,
+          error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+        });
       } finally {
         setLoading(false);
       }
@@ -90,16 +88,7 @@ export default function InvoicesPage() {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'paid':
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case 'overdue':
-        return <AlertCircle className="h-4 w-4 text-red-600" />;
-      default:
-        return <Clock className="h-4 w-4 text-yellow-600" />;
-    }
-  };
+  // removed unused getStatusIcon helper
 
   if (loading) {
     return <InvoicesSkeleton />;
@@ -161,11 +150,9 @@ export default function InvoicesPage() {
                 <InvoiceCard
                   key={invoice.id}
                   invoice={invoice}
-                  businessId={businessId}
                   formatCurrency={formatCurrency}
                   formatDate={formatDate}
                   getStatusColor={getStatusColor}
-                  getStatusIcon={getStatusIcon}
                 />
               ))}
             </div>
@@ -191,11 +178,9 @@ export default function InvoicesPage() {
                 <InvoiceCard
                   key={invoice.id}
                   invoice={invoice}
-                  businessId={businessId}
                   formatCurrency={formatCurrency}
                   formatDate={formatDate}
                   getStatusColor={getStatusColor}
-                  getStatusIcon={getStatusIcon}
                 />
               ))}
             </div>
@@ -208,18 +193,14 @@ export default function InvoicesPage() {
 
 function InvoiceCard({
   invoice,
-  businessId,
   formatCurrency,
   formatDate,
   getStatusColor,
-  getStatusIcon,
 }: {
   invoice: Invoice;
-  businessId: string;
   formatCurrency: (amount: number) => string;
   formatDate: (date: string) => string;
   getStatusColor: (status: string) => string;
-  getStatusIcon: (status: string) => React.ReactNode;
 }) {
   return (
     <Card>

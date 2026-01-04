@@ -10,6 +10,7 @@ import {
   lookupCustomerByEmail,
   lookupCustomerByName,
 } from '@/lib/admin/leads-captain-support';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -65,10 +66,10 @@ export async function GET(request: NextRequest) {
       query,
       type,
     });
-  } catch (error: any) {
-    console.error('Error in GET /api/admin/support/lookup:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error in GET /api/admin/support/lookup', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to search customers' },
+      { error: error instanceof Error ? error.message : 'Failed to search customers' },
       { status: 500 }
     );
   }

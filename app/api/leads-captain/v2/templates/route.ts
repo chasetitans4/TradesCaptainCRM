@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { checkPlanLimit } from '@/lib/leads-captain/v2/features';
+import { apiLogger } from '@/lib/logger';
 import type { CreateTemplateRequest } from '@/types/leads-captain';
 
 export async function GET(request: NextRequest) {
@@ -57,8 +58,11 @@ export async function GET(request: NextRequest) {
       custom_count: templates?.filter(t => !t.is_system).length || 0,
       limits: limitInfo,
     });
-  } catch (error: unknown) {
-    console.error('Error fetching templates:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error fetching templates',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch templates' },
       { status: 500 }
@@ -135,8 +139,11 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ template }, { status: 201 });
-  } catch (error: unknown) {
-    console.error('Error creating template:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error creating template',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to create template' },
       { status: 500 }

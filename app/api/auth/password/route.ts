@@ -5,6 +5,7 @@ import {
   validatePassword,
   isPasswordExpired,
 } from '@/lib/auth/password';
+import { apiLogger } from '@/lib/logger';
 
 // GET - Check if password is expired
 export async function GET() {
@@ -21,9 +22,9 @@ export async function GET() {
     const expired = await isPasswordExpired(user.id);
 
     return NextResponse.json({ expired });
-  } catch (error: any) {
-    console.error('Check password expired error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'Check password expired error', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }
 
@@ -83,8 +84,8 @@ export async function POST(request: NextRequest) {
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
-  } catch (error: any) {
-    console.error('Password operation error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'Password operation error', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }

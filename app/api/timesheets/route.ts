@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { getTimeEntries, addTimeEntry } from '@/lib/timesheets';
 import { isFeatureEnabled } from '@/lib/features';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,10 +45,10 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({ entries });
-  } catch (error: any) {
-    console.error('Error fetching time entries:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error fetching time entries' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch time entries' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch time entries' },
       { status: 500 }
     );
   }
@@ -93,10 +94,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ entry });
-  } catch (error: any) {
-    console.error('Error adding time entry:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error adding time entry' });
     return NextResponse.json(
-      { error: error.message || 'Failed to add time entry' },
+      { error: error instanceof Error ? error.message : 'Failed to add time entry' },
       { status: 500 }
     );
   }

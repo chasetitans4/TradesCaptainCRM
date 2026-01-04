@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { to, message, conversation_id, customer_id, job_id } = body;
+    const { to, message, conversation_id } = body;
 
     if (!to || !message) {
       return NextResponse.json(

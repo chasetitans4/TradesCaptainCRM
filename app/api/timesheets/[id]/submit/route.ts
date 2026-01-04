@@ -6,9 +6,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { submitTimesheet } from '@/lib/timesheets';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -69,10 +70,10 @@ export async function POST(
     const updatedEntry = await submitTimesheet(id);
 
     return NextResponse.json({ entry: updatedEntry });
-  } catch (error: any) {
-    console.error('Error in POST /api/timesheets/[id]/submit:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error in POST /api/timesheets/[id]/submit' });
     return NextResponse.json(
-      { error: error.message || 'Failed to submit time entry' },
+      { error: error instanceof Error ? error.message : 'Failed to submit time entry' },
       { status: 400 }
     );
   }

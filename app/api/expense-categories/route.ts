@@ -6,13 +6,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import {
   getExpenseCategories,
   createExpenseCategory,
   initializeDefaultCategories,
 } from '@/lib/expenses';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -44,10 +45,10 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ categories });
-  } catch (error: any) {
-    console.error('Error in GET /api/expense-categories:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'GET /api/expense-categories' });
     return NextResponse.json(
-      { error: error.message || 'Failed to get categories' },
+      { error: error instanceof Error ? error.message : 'Failed to get categories' },
       { status: 500 }
     );
   }
@@ -104,10 +105,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ category }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error in POST /api/expense-categories:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'POST /api/expense-categories' });
     return NextResponse.json(
-      { error: error.message || 'Failed to create category' },
+      { error: error instanceof Error ? error.message : 'Failed to create category' },
       { status: 400 }
     );
   }

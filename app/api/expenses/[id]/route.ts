@@ -9,9 +9,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getExpense, updateExpense, deleteExpense } from '@/lib/expenses';
 import { parseISO } from 'date-fns';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -48,10 +49,10 @@ export async function GET(
     }
 
     return NextResponse.json({ expense });
-  } catch (error: any) {
-    console.error('Error in GET /api/expenses/[id]:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error in GET /api/expenses/[id]', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to get expense' },
+      { error: error instanceof Error ? error.message : 'Failed to get expense' },
       { status: 500 }
     );
   }
@@ -124,17 +125,17 @@ export async function PUT(
     const updatedExpense = await updateExpense(id, updates);
 
     return NextResponse.json({ expense: updatedExpense });
-  } catch (error: any) {
-    console.error('Error in PUT /api/expenses/[id]:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error in PUT /api/expenses/[id]', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to update expense' },
+      { error: error instanceof Error ? error.message : 'Failed to update expense' },
       { status: 400 }
     );
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -181,10 +182,10 @@ export async function DELETE(
     await deleteExpense(id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error in DELETE /api/expenses/[id]:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error in DELETE /api/expenses/[id]', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to delete expense' },
+      { error: error instanceof Error ? error.message : 'Failed to delete expense' },
       { status: 400 }
     );
   }

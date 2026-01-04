@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { requirePortalSession } from '@/lib/portal/session';
 import { getCustomerDashboardSummary } from '@/lib/portal/data';
+import { apiLogger } from '@/lib/logger';
 
 // GET /api/portal/dashboard - Get customer dashboard data
 export async function GET() {
@@ -19,11 +20,11 @@ export async function GET() {
       },
       ...summary,
     });
-  } catch (error: any) {
-    if (error.message === 'Portal authentication required') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Portal authentication required') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    console.error('Portal dashboard error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    apiLogger.error({ error, context: 'Portal dashboard error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
   }
 }

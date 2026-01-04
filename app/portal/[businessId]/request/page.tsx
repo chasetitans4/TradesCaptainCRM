@@ -2,16 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import {
-  Wrench,
-  Calendar,
-  Clock,
-  AlertCircle,
-  CheckCircle,
-  ArrowRight,
-  Loader2,
-} from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { AlertCircle, CheckCircle, ArrowRight, Loader2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,6 +16,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { logger } from '@/lib/logger';
+const portalRequestLogger = logger.child({ context: 'portal.request' });
 
 interface ServiceType {
   id: string;
@@ -68,7 +62,11 @@ export default function ServiceRequestPage() {
         setServiceTypes(data.serviceTypes || []);
         setEquipment(data.equipment || []);
       } catch (error) {
-        console.error('Error loading options:', error);
+        portalRequestLogger.error({
+          msg: 'Error loading request options',
+          businessId,
+          error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+        });
       } finally {
         setLoading(false);
       }

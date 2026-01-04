@@ -4,6 +4,7 @@
 // =====================================================
 
 import { getRedis } from '@/lib/redis/client';
+import { cacheLogger } from '@/lib/logger';
 
 // In-memory cache store for fallback when Redis is unavailable
 const memoryStore = new Map<string, { data: string; expiresAt: number }>();
@@ -47,9 +48,6 @@ function isRedisAvailable(): boolean {
   }
 }
 
-interface CacheOptions {
-  ttl?: number; // Time to live in seconds
-}
 
 const DEFAULT_TTL = 300; // 5 minutes
 
@@ -108,7 +106,10 @@ export class Cache {
       }
       return data as unknown as T;
     } catch (error) {
-      console.error('Cache get error:', error);
+      cacheLogger.error({
+        msg: 'Cache get error',
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
       // Fall back to memory
       this.useMemoryFallback = true;
       return null;
@@ -146,7 +147,10 @@ export class Cache {
 
       await redis.setex(fullKey, ttl, data);
     } catch (error) {
-      console.error('Cache set error:', error);
+      cacheLogger.error({
+        msg: 'Cache set error',
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
       // Fall back to memory
       this.useMemoryFallback = true;
       memoryStore.set(fullKey, {
@@ -164,7 +168,10 @@ export class Cache {
       const redis = getRedis();
       await redis.del(this.getKey(key));
     } catch (error) {
-      console.error('Cache delete error:', error);
+      cacheLogger.error({
+        msg: 'Cache delete error',
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
     }
   }
 
@@ -180,7 +187,10 @@ export class Cache {
       }
       return keys.length;
     } catch (error) {
-      console.error('Cache deletePattern error:', error);
+      cacheLogger.error({
+        msg: 'Cache deletePattern error',
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
       return 0;
     }
   }

@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import type { UpdateConfigRequest, LeadsCaptainConfig } from '@/types/leads-captain';
 
 export async function GET() {
@@ -35,8 +36,11 @@ export async function GET() {
     }
 
     return NextResponse.json({ config });
-  } catch (error: unknown) {
-    console.error('Error fetching Leads Captain config:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error fetching Leads Captain config',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch config' },
       { status: 500 }
@@ -115,8 +119,11 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ config, message: 'Config created with defaults' });
-  } catch (error: unknown) {
-    console.error('Error creating Leads Captain config:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error creating Leads Captain config',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to create config' },
       { status: 500 }
@@ -183,8 +190,11 @@ export async function PUT(request: NextRequest) {
     });
 
     return NextResponse.json({ config });
-  } catch (error: unknown) {
-    console.error('Error updating Leads Captain config:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error updating Leads Captain config',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to update config' },
       { status: 500 }

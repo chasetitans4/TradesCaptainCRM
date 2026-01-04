@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
     const { data: follow_ups, error } = await query;
 
     if (error) {
-      console.error('Error fetching follow-ups:', error);
+      apiLogger.error({ message: 'Error fetching follow-ups', error });
       return NextResponse.json({ error: 'Failed to fetch follow-ups' }, { status: 500 });
     }
 
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ follow_ups: enrichedFollowUps });
   } catch (error) {
-    console.error('Error in GET /api/follow-ups:', error);
+    apiLogger.error({ message: 'Error in GET /api/follow-ups', error });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -115,13 +116,13 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Error creating follow-up:', error);
+      apiLogger.error({ message: 'Error creating follow-up', error });
       return NextResponse.json({ error: 'Failed to create follow-up' }, { status: 500 });
     }
 
     return NextResponse.json({ follow_up }, { status: 201 });
   } catch (error) {
-    console.error('Error in POST /api/follow-ups:', error);
+    apiLogger.error({ message: 'Error in POST /api/follow-ups', error });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

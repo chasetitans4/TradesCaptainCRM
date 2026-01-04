@@ -4,6 +4,7 @@
 
 import { stripe } from './client';
 import { createClient } from '@/lib/supabase/server';
+import { syncLogger } from '@/lib/logger';
 
 export interface SubscriptionDetails {
   status: string;
@@ -134,7 +135,9 @@ export async function getSubscriptionDetails(
     cancelAtPeriodEnd: business.cancel_at_period_end || false,
     hasMultiLocationAddon: business.has_multi_location_addon || false,
     leadsThisMonth: business.leads_this_month || business.leads_used || 0,
-    leadsLimit: business.leads_limit || (business.plan_tier === 'pro' ? 300 : 200),
+    leadsLimit:
+      business.leads_limit ??
+      (business.plan_tier === 'enterprise' ? 300 : business.plan_tier === 'pro' ? 200 : 0),
     upcomingAmount: null,
     paymentMethod: null,
   };
@@ -176,7 +179,12 @@ export async function getSubscriptionDetails(
       // No upcoming invoice (e.g., canceled)
     }
   } catch (error) {
-    console.error('Error fetching Stripe subscription:', error);
+    syncLogger.error({
+      msg: 'Error fetching Stripe subscription',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error),
+      businessId,
+      subscriptionId: business.stripe_subscription_id,
+    });
   }
 
   return result;
@@ -221,7 +229,12 @@ export async function getInvoiceHistory(
       pdfUrl: invoice.invoice_pdf ?? null,
     }));
   } catch (error) {
-    console.error('Error fetching invoice history:', error);
+    syncLogger.error({
+      msg: 'Error fetching invoice history',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error),
+      businessId,
+      limit,
+    });
     return [];
   }
 }
@@ -261,13 +274,20 @@ export async function changePlan(
     proration_behavior: 'create_prorations',
   });
 
-  // Update plan tier in database
-  const planTier = newPriceId === process.env.STRIPE_PRICE_GROWTH_MONTHLY ? 'growth' : 'pro';
+  let planTier: 'starter' | 'pro' | 'enterprise' = 'enterprise';
+  let leadsLimit = 300;
+  if (newPriceId === process.env.STRIPE_PRICE_STARTER_MONTHLY) {
+    planTier = 'starter';
+    leadsLimit = 0;
+  } else if (newPriceId === process.env.STRIPE_PRICE_PRO_MONTHLY) {
+    planTier = 'pro';
+    leadsLimit = 200;
+  }
   await supabase
     .from('businesses')
     .update({
       plan_tier: planTier,
-      leads_limit: planTier === 'pro' ? 300 : 200,
+      leads_limit: leadsLimit,
     })
     .eq('id', businessId);
 }
@@ -371,8 +391,9 @@ export async function addMultiLocationAddon(businessId: string): Promise<void> {
  */
 export function getPriceIds() {
   return {
-    growth: process.env.STRIPE_PRICE_GROWTH_MONTHLY,
+    starter: process.env.STRIPE_PRICE_STARTER_MONTHLY,
     pro: process.env.STRIPE_PRICE_PRO_MONTHLY,
+    enterprise: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY ?? process.env.STRIPE_PRICE_GROWTH_MONTHLY,
     multiLocation: process.env.STRIPE_PRICE_MULTI_LOCATION_ADDON,
   };
 }

@@ -141,7 +141,15 @@ export async function getReceipts(filters: ReceiptFilters): Promise<Receipt[]> {
   const { data, error } = await query;
 
   if (error) {
-    console.error('Error fetching receipts:', error);
+    receiptsLogger.error({
+      msg: 'Error fetching receipts',
+      businessId: filters.businessId,
+      userId: filters.userId,
+      jobId: filters.jobId,
+      category: filters.category,
+      status: filters.status,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to fetch receipts');
   }
 
@@ -166,7 +174,11 @@ export async function getReceipt(receiptId: string): Promise<Receipt | null> {
 
   if (error) {
     if (error.code === 'PGRST116') return null;
-    console.error('Error fetching receipt:', error);
+    receiptsLogger.error({
+      msg: 'Error fetching receipt',
+      receiptId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to fetch receipt');
   }
 
@@ -210,7 +222,12 @@ export async function updateReceipt(
     .single();
 
   if (error) {
-    console.error('Error updating receipt:', error);
+    receiptsLogger.error({
+      msg: 'Error updating receipt',
+      receiptId,
+      updates: updateData,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to update receipt');
   }
 
@@ -229,7 +246,11 @@ export async function deleteReceipt(receiptId: string): Promise<void> {
     .eq('id', receiptId);
 
   if (error) {
-    console.error('Error deleting receipt:', error);
+    receiptsLogger.error({
+      msg: 'Error deleting receipt',
+      receiptId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to delete receipt');
   }
 }
@@ -257,7 +278,13 @@ export async function reviewReceipt(
     .single();
 
   if (error) {
-    console.error('Error reviewing receipt:', error);
+    receiptsLogger.error({
+      msg: 'Error reviewing receipt',
+      receiptId,
+      action,
+      reviewerId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to review receipt');
   }
 
@@ -378,7 +405,12 @@ export async function uploadReceiptImage(
     });
 
   if (error) {
-    console.error('Error uploading receipt image:', error);
+    receiptsLogger.error({
+      msg: 'Error uploading receipt image',
+      businessId,
+      fileName,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to upload image');
   }
 

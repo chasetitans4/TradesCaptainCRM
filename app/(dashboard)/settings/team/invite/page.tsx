@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -14,21 +14,19 @@ import { getCurrentUserProfile } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { hasPermission } from '@/lib/permissions';
 import type { UserWithBusiness } from '@/types';
+import { useToast } from '@/components/ui/use-toast';
 
 export default function InviteTeamMemberPage() {
   const router = useRouter();
   const [user, setUser] = useState<UserWithBusiness | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const { toast } = useToast();
 
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'admin' | 'technician'>('technician');
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     const profile = await getCurrentUserProfile();
     if (!profile) {
       router.push('/login');
@@ -43,13 +41,17 @@ export default function InviteTeamMemberPage() {
 
     setUser(profile as UserWithBusiness);
     setLoading(false);
-  };
+  }, [router]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!email.trim()) {
-      alert('Please enter an email address');
+      toast({ title: 'Invalid email', description: 'Please enter an email address', variant: 'destructive' });
       return;
     }
 
@@ -65,10 +67,10 @@ export default function InviteTeamMemberPage() {
         router.push('/settings/team');
       } else {
         const data = await response.json();
-        alert(data.error || 'Failed to send invitation');
+        toast({ title: 'Failed to send invitation', description: data.error || 'Please try again', variant: 'destructive' });
       }
-    } catch (error) {
-      alert('Failed to send invitation');
+    } catch (_error) {
+      toast({ title: 'Failed to send invitation', description: 'Please try again', variant: 'destructive' });
     } finally {
       setSending(false);
     }

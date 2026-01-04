@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processScheduledFollowUps } from '@/lib/followup/engine';
+import { apiLogger } from '@/lib/logger';
 
 // POST /api/followup/process - Process scheduled follow-ups
 // This endpoint should be called by a cron job (e.g., every 5 minutes)
@@ -19,9 +20,9 @@ export async function POST(request: NextRequest) {
       success: true,
       ...result,
     });
-  } catch (error: any) {
-    console.error('Error processing follow-ups:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ message: 'Error processing follow-ups', error });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to process follow-ups' }, { status: 500 });
   }
 }
 

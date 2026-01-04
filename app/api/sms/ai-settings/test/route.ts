@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 import { checkAIRateLimit } from '@/lib/rate-limit';
+import { apiLogger } from '@/lib/logger';
 
 let _openai: OpenAI | null = null;
 
@@ -114,7 +115,7 @@ Respond to the customer message naturally.`;
 
     return NextResponse.json({ response });
   } catch (error) {
-    console.error('Error testing AI:', error);
+    apiLogger.error({ error, context: 'testing AI' });
     return NextResponse.json(
       { error: 'Failed to test AI response' },
       { status: 500 }

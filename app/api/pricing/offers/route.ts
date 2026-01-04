@@ -15,6 +15,7 @@ import {
   getPendingApprovalRequests,
 } from '@/lib/pricing/offers';
 import { getPlanById } from '@/lib/pricing/plans';
+import { apiLogger } from '@/lib/logger';
 
 // GET - List active offers
 export async function GET(request: NextRequest) {
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Error fetching offers:', error);
+    apiLogger.error({ error, context: 'Error fetching offers' });
     return NextResponse.json(
       { error: 'Failed to fetch offers' },
       { status: 500 }
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
       validation: { valid: true },
     });
   } catch (error) {
-    console.error('Error calculating pricing:', error);
+    apiLogger.error({ error, context: 'Error calculating pricing' });
     return NextResponse.json(
       { error: 'Failed to calculate pricing' },
       { status: 500 }

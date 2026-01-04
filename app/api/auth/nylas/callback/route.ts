@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { exchangeCodeForGrant, listCalendars } from '@/lib/nylas';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { encrypt } from '@/lib/crypto';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get('code');
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
 
   // Handle OAuth errors from Nylas
   if (errorParam) {
-    console.error('Nylas OAuth error:', errorParam);
+    apiLogger.error({ msg: 'Nylas OAuth error', error: errorParam });
     return NextResponse.redirect(
       new URL('/settings/calendar?error=oauth_denied', request.url)
     );
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
     // This prevents attackers from using their OAuth code to hijack another user's account
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      console.error('Nylas callback: No authenticated user');
+      apiLogger.error({ msg: 'Nylas callback: No authenticated user', error: 'No authenticated user' });
       return NextResponse.redirect(
         new URL('/settings/calendar?error=unauthorized', request.url)
       );
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (!profile || profile.id !== userId) {
-      console.error('Nylas callback: State mismatch - possible CSRF attack');
+      apiLogger.error({ msg: 'Nylas callback: State mismatch - possible CSRF attack', error: 'State mismatch' });
       return NextResponse.redirect(
         new URL('/settings/calendar?error=state_mismatch', request.url)
       );
@@ -84,7 +85,7 @@ export async function GET(request: NextRequest) {
       );
 
     if (upsertError) {
-      console.error('Error saving calendar connection:', upsertError);
+      apiLogger.error({ msg: 'Error saving calendar connection', error: upsertError.message || 'Unknown error' });
       return NextResponse.redirect(
         new URL('/settings/calendar?error=database_error', request.url)
       );
@@ -94,7 +95,7 @@ export async function GET(request: NextRequest) {
       new URL('/settings/calendar?success=connected', request.url)
     );
   } catch (error) {
-    console.error('Nylas OAuth callback error:', error);
+    apiLogger.error({ msg: 'Nylas OAuth callback error', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.redirect(
       new URL('/settings/calendar?error=oauth_failed', request.url)
     );

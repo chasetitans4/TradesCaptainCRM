@@ -281,7 +281,12 @@ export async function getCallStats(
   const { data: calls, error } = await query;
 
   if (error) {
-    console.error('Error fetching call stats:', error);
+    callLogger.error({
+      msg: 'Error fetching call stats',
+      error: error instanceof Error
+        ? { name: error.name, message: error.message, stack: error.stack }
+        : { message: String(error) },
+    });
     throw new Error('Failed to fetch call stats');
   }
 
@@ -361,7 +366,12 @@ export async function getCustomerCallHistory(
     .limit(limit);
 
   if (error) {
-    console.error('Error fetching customer call history:', error);
+    callLogger.error({
+      msg: 'Error fetching customer call history',
+      error: error instanceof Error
+        ? { name: error.name, message: error.message, stack: error.stack }
+        : { message: String(error) },
+    });
     throw new Error('Failed to fetch customer call history');
   }
 
@@ -390,7 +400,12 @@ export async function getLeadCallHistory(
     .limit(limit);
 
   if (error) {
-    console.error('Error fetching lead call history:', error);
+    callLogger.error({
+      msg: 'Error fetching lead call history',
+      error: error instanceof Error
+        ? { name: error.name, message: error.message, stack: error.stack }
+        : { message: String(error) },
+    });
     throw new Error('Failed to fetch lead call history');
   }
 
@@ -501,7 +516,10 @@ export async function updateCallOnComplete(
     .single();
 
   if (!call) {
-    console.error('Call not found for Twilio SID:', twilioCallSid);
+    callLogger.error({
+      msg: 'Call not found for Twilio SID',
+      twilioCallSid,
+    });
     return null;
   }
 

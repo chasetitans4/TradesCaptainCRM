@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { completeMonth3Call, getRetentionTracking } from '@/lib/admin/commissions';
 import { verifyAdminAuth } from '@/lib/admin/auth';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -37,10 +38,10 @@ export async function POST(
     await completeMonth3Call(trackingId, notes);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Complete month 3 call error:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Complete month 3 call error', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to complete month 3 call' },
+      { error: error instanceof Error ? error.message : 'Failed to complete month 3 call' },
       { status: 500 }
     );
   }

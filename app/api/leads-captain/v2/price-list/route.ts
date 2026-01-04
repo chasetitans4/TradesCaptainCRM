@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { checkPlanLimit } from '@/lib/leads-captain/v2/features';
+import { apiLogger } from '@/lib/logger';
 import type { CreatePriceItemRequest } from '@/types/leads-captain';
 
 export async function GET() {
@@ -46,8 +47,11 @@ export async function GET() {
       total: items?.length || 0,
       limits: limitInfo,
     });
-  } catch (error: unknown) {
-    console.error('Error fetching price list:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error fetching price list',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch price list' },
       { status: 500 }
@@ -120,8 +124,11 @@ export async function POST(request: NextRequest) {
     if (error) throw error;
 
     return NextResponse.json({ item }, { status: 201 });
-  } catch (error: unknown) {
-    console.error('Error creating price item:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error creating price item',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to create price item' },
       { status: 500 }

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -36,13 +37,13 @@ export async function POST(
       .single();
 
     if (error) {
-      console.error('Error saving response:', error);
+      apiLogger.error({ error, context: 'saving response' });
       return NextResponse.json({ error: 'Failed to save response' }, { status: 500 });
     }
 
     return NextResponse.json({ review });
   } catch (error) {
-    console.error('Error in POST /api/reviews/:id/respond:', error);
+    apiLogger.error({ error, context: 'POST /api/reviews/:id/respond' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

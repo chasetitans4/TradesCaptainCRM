@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRetentionTasks } from '@/lib/admin/commissions';
 import { verifyAdminAuth } from '@/lib/admin/auth';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,10 +23,10 @@ export async function GET(request: NextRequest) {
     const tasks = await getRetentionTasks(agentId);
 
     return NextResponse.json({ tasks });
-  } catch (error: any) {
-    console.error('Get retention tasks error:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Get retention tasks error', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to get retention tasks' },
+      { error: error instanceof Error ? error.message : 'Failed to get retention tasks' },
       { status: 500 }
     );
   }

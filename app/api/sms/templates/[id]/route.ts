@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -68,7 +69,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       .single();
 
     if (error) {
-      console.error('Error updating template:', error);
+      apiLogger.error({ error, context: 'updating template' });
       return NextResponse.json(
         { error: 'Failed to update template' },
         { status: 500 }
@@ -77,7 +78,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ template });
   } catch (error) {
-    console.error('Error updating template:', error);
+    apiLogger.error({ error, context: 'updating template' });
     return NextResponse.json(
       { error: 'Failed to update template' },
       { status: 500 }
@@ -86,7 +87,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 }
 
 // DELETE - Delete template
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const profile = await getServerUserProfile();
@@ -112,7 +113,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       .eq('business_id', profile.business_id);
 
     if (error) {
-      console.error('Error deleting template:', error);
+      apiLogger.error({ error, context: 'deleting template' });
       return NextResponse.json(
         { error: 'Failed to delete template' },
         { status: 500 }
@@ -121,7 +122,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting template:', error);
+    apiLogger.error({ error, context: 'deleting template' });
     return NextResponse.json(
       { error: 'Failed to delete template' },
       { status: 500 }

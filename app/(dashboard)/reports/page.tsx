@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Button,
   Card,
@@ -34,8 +34,8 @@ import {
   endOfQuarter,
   startOfYear,
   subMonths,
-  format,
 } from 'date-fns';
+import { useToast } from '@/components/ui/use-toast';
 
 interface DashboardMetrics {
   revenue: number;
@@ -110,12 +110,9 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ReportData | null>(null);
   const [datePreset, setDatePreset] = useState('this_month');
+  const { toast } = useToast();
 
-  useEffect(() => {
-    fetchReports();
-  }, [datePreset]);
-
-  async function fetchReports() {
+  const fetchReports = useCallback(async () => {
     setLoading(true);
     try {
       const { start, end } = getDateRange(datePreset);
@@ -123,17 +120,24 @@ export default function ReportsPage() {
         start: start.toISOString(),
         end: end.toISOString(),
       });
-
       const res = await fetch(`/api/reports?${params}`);
       if (!res.ok) throw new Error('Failed to fetch reports');
       const result = await res.json();
       setData(result);
-    } catch (err) {
-      console.error('Error fetching reports:', err);
+    } catch (_err) {
+      toast({
+        title: 'Failed to fetch reports',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
-  }
+  }, [datePreset, toast]);
+
+  useEffect(() => {
+    fetchReports();
+  }, [fetchReports]);
 
   if (loading) {
     return (

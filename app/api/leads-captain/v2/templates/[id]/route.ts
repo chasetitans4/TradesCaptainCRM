@@ -10,12 +10,13 @@ import { getServerUserProfile } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { previewTemplate } from '@/lib/leads-captain/v2/template-renderer';
 import type { UpdateTemplateRequest } from '@/types/leads-captain';
+import { apiLogger } from '@/lib/logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const profile = await getServerUserProfile();
     if (!profile) {
@@ -52,8 +53,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const preview = previewTemplate(template.content);
 
     return NextResponse.json({ template, preview });
-  } catch (error: unknown) {
-    console.error('Error fetching template:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error fetching template', error });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch template' },
       { status: 500 }
@@ -135,8 +136,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     });
 
     return NextResponse.json({ template });
-  } catch (error: unknown) {
-    console.error('Error updating template:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error updating template', error });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to update template' },
       { status: 500 }
@@ -144,7 +145,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
     const profile = await getServerUserProfile();
     if (!profile) {
@@ -215,8 +216,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: unknown) {
-    console.error('Error deleting template:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error deleting template', error });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to delete template' },
       { status: 500 }

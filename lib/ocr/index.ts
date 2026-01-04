@@ -6,6 +6,8 @@
 import 'openai/shims/node';
 import OpenAI from 'openai';
 import { createClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
+const ocrLogger = logger.child({ context: 'ocr' });
 
 let _openai: OpenAI | null = null;
 
@@ -165,7 +167,11 @@ Only return valid JSON, no markdown formatting.`;
 
     return { success: true, data };
   } catch (error: any) {
-    console.error('Receipt OCR error:', error);
+    ocrLogger.error({
+      msg: 'Receipt OCR error',
+      imageSource,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message || 'OCR processing failed' };
   }
 }
@@ -240,7 +246,13 @@ export async function processReceiptToExpense(
       extractedData: extracted,
     };
   } catch (error: any) {
-    console.error('Error processing receipt to expense:', error);
+    ocrLogger.error({
+      msg: 'Error processing receipt to expense',
+      imageUrl,
+      businessId,
+      userId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }
@@ -348,7 +360,11 @@ export async function reprocessExpenseReceipt(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Error reprocessing receipt:', error);
+    ocrLogger.error({
+      msg: 'Error reprocessing receipt',
+      expenseId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }

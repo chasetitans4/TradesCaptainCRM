@@ -5,7 +5,7 @@
 
 import { getCalendarEvents } from '@/lib/nylas/calendar';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import type { TimeSlot, WorkingHours, ScheduleBlock } from '@/types';
+import type { TimeSlot, ScheduleBlock } from '@/types';
 
 interface AvailabilityOptions {
   user_id: string;

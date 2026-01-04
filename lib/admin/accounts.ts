@@ -4,7 +4,7 @@
 // =====================================================
 
 import { createAdminClient } from '@/lib/supabase/server';
-import { CrmAccount, WebCustomer, CreateAccountInput, AccountStatus, BillingInterval } from './types';
+import { CrmAccount, WebCustomer, CreateAccountInput, AccountStatus } from './types';
 import { generateCouponCode } from './coupons';
 
 // Plan pricing (should match commission_rules)
@@ -435,7 +435,6 @@ export async function getAdminDashboardStats(): Promise<{
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
   // Get CRM accounts

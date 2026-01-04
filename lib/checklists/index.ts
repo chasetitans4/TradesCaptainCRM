@@ -4,7 +4,6 @@
 // =====================================================
 
 import { createClient as createServerClient } from '@/lib/supabase/server';
-import { createClient } from '@/lib/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 
 export type ChecklistType = 'pre_job' | 'service' | 'post_job' | 'safety';

@@ -14,6 +14,7 @@ import {
   getBusinessPerformanceSummary,
   rateJobPerformance,
 } from '@/lib/metrics/technician';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -74,10 +75,10 @@ export async function GET(request: NextRequest) {
     // Performance data
     const performance = await getTechnicianPerformance(technicianId, profile.business_id, range);
     return NextResponse.json(performance);
-  } catch (error: any) {
-    console.error('Error fetching metrics:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error fetching metrics', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch metrics' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch metrics' },
       { status: 500 }
     );
   }
@@ -110,10 +111,10 @@ export async function POST(request: NextRequest) {
     );
 
     return NextResponse.json(rating);
-  } catch (error: any) {
-    console.error('Error rating job:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error rating job', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to rate job' },
+      { error: error instanceof Error ? error.message : 'Failed to rate job' },
       { status: 500 }
     );
   }

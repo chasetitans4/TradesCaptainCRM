@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { handleInboundMessage, sendOutreachMessage, generateAIResponse } from '@/lib/outreach/sms';
 import { qualifyContact } from '@/lib/outreach/sms';
+import { smsLogger } from '@/lib/logger';
 
 /**
  * POST /api/webhooks/outreach/sms
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!result.success) {
-      console.error('Failed to handle inbound message:', result.error);
+      smsLogger.error({ msg: 'Failed to handle inbound message', error: result.error });
       // Return 200 to Twilio to prevent retries
       return new NextResponse(
         `<?xml version="1.0" encoding="UTF-8"?>
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
       }
     );
   } catch (error) {
-    console.error('Error handling SMS webhook:', error);
+    smsLogger.error({ msg: 'Error handling SMS webhook', error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) } });
     // Return 200 to prevent Twilio retries
     return new NextResponse(
       `<?xml version="1.0" encoding="UTF-8"?>

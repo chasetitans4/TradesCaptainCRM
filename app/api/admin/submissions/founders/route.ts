@@ -12,6 +12,7 @@ import {
   claimFoundersSlot,
   logAdminActivity,
 } from '@/lib/admin';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -94,10 +95,10 @@ export async function POST(request: NextRequest) {
       founders_slot: slotNumber,
       slots_remaining: foundersStatus.total_slots - slotNumber,
     }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error in POST /api/admin/submissions/founders:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error in POST /api/admin/submissions/founders', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to create founders submission' },
+      { error: error instanceof Error ? error.message : 'Failed to create founders submission' },
       { status: 400 }
     );
   }

@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { updateChecklistItem, deleteChecklistTemplate } from '@/lib/checklists';
+import { apiLogger } from '@/lib/logger';
 
 export async function PATCH(
   request: NextRequest,
@@ -21,7 +22,7 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { itemId, isCompleted, notes, photoUrl } = body;
+    const { itemId, isCompleted, notes } = body;
 
     if (!itemId) {
       return NextResponse.json({ error: 'itemId is required' }, { status: 400 });
@@ -33,17 +34,17 @@ export async function PATCH(
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error updating checklist item:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error updating checklist item' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update checklist item' },
+      { error: error instanceof Error ? error.message : 'Failed to update checklist item' },
       { status: 500 }
     );
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -63,10 +64,10 @@ export async function DELETE(
     await deleteChecklistTemplate(id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error deleting checklist template:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error deleting checklist template' });
     return NextResponse.json(
-      { error: error.message || 'Failed to delete checklist template' },
+      { error: error instanceof Error ? error.message : 'Failed to delete checklist template' },
       { status: 500 }
     );
   }

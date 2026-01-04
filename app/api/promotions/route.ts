@@ -12,6 +12,7 @@ import {
   getActivePromotions,
   getPromotionReport,
 } from '@/lib/promotions';
+import { apiLogger } from '@/lib/logger';
 
 // GET /api/promotions - Get promotions
 export async function GET(request: NextRequest) {
@@ -86,9 +87,9 @@ export async function GET(request: NextRequest) {
     // Get all promotions
     const promotions = await getPromotions(userData.business_id, includeInactive);
     return NextResponse.json({ promotions });
-  } catch (error: any) {
-    console.error('Error fetching promotions:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error fetching promotions' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -173,8 +174,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Error with promotion action:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error with promotion action' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
   }
 }

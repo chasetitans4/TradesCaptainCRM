@@ -10,6 +10,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { updateAdminLastLogin, logAdminActivity } from '@/lib/admin';
 import { checkLoginRateLimit } from '@/lib/rate-limit';
+import { apiLogger } from '@/lib/logger';
 
 /**
  * Verify password using bcrypt (secure) or legacy SHA256/PBKDF2 (for migration)
@@ -105,8 +106,6 @@ export async function POST(request: NextRequest) {
     // Log activity (reuse ip from rate limiting)
     await logAdminActivity(admin.id, 'logged_in', undefined, undefined, undefined, ip);
 
-    // Create session token
-    const sessionToken = crypto.randomBytes(32).toString('hex');
     const sessionData = {
       adminId: admin.id,
       role: admin.role,
@@ -132,10 +131,14 @@ export async function POST(request: NextRequest) {
         role: admin.role,
       },
     });
-  } catch (error: any) {
-    console.error('Error in POST /api/admin/login:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Admin login error',
+      path: '/api/admin/login',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Login failed' },
+      { error: error instanceof Error ? error.message : 'Login failed' },
       { status: 500 }
     );
   }

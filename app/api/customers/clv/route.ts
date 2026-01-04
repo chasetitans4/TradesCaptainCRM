@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import {
   updateCustomerCLV,
   updateAllCustomerCLV,
@@ -96,9 +97,9 @@ export async function GET(request: NextRequest) {
     // Default: get CLV report
     const reportData = await getCLVReport(userData.business_id);
     return NextResponse.json({ report: reportData });
-  } catch (error: any) {
-    console.error('Error fetching CLV data:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ error, route: 'GET /api/customers/clv' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to fetch CLV data' }, { status: 500 });
   }
 }
 
@@ -142,8 +143,8 @@ export async function POST(request: NextRequest) {
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
-  } catch (error: any) {
-    console.error('Error with CLV action:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ error, route: 'POST /api/customers/clv' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'CLV action failed' }, { status: 500 });
   }
 }

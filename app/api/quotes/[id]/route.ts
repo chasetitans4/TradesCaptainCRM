@@ -8,9 +8,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
 import { calculateQuoteTotals } from '@/lib/quotes';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -39,7 +40,7 @@ export async function GET(
 
     return NextResponse.json({ quote });
   } catch (error) {
-    console.error('Error fetching quote:', error);
+    apiLogger.error({ error, context: 'fetching quote' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -122,20 +123,20 @@ export async function PATCH(
         .eq('id', id);
 
       if (updateError) {
-        console.error('Error updating quote:', updateError);
+        apiLogger.error({ error: updateError, context: 'updating quote' });
         return NextResponse.json({ error: 'Failed to update quote' }, { status: 500 });
       }
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error updating quote:', error);
+    apiLogger.error({ error, context: 'updating quote' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -174,13 +175,13 @@ export async function DELETE(
       .eq('id', id);
 
     if (deleteError) {
-      console.error('Error deleting quote:', deleteError);
+      apiLogger.error({ error: deleteError, context: 'deleting quote' });
       return NextResponse.json({ error: 'Failed to delete quote' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting quote:', error);
+    apiLogger.error({ error, context: 'deleting quote' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

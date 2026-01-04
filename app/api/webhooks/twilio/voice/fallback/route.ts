@@ -11,6 +11,7 @@ import { handleMissedCall, hasLeadsCaptainAccess, TwilioMissedCallPayload } from
 import { processInboundMessage, type ProcessorOptions } from '@/lib/leads-captain/v2';
 import { createAdminClient } from '@/lib/supabase/server';
 import { formatPhoneE164, sendSMS } from '@/lib/twilio';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,6 +27,7 @@ export async function POST(request: NextRequest) {
     const to = params.To;
 
     const twiml = new twilio.twiml.VoiceResponse();
+    const voiceLogger = apiLogger.child({ context: 'api.twilio.voice.fallback' });
 
     // If the call wasn't answered, trigger Leads Captain and/or voicemail
     if (dialCallStatus !== 'completed') {
@@ -70,10 +72,10 @@ export async function POST(request: NextRequest) {
                   businessId: business.id,
                   isAIResponse: result.ai_used,
                 });
-                console.log('Leads Captain v2 missed call response sent');
+                voiceLogger.info('Leads Captain v2 missed call response sent');
               }
             } catch (error) {
-              console.error('Leads Captain v2 missed call handler error:', error);
+              voiceLogger.error({ msg: 'Leads Captain v2 missed call handler error', error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) } });
             }
           };
 
@@ -102,7 +104,7 @@ export async function POST(request: NextRequest) {
 
             // Trigger Leads Captain in background (don't block TwiML response)
             handleMissedCall(missedCallPayload).catch(error => {
-              console.error('Leads Captain v1 missed call handler error:', error);
+              voiceLogger.error({ msg: 'Leads Captain v1 missed call handler error', error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) } });
             });
           }
         }
@@ -122,7 +124,8 @@ export async function POST(request: NextRequest) {
       headers: { 'Content-Type': 'text/xml' },
     });
   } catch (error) {
-    console.error('Error in voice fallback:', error);
+    const voiceLogger = apiLogger.child({ context: 'api.twilio.voice.fallback' });
+    voiceLogger.error({ msg: 'Error in voice fallback', error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) } });
 
     const twiml = new twilio.twiml.VoiceResponse();
     twiml.say({ voice: 'alice' }, 'An error occurred. Please try again later.');

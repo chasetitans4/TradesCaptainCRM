@@ -21,6 +21,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { toasts, showError, showSuccess } from '@/lib/toast';
+import { logger } from '@/lib/logger';
+const adminSettingsLogger = logger.child({ context: 'admin.settings' });
 
 interface AdminProfile {
   id: string;
@@ -68,7 +70,10 @@ export default function AdminSettingsPage() {
         setProfile(data.admin);
       }
     } catch (error) {
-      console.error('Failed to fetch profile:', error);
+      adminSettingsLogger.error({
+        msg: 'Failed to fetch admin profile',
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
     } finally {
       setLoading(false);
     }

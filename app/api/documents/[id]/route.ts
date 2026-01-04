@@ -7,10 +7,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import { getDocument, updateDocument, deleteDocument, copyDocument } from '@/lib/documents';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -28,10 +29,10 @@ export async function GET(
     }
 
     return NextResponse.json(document);
-  } catch (error: any) {
-    console.error('Error fetching document:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'GET /api/documents/[id]' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch document' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch document' },
       { status: 500 }
     );
   }
@@ -73,17 +74,17 @@ export async function PATCH(
     });
 
     return NextResponse.json(document);
-  } catch (error: any) {
-    console.error('Error updating document:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'PATCH /api/documents/[id]' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update document' },
+      { error: error instanceof Error ? error.message : 'Failed to update document' },
       { status: 500 }
     );
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -98,10 +99,10 @@ export async function DELETE(
     await deleteDocument(id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error deleting document:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'DELETE /api/documents/[id]' });
     return NextResponse.json(
-      { error: error.message || 'Failed to delete document' },
+      { error: error instanceof Error ? error.message : 'Failed to delete document' },
       { status: 500 }
     );
   }

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
 import { generateInvoiceNumber, generateAccessToken, calculateInvoiceTotals, sendInvoiceViaSms } from '@/lib/invoices';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (invoiceError || !invoice) {
-      console.error('Error creating invoice:', invoiceError);
+      apiLogger.error({ message: 'Error creating invoice', error: invoiceError });
       return NextResponse.json({ error: 'Failed to create invoice' }, { status: 500 });
     }
 
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
     const { error: itemsError } = await supabase.from('invoice_items').insert(lineItems);
 
     if (itemsError) {
-      console.error('Error creating invoice items:', itemsError);
+      apiLogger.error({ message: 'Error creating invoice items', error: itemsError });
       // Clean up the invoice if items failed
       await supabase.from('invoices').delete().eq('id', invoice.id);
       return NextResponse.json({ error: 'Failed to create invoice items' }, { status: 500 });
@@ -119,14 +120,14 @@ export async function POST(request: NextRequest) {
       try {
         await sendInvoiceViaSms(invoice.id);
       } catch (error) {
-        console.error('Error sending invoice:', error);
+        apiLogger.error({ message: 'Error sending invoice', error });
         // Invoice was created, just failed to send
       }
     }
 
     return NextResponse.json({ invoice: { id: invoice.id, invoice_number: invoiceNumber } });
   } catch (error) {
-    console.error('Error in invoices API:', error);
+    apiLogger.error({ message: 'Error in invoices API', error });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

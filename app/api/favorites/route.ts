@@ -13,6 +13,7 @@ import {
   removeFavorite,
   type EntityType,
 } from '@/lib/favorites';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ favorites });
   } catch (error) {
-    console.error('Error in GET /api/favorites:', error);
+    apiLogger.error({ message: 'Error in GET /api/favorites', error });
     return NextResponse.json(
       { error: 'Failed to fetch favorites' },
       { status: 500 }
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error in POST /api/favorites:', error);
+    apiLogger.error({ message: 'Error in POST /api/favorites', error });
     return NextResponse.json(
       { error: 'Failed to toggle favorite' },
       { status: 500 }
@@ -135,7 +136,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error in DELETE /api/favorites:', error);
+    apiLogger.error({ message: 'Error in DELETE /api/favorites', error });
     return NextResponse.json(
       { error: 'Failed to remove favorite' },
       { status: 500 }

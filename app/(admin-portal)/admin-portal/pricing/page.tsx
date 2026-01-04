@@ -21,6 +21,8 @@ import {
 } from 'lucide-react';
 import type { Plan, PlanTrack, AddOn } from '@/lib/pricing/plans';
 import type { Offer } from '@/lib/pricing/offers';
+import { logger } from '@/lib/logger';
+const adminPricingLogger = logger.child({ context: 'admin.pricing' });
 
 const TRACK_CONFIG: Record<PlanTrack, { label: string; description: string; icon: React.ElementType; color: string }> = {
   leads_captain: {
@@ -92,7 +94,10 @@ export default function PricingManagementPage() {
         setOffers(data.offers || []);
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      adminPricingLogger.error({
+        msg: 'Error fetching pricing data',
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
     } finally {
       setLoading(false);
     }

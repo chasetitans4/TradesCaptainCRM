@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -13,12 +13,10 @@ import {
   Loader2,
   TestTube,
   Sparkles,
-  Clock,
   AlertCircle,
   CheckCircle2
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
-import type { AISMSSettings } from '@/types';
+import { useToast } from '@/components/ui/use-toast';
 
 type AITone = 'professional' | 'friendly' | 'casual';
 
@@ -35,6 +33,7 @@ export default function AISMSSettingsPage() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [testMessage, setTestMessage] = useState('Hi, I need to schedule a service appointment');
+  const { toast } = useToast();
 
   // Settings state
   const [enabled, setEnabled] = useState(false);
@@ -44,11 +43,7 @@ export default function AISMSSettingsPage() {
   const [knowledgeBase, setKnowledgeBase] = useState('');
   const [maxAutoReplies, setMaxAutoReplies] = useState(10);
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       const response = await fetch('/api/sms/ai-settings');
       if (response.ok) {
@@ -62,12 +57,20 @@ export default function AISMSSettingsPage() {
           setMaxAutoReplies(data.settings.ai_sms_max_replies || 10);
         }
       }
-    } catch (error) {
-      console.error('Error loading AI settings:', error);
+    } catch (_error) {
+      toast({
+        title: 'Failed to load AI settings',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -88,9 +91,12 @@ export default function AISMSSettingsPage() {
       if (!response.ok) {
         throw new Error('Failed to save settings');
       }
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      alert('Failed to save settings');
+    } catch (_error) {
+      toast({
+        title: 'Failed to save settings',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }
@@ -120,7 +126,7 @@ export default function AISMSSettingsPage() {
       } else {
         setTestResult({ success: false, error: data.error || 'Test failed' });
       }
-    } catch (error) {
+    } catch (_error) {
       setTestResult({ success: false, error: 'Failed to test AI response' });
     } finally {
       setTesting(false);

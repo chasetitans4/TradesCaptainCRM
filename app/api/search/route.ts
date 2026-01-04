@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { checkSearchRateLimit } from '@/lib/rate-limit';
+import { apiLogger } from '@/lib/logger';
 
 interface SearchResult {
   type: 'customer' | 'job' | 'lead' | 'invoice';
@@ -173,7 +174,7 @@ export async function GET(request: NextRequest) {
       total: results.length,
     });
   } catch (error) {
-    console.error('Error in GET /api/search:', error);
+    apiLogger.error({ error, context: 'GET /api/search' });
     return NextResponse.json(
       { error: 'Search failed' },
       { status: 500 }

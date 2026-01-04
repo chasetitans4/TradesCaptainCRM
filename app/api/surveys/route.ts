@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { sendSurvey, getSurveyStats, getRecentSurveys } from '@/lib/surveys';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,10 +34,10 @@ export async function GET(request: NextRequest) {
 
     const recentSurveys = await getRecentSurveys(profile.business_id, limit);
     return NextResponse.json(recentSurveys);
-  } catch (error: any) {
-    console.error('Error fetching surveys:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'fetching surveys' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch surveys' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch surveys' },
       { status: 500 }
     );
   }
@@ -63,10 +64,10 @@ export async function POST(request: NextRequest) {
     await sendSurvey(profile.business_id, customerId, jobId);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error sending survey:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'sending survey' });
     return NextResponse.json(
-      { error: error.message || 'Failed to send survey' },
+      { error: error instanceof Error ? error.message : 'Failed to send survey' },
       { status: 500 }
     );
   }

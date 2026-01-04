@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getClientDocuments, uploadDocument } from '@/lib/admin/documents';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
   request: NextRequest,
@@ -22,10 +23,13 @@ export async function GET(
     const documents = await getClientDocuments(clientId);
 
     return NextResponse.json({ documents });
-  } catch (error: any) {
-    console.error('Get client documents error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Get client documents error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch documents' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch documents' },
       { status: 500 }
     );
   }
@@ -71,10 +75,13 @@ export async function POST(
       success: true,
       document,
     });
-  } catch (error: any) {
-    console.error('Upload document error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Upload document error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to upload document' },
+      { error: error instanceof Error ? error.message : 'Failed to upload document' },
       { status: 500 }
     );
   }

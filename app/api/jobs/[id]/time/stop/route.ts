@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { stopJobTimer, getActiveJobTimer } from '@/lib/timesheets';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -54,10 +55,13 @@ export async function POST(
     const jobTimeEntry = await stopJobTimer(activeTimer.id);
 
     return NextResponse.json({ jobTimeEntry });
-  } catch (error: any) {
-    console.error('Error in POST /api/jobs/[id]/time/stop:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error in POST /api/jobs/[id]/time/stop',
+      error,
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to stop job timer' },
+      { error: error instanceof Error ? error.message : 'Failed to stop job timer' },
       { status: 400 }
     );
   }

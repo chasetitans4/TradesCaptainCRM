@@ -8,8 +8,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { getPortalSession } from '@/lib/portal/session';
 import { checkPortalMessageRateLimit } from '@/lib/rate-limit';
+import { apiLogger } from '@/lib/logger';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await getPortalSession();
     if (!session) {
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
       hasPhone: true,
     });
   } catch (error) {
-    console.error('Error fetching portal messages:', error);
+    apiLogger.error({ error, context: 'Error fetching portal messages' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -213,7 +214,7 @@ export async function POST(request: NextRequest) {
       message: newMessage,
     });
   } catch (error) {
-    console.error('Error sending portal message:', error);
+    apiLogger.error({ error, context: 'Error sending portal message' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

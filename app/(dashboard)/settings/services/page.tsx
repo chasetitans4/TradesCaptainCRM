@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -13,10 +13,10 @@ import {
   X,
   DollarSign,
   Tag,
-  Check,
 } from 'lucide-react';
 import { createClient, getCurrentUserProfile } from '@/lib/supabase/client';
 import type { UserWithBusiness } from '@/types';
+import { useToast } from '@/components/ui/use-toast';
 
 interface SavedService {
   id: string;
@@ -52,6 +52,7 @@ export default function SavedServicesPage() {
   const [editingService, setEditingService] = useState<SavedService | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
 
   // Form state
   const [formName, setFormName] = useState('');
@@ -62,11 +63,7 @@ export default function SavedServicesPage() {
   const [formCategory, setFormCategory] = useState<'labor' | 'materials' | 'service'>('service');
   const [formIsTaxable, setFormIsTaxable] = useState(true);
 
-  useEffect(() => {
-    loadUser();
-  }, []);
-
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
     const profile = await getCurrentUserProfile();
     if (!profile) {
       router.push('/login');
@@ -74,7 +71,11 @@ export default function SavedServicesPage() {
     }
     setUser(profile as UserWithBusiness);
     loadServices(profile.business_id);
-  };
+  }, [router]);
+
+  useEffect(() => {
+    loadUser();
+  }, [loadUser]);
 
   const loadServices = async (businessId: string) => {
     const supabase = createClient();
@@ -148,9 +149,8 @@ export default function SavedServicesPage() {
 
       await loadServices(user.business_id);
       resetForm();
-    } catch (error) {
-      console.error('Error saving service:', error);
-      alert('Failed to save service');
+    } catch (_error) {
+      toast({ title: 'Failed to save service', description: 'Please try again', variant: 'destructive' });
     } finally {
       setSaving(false);
     }

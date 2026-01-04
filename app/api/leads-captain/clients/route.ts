@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getLeadsCaptainClients } from '@/lib/admin/leads-captain-dashboard';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,10 +21,13 @@ export async function GET(request: NextRequest) {
     const clients = await getLeadsCaptainClients(auth.id, filter || 'all');
 
     return NextResponse.json({ clients });
-  } catch (error: any) {
-    console.error('Leads Captain clients error:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Leads Captain clients error',
+      error,
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch clients' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch clients' },
       { status: 500 }
     );
   }

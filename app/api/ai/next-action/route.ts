@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
+import { apiLogger } from '@/lib/logger';
 
 interface SuggestionContext {
   missedCalls: number;
@@ -294,7 +295,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error('Error generating AI suggestion:', error);
+    apiLogger.error({ error, context: 'Error generating AI suggestion' });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to generate suggestion' },
       { status: 500 }
@@ -322,7 +323,7 @@ async function generateSuggestion(context: SuggestionContext): Promise<AINextAct
       const suggestion = await generateLLMSuggestion(client, context);
       if (suggestion) return suggestion;
     } catch (err) {
-      console.error('LLM suggestion failed, using fallback:', err);
+      apiLogger.error({ error: err, context: 'LLM suggestion failed, using fallback' });
     }
   }
 
@@ -393,7 +394,7 @@ Be specific and action-oriented. Use the customer's name when available.`,
 
     return suggestion;
   } catch {
-    console.error('Failed to parse LLM response:', content);
+    apiLogger.error({ message: 'Failed to parse LLM response', content, context: 'generateLLMSuggestion' });
     return null;
   }
 }

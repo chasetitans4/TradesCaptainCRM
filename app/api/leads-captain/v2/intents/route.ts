@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import type { UpdateIntentsRequest } from '@/types/leads-captain';
 
 export async function GET() {
@@ -53,8 +54,11 @@ export async function GET() {
       total: intents?.length || 0,
       enabled_count: intents?.filter(i => i.enabled).length || 0,
     });
-  } catch (error: unknown) {
-    console.error('Error fetching intents:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error fetching intents',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch intents' },
       { status: 500 }
@@ -106,8 +110,11 @@ export async function PUT(request: NextRequest) {
       intents: intents || [],
       message: 'Intents updated successfully',
     });
-  } catch (error: unknown) {
-    console.error('Error updating intents:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error updating intents',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to update intents' },
       { status: 500 }

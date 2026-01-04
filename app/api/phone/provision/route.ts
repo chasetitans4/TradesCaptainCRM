@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { provisionPhoneNumber } from '@/lib/twilio';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
       phone_sid: result.phoneSid,
     });
   } catch (error) {
-    console.error('Error provisioning phone number:', error);
+    apiLogger.error({ error, context: 'Error provisioning phone number' });
     return NextResponse.json(
       { error: 'Failed to provision phone number. It may no longer be available.' },
       { status: 500 }

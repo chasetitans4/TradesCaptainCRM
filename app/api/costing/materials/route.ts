@@ -9,6 +9,7 @@ import {
   searchMaterials,
   getFrequentMaterials,
 } from '@/lib/costing/materials';
+import { apiLogger } from '@/lib/logger';
 
 // GET /api/costing/materials - Get materials
 export async function GET(request: NextRequest) {
@@ -65,9 +66,9 @@ export async function GET(request: NextRequest) {
       { error: 'Job ID or search query is required' },
       { status: 400 }
     );
-  } catch (error: any) {
-    console.error('Error fetching materials:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'Error fetching materials', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to fetch materials' }, { status: 500 });
   }
 }
 
@@ -135,8 +136,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Error with material action:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'Error with material action', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to process material action' }, { status: 500 });
   }
 }

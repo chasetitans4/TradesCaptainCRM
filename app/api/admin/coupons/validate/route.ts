@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { validateCoupon } from '@/lib/admin/coupons';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,10 +22,13 @@ export async function POST(request: NextRequest) {
     const result = await validateCoupon(code);
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Validate coupon error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Validate coupon error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to validate coupon' },
+      { error: error instanceof Error ? error.message : 'Failed to validate coupon' },
       { status: 500 }
     );
   }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Gift,
   Plus,
@@ -52,6 +52,7 @@ import {
 } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/components/ui/use-toast';
 
 interface ReferralProgram {
   id: string;
@@ -93,6 +94,7 @@ export default function ReferralsSettingsPage() {
   const [editingProgram, setEditingProgram] = useState<ReferralProgram | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -105,11 +107,7 @@ export default function ReferralsSettingsPage() {
     is_active: true,
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const [programsRes, referralsRes] = await Promise.all([
         fetch('/api/referrals/programs'),
@@ -125,13 +123,21 @@ export default function ReferralsSettingsPage() {
         const data = await referralsRes.json();
         setReferrals(data.referrals || []);
       }
-    } catch (error) {
-      console.error('Error loading data:', error);
+    } catch (_error) {
       setError('Failed to load referral data');
+      toast({
+        title: 'Failed to load referral data',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
-  }
+  }, [toast]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const openNewProgramDialog = () => {
     setEditingProgram(null);
@@ -212,8 +218,12 @@ export default function ReferralsSettingsPage() {
     try {
       await fetch(`/api/referrals/programs/${programId}`, { method: 'DELETE' });
       loadData();
-    } catch (error) {
-      console.error('Error deleting program:', error);
+    } catch (_error) {
+      toast({
+        title: 'Failed to delete program',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -225,8 +235,12 @@ export default function ReferralsSettingsPage() {
         body: JSON.stringify({ status }),
       });
       loadData();
-    } catch (error) {
-      console.error('Error updating referral:', error);
+    } catch (_error) {
+      toast({
+        title: 'Failed to update referral',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
     }
   };
 

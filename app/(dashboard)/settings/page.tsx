@@ -5,13 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient, getCurrentUserProfile, signOut } from '@/lib/supabase/client';
 import { hasPermission, type Permission } from '@/lib/permissions';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/use-toast';
 import type { UserWithBusiness } from '@/types';
 import {
   ArrowLeft,
@@ -141,6 +141,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const { toast } = useToast();
 
   // Profile form
   const [name, setName] = useState('');
@@ -185,8 +186,12 @@ export default function SettingsPage() {
       if (error) throw error;
 
       setUser({ ...user, name: name.trim(), phone: phone.trim() || null });
-    } catch (error) {
-      console.error('Error saving profile:', error);
+    } catch (_error) {
+      toast({
+        title: 'Failed to save profile',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }

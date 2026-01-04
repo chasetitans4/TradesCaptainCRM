@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getExpense, rejectExpense } from '@/lib/expenses';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -60,10 +61,10 @@ export async function POST(
     const updatedExpense = await rejectExpense(id, profile.id, reason);
 
     return NextResponse.json({ expense: updatedExpense });
-  } catch (error: any) {
-    console.error('Error in POST /api/expenses/[id]/reject:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error in POST /api/expenses/[id]/reject', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to reject expense' },
+      { error: error instanceof Error ? error.message : 'Failed to reject expense' },
       { status: 400 }
     );
   }

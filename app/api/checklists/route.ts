@@ -15,6 +15,7 @@ import {
   getJobChecklists,
   getChecklistProgress,
 } from '@/lib/checklists';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,10 +43,10 @@ export async function GET(request: NextRequest) {
     const progress = await getChecklistProgress(jobId);
 
     return NextResponse.json({ checklists, progress });
-  } catch (error: any) {
-    console.error('Error fetching checklists:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error fetching checklists' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch checklists' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch checklists' },
       { status: 500 }
     );
   }
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { action, jobId, templateId, name, items, jobType, isDefault } = body;
+    const { action, jobId, templateId, name, items, jobType } = body;
 
     if (action === 'createTemplate') {
       if (!name || !items || !Array.isArray(items)) {
@@ -91,10 +92,10 @@ export async function POST(request: NextRequest) {
     const checklist = await applyChecklistToJob(jobId, templateId);
 
     return NextResponse.json(checklist);
-  } catch (error: any) {
-    console.error('Error with checklist:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error with checklist' });
     return NextResponse.json(
-      { error: error.message || 'Failed to process checklist request' },
+      { error: error instanceof Error ? error.message : 'Failed to process checklist request' },
       { status: 500 }
     );
   }

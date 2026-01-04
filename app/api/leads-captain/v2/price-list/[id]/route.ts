@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import type { UpdatePriceItemRequest } from '@/types/leads-captain';
 
 interface RouteParams {
@@ -71,8 +72,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (error) throw error;
 
     return NextResponse.json({ item });
-  } catch (error: unknown) {
-    console.error('Error updating price item:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error updating price item',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to update price item' },
       { status: 500 }
@@ -80,7 +84,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
     const profile = await getServerUserProfile();
     if (!profile) {
@@ -122,8 +126,11 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     if (error) throw error;
 
     return NextResponse.json({ success: true });
-  } catch (error: unknown) {
-    console.error('Error deleting price item:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error deleting price item',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to delete price item' },
       { status: 500 }

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { approveCommission } from '@/lib/admin/commissions';
 import { verifyAdminAuth } from '@/lib/admin/auth';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -26,10 +27,13 @@ export async function POST(
     await approveCommission(commissionId, auth.user.id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Approve commission error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Approve commission error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to approve commission' },
+      { error: error instanceof Error ? error.message : 'Failed to approve commission' },
       { status: 500 }
     );
   }

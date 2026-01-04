@@ -4,7 +4,6 @@
 // =====================================================
 
 import { createClient as createServerClient } from '@/lib/supabase/server';
-import { createClient } from '@/lib/supabase/client';
 
 export interface CustomerEquipment {
   id: string;

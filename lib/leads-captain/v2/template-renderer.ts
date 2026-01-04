@@ -31,9 +31,6 @@ export function renderTemplate(
   const variablesUsed: string[] = [];
   const missingVariables: string[] = [];
 
-  // First, find all variables in the template
-  const allVariables = extractTemplateVariables(content);
-
   // Process conditional blocks first
   let rendered = processConditionalBlocks(content, variables);
 

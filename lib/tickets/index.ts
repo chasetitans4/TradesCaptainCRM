@@ -4,8 +4,9 @@
 // =====================================================
 
 import 'openai/shims/node';
-import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
+import { logger } from '@/lib/logger';
+const ticketsLogger = logger.child({ context: 'tickets' });
 import {
   SupportTicket,
   TicketMessage,
@@ -107,7 +108,10 @@ Be concise but capture the key details. If the issue involves system errors or b
       };
     }
   } catch (error) {
-    console.error('Error summarizing issue:', error);
+    ticketsLogger.error({
+      msg: 'Error summarizing issue',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
   }
 
   // Fallback

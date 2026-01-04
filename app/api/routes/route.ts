@@ -9,6 +9,7 @@ import { getServerUserProfile, createClient } from '@/lib/supabase/server';
 import { createOptimizedRoute, getDailyRoute } from '@/lib/routes';
 import { isFeatureEnabled } from '@/lib/features';
 import { startOfDay } from 'date-fns';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,10 +48,10 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ route });
-  } catch (error: any) {
-    console.error('Error fetching route:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'fetching route' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch route' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch route' },
       { status: 500 }
     );
   }
@@ -125,10 +126,10 @@ export async function POST(request: NextRequest) {
       route: optimizedRoute,
       message: `Optimized ${optimizedRoute.stops.length} stops`,
     });
-  } catch (error: any) {
-    console.error('Error optimizing route:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'optimizing route' });
     return NextResponse.json(
-      { error: error.message || 'Failed to optimize route' },
+      { error: error instanceof Error ? error.message : 'Failed to optimize route' },
       { status: 500 }
     );
   }

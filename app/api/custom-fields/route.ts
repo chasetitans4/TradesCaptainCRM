@@ -13,6 +13,7 @@ import {
   setFieldValues,
   validateEntityFields,
 } from '@/lib/custom-fields';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,10 +52,10 @@ export async function GET(request: NextRequest) {
       includeInactive
     );
     return NextResponse.json(definitions);
-  } catch (error: any) {
-    console.error('Error fetching custom fields:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error fetching custom fields', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch custom fields' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch custom fields' },
       { status: 500 }
     );
   }
@@ -138,10 +139,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(definition);
-  } catch (error: any) {
-    console.error('Error with custom fields:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error with custom fields', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to process custom fields request' },
+      { error: error instanceof Error ? error.message : 'Failed to process custom fields request' },
       { status: 500 }
     );
   }

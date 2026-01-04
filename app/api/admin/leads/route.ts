@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getLeads, createLead } from '@/lib/admin/leads';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { LeadStatus } from '@/lib/admin/types';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,10 +35,13 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Get leads error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Get leads error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to get leads' },
+      { error: error instanceof Error ? error.message : 'Failed to get leads' },
       { status: 500 }
     );
   }
@@ -59,10 +63,13 @@ export async function POST(request: NextRequest) {
     const lead = await createLead(auth.user.id, body);
 
     return NextResponse.json({ success: true, lead });
-  } catch (error: any) {
-    console.error('Create lead error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Create lead error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to create lead' },
+      { error: error instanceof Error ? error.message : 'Failed to create lead' },
       { status: 500 }
     );
   }

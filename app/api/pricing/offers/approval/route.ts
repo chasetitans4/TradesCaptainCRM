@@ -15,6 +15,7 @@ import {
   getOfferByCode,
 } from '@/lib/pricing/offers';
 import { getPlanById } from '@/lib/pricing/plans';
+import { apiLogger } from '@/lib/logger';
 
 // POST - Create approval request (for VIP20 etc)
 export async function POST(request: NextRequest) {
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ approval_request: approvalRequest }, { status: 201 });
   } catch (error) {
-    console.error('Error creating approval request:', error);
+    apiLogger.error({ error, context: 'Error creating approval request' });
     return NextResponse.json(
       { error: 'Failed to create approval request' },
       { status: 500 }
@@ -97,7 +98,7 @@ export async function GET(request: NextRequest) {
     const pendingRequests = await getPendingApprovalRequests();
     return NextResponse.json({ pending_requests: pendingRequests });
   } catch (error) {
-    console.error('Error fetching approval requests:', error);
+    apiLogger.error({ error, context: 'Error fetching approval requests' });
     return NextResponse.json(
       { error: 'Failed to fetch approval requests' },
       { status: 500 }
@@ -138,7 +139,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ approval_request: result });
   } catch (error) {
-    console.error('Error updating approval request:', error);
+    apiLogger.error({ error, context: 'Error updating approval request' });
     return NextResponse.json(
       { error: 'Failed to update approval request' },
       { status: 500 }

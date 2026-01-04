@@ -8,9 +8,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getLeadActivities, logActivity } from '@/lib/admin/pipeline';
 import type { LeadActivityType } from '@/lib/admin/types';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ leadId: string }> }
 ) {
   try {
@@ -23,10 +24,10 @@ export async function GET(
     const activities = await getLeadActivities(leadId);
 
     return NextResponse.json({ activities });
-  } catch (error: any) {
-    console.error('Get activities error:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Get activities error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch activities' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch activities' },
       { status: 500 }
     );
   }
@@ -57,10 +58,10 @@ export async function POST(
     );
 
     return NextResponse.json({ activity }, { status: 201 });
-  } catch (error: any) {
-    console.error('Log activity error:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Log activity error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to log activity' },
+      { error: error instanceof Error ? error.message : 'Failed to log activity' },
       { status: 500 }
     );
   }

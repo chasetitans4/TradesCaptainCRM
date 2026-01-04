@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import type { ApprovalQueueItem, ApprovalQueueResponse, LeadsCaptainMessage } from '@/types/leads-captain';
 
 export async function GET() {
@@ -76,8 +77,11 @@ export async function GET() {
     };
 
     return NextResponse.json(response);
-  } catch (error: unknown) {
-    console.error('Error fetching approvals:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error fetching approvals',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch approvals' },
       { status: 500 }

@@ -4,10 +4,11 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserProfile, createClient } from '@/lib/supabase/server';
+import { getServerUserProfile } from '@/lib/supabase/server';
 import { syncAllToQuickBooks } from '@/lib/quickbooks/sync';
+import { apiLogger } from '@/lib/logger';
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const profile = await getServerUserProfile();
 
@@ -27,10 +28,10 @@ export async function POST(request: NextRequest) {
       results,
       message: `Synced ${results.customers} customers, ${results.invoices} invoices, ${results.payments} payments, ${results.expenses} expenses`,
     });
-  } catch (error: any) {
-    console.error('Error syncing to QuickBooks:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error syncing to QuickBooks' });
     return NextResponse.json(
-      { error: error.message || 'Failed to sync to QuickBooks' },
+      { error: error instanceof Error ? error.message : 'Failed to sync to QuickBooks' },
       { status: 500 }
     );
   }

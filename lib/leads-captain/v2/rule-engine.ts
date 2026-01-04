@@ -6,17 +6,14 @@
 
 import {
   LeadsCaptainRule,
-  LeadsCaptainConfig,
-  LeadsCaptainConversation,
-  RuleConditions,
   RuleCondition,
   RuleActions,
   RuleEvaluationContext,
   RuleEvaluationResult,
-  IntentClassificationResult,
   BusinessHours,
   DayOfWeek,
 } from '@/types/leads-captain';
+import { jobLogger } from '@/lib/logger';
 
 // =====================================================
 // CHAIN DEPTH LIMITING (Section 3.3)
@@ -40,7 +37,7 @@ export function evaluateRules(
 ): RuleEvaluationResult {
   // Section 3.3: Enforce chain depth limit
   if (chainDepth >= MAX_CHAIN_DEPTH) {
-    console.warn(`[Leads Captain v2] Chain depth limit (${MAX_CHAIN_DEPTH}) reached. Stopping rule evaluation.`);
+    jobLogger.warn({ msg: 'Chain depth limit reached', maxChainDepth: MAX_CHAIN_DEPTH });
     return {
       matched: false,
       rule: null,
@@ -266,7 +263,7 @@ export function evaluateCondition(
       break;
 
     default:
-      console.warn(`[Leads Captain v2] Unknown condition field: ${field}`);
+      jobLogger.warn({ msg: 'Unknown condition field', field });
       result = false;
   }
 
@@ -454,7 +451,7 @@ export function isWithinQuietHours(
  */
 export function executeRuleActions(
   rule: LeadsCaptainRule,
-  context: RuleEvaluationContext
+  _context: RuleEvaluationContext
 ): {
   should_send_response: boolean;
   template_id: string | null;

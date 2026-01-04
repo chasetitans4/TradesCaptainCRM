@@ -8,6 +8,7 @@ import {
   getJobTypeProfitability,
   getCostVarianceAnalysis,
 } from '@/lib/costing/summary';
+import { apiLogger } from '@/lib/logger';
 
 // GET /api/costing/summary - Get cost summaries and reports
 export async function GET(request: NextRequest) {
@@ -94,9 +95,9 @@ export async function GET(request: NextRequest) {
       { error: 'Job ID or report type is required' },
       { status: 400 }
     );
-  } catch (error: any) {
-    console.error('Error fetching cost summary:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'Error fetching cost summary', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to fetch cost summary' }, { status: 500 });
   }
 }
 
@@ -132,8 +133,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Error updating cost summary:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'Error updating cost summary', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to update cost summary' }, { status: 500 });
   }
 }

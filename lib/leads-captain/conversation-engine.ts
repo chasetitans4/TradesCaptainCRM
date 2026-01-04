@@ -20,6 +20,7 @@ import {
   HELP_KEYWORDS,
   START_KEYWORDS,
 } from './types';
+import { aiLogger } from '@/lib/logger';
 
 let anthropicClient: Anthropic | null = null;
 function getAnthropic(): Anthropic {
@@ -370,13 +371,20 @@ function parseAIResponse(responseText: string): AIResponse | null {
 
     // Validate required fields
     if (!parsed.reply_text || !parsed.state) {
-      console.error('AI response missing required fields:', parsed);
+      aiLogger.error({
+        msg: 'AI response missing required fields',
+        parsed,
+      });
       return null;
     }
 
     return parsed as AIResponse;
   } catch (error) {
-    console.error('Failed to parse AI response:', error, responseText);
+    aiLogger.error({
+      msg: 'Failed to parse AI response',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      responseText,
+    });
     return null;
   }
 }
@@ -460,7 +468,12 @@ Respond with ONLY a JSON object.`;
       };
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`AI response attempt ${attempt + 1} failed:`, lastError);
+      const { aiLogger } = await import('@/lib/logger');
+      aiLogger.error({
+        msg: 'AI response attempt failed',
+        attempt: attempt + 1,
+        error: lastError,
+      });
 
       // Wait before retry with exponential backoff
       if (attempt < MAX_RETRIES - 1) {

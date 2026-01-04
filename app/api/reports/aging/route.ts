@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { generateAgingReport, getAgingSummary } from '@/lib/invoices/aging';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,10 +31,10 @@ export async function GET(request: NextRequest) {
     const report = await generateAgingReport(profile.business_id);
 
     return NextResponse.json(report);
-  } catch (error: any) {
-    console.error('Error generating aging report:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'generating aging report' });
     return NextResponse.json(
-      { error: error.message || 'Failed to generate report' },
+      { error: error instanceof Error ? error.message : 'Failed to generate report' },
       { status: 500 }
     );
   }

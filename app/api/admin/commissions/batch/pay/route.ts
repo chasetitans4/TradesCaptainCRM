@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { batchPayCommissions } from '@/lib/admin/commissions';
 import { verifyAdminAuth } from '@/lib/admin/auth';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,10 +33,13 @@ export async function POST(request: NextRequest) {
     const count = await batchPayCommissions(commission_ids, payment_method, payment_reference);
 
     return NextResponse.json({ success: true, paid_count: count });
-  } catch (error: any) {
-    console.error('Batch pay commissions error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Batch pay commissions error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to pay commissions' },
+      { error: error instanceof Error ? error.message : 'Failed to pay commissions' },
       { status: 500 }
     );
   }

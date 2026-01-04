@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 export async function PATCH(
   request: NextRequest,
@@ -42,19 +43,19 @@ export async function PATCH(
       .single();
 
     if (error) {
-      console.error('Error updating referral program:', error);
+      apiLogger.error({ error, context: 'updating referral program' });
       return NextResponse.json({ error: 'Failed to update program' }, { status: 500 });
     }
 
     return NextResponse.json({ program });
   } catch (error) {
-    console.error('Error in PATCH /api/referrals/programs/:id:', error);
+    apiLogger.error({ error, context: 'PATCH /api/referrals/programs/:id' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -72,13 +73,13 @@ export async function DELETE(
     const { error } = await supabase.from('referral_programs').delete().eq('id', id);
 
     if (error) {
-      console.error('Error deleting referral program:', error);
+      apiLogger.error({ error, context: 'deleting referral program' });
       return NextResponse.json({ error: 'Failed to delete program' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error in DELETE /api/referrals/programs/:id:', error);
+    apiLogger.error({ error, context: 'DELETE /api/referrals/programs/:id' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import { getExpenses, createExpense } from '@/lib/expenses';
 import { parseISO } from 'date-fns';
 
@@ -76,10 +77,10 @@ export async function GET(request: NextRequest) {
         totalPages: Math.ceil(total / limit),
       },
     });
-  } catch (error: any) {
-    console.error('Error in GET /api/expenses:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'GET /api/expenses' });
     return NextResponse.json(
-      { error: error.message || 'Failed to get expenses' },
+      { error: error instanceof Error ? error.message : 'Failed to get expenses' },
       { status: 500 }
     );
   }
@@ -169,10 +170,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ expense }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error in POST /api/expenses:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'POST /api/expenses' });
     return NextResponse.json(
-      { error: error.message || 'Failed to create expense' },
+      { error: error instanceof Error ? error.message : 'Failed to create expense' },
       { status: 400 }
     );
   }

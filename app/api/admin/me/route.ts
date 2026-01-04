@@ -6,8 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getAdminUser } from '@/lib/admin';
+import { apiLogger } from '@/lib/logger';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get('admin_session');
@@ -42,10 +43,14 @@ export async function GET(request: NextRequest) {
         role: admin.role,
       },
     });
-  } catch (error: any) {
-    console.error('Error in GET /api/admin/me:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Get admin me error',
+      path: '/api/admin/me',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to get admin' },
+      { error: error instanceof Error ? error.message : 'Failed to get admin' },
       { status: 500 }
     );
   }

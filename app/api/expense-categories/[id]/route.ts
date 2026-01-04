@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import { updateExpenseCategory, deleteExpenseCategory } from '@/lib/expenses';
 
 export async function PUT(
@@ -68,17 +69,17 @@ export async function PUT(
     const updatedCategory = await updateExpenseCategory(id, updates);
 
     return NextResponse.json({ category: updatedCategory });
-  } catch (error: any) {
-    console.error('Error in PUT /api/expense-categories/[id]:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'PUT /api/expense-categories/[id]' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update category' },
+      { error: error instanceof Error ? error.message : 'Failed to update category' },
       { status: 400 }
     );
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -132,10 +133,10 @@ export async function DELETE(
     await deleteExpenseCategory(id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error in DELETE /api/expense-categories/[id]:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'DELETE /api/expense-categories/[id]' });
     return NextResponse.json(
-      { error: error.message || 'Failed to delete category' },
+      { error: error instanceof Error ? error.message : 'Failed to delete category' },
       { status: 400 }
     );
   }

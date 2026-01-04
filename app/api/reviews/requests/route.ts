@@ -6,8 +6,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -39,13 +40,13 @@ export async function GET(request: NextRequest) {
       .order('sent_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching review requests:', error);
+      apiLogger.error({ error, context: 'fetching review requests' });
       return NextResponse.json({ error: 'Failed to fetch requests' }, { status: 500 });
     }
 
     return NextResponse.json({ requests });
   } catch (error) {
-    console.error('Error in GET /api/reviews/requests:', error);
+    apiLogger.error({ error, context: 'GET /api/reviews/requests' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Error creating review request:', error);
+      apiLogger.error({ error, context: 'creating review request' });
       return NextResponse.json({ error: 'Failed to create request' }, { status: 500 });
     }
 
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ request: reviewRequest }, { status: 201 });
   } catch (error) {
-    console.error('Error in POST /api/reviews/requests:', error);
+    apiLogger.error({ error, context: 'POST /api/reviews/requests' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

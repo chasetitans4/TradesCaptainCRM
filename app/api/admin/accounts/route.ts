@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getCRMAccounts, PlanStatus, PlanType } from '@/lib/admin';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,10 +48,14 @@ export async function GET(request: NextRequest) {
         totalPages: Math.ceil(total / limit),
       },
     });
-  } catch (error: any) {
-    console.error('Error in GET /api/admin/accounts:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Error fetching accounts',
+      path: '/api/admin/accounts',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to get accounts' },
+      { error: error instanceof Error ? error.message : 'Failed to get accounts' },
       { status: 500 }
     );
   }

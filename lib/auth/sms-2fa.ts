@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 import { generateNumericCode } from '@/lib/crypto';
 import { logSecurityEvent } from './audit';
 import { ensureBackupCodes } from './backup-codes';
+import { smsLogger } from '@/lib/logger';
 
 const CODE_LENGTH = 6;
 const CODE_EXPIRY_MINUTES = 10;
@@ -41,9 +42,12 @@ export async function sendSMS2FACode(
       body: `Your TradesCaptain verification code is: ${code}. It expires in ${CODE_EXPIRY_MINUTES} minutes. Don't share this code with anyone.`,
     });
   } catch (error) {
-    // SMS sending failed - code was still stored in database
-    // In production, this should trigger an alert to ops team
-    console.error('Failed to send SMS 2FA code:', error instanceof Error ? error.message : 'Unknown error');
+    smsLogger.error({
+      msg: 'Failed to send SMS 2FA code',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      userId,
+      phone,
+    });
   }
 }
 

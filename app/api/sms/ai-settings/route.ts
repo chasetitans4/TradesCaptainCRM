@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 // GET - Fetch AI SMS settings
 export async function GET() {
@@ -30,7 +31,7 @@ export async function GET() {
       .single();
 
     if (error) {
-      console.error('Error fetching AI SMS settings:', error);
+      apiLogger.error({ error, context: 'fetching AI SMS settings' });
       return NextResponse.json(
         { error: 'Failed to fetch AI SMS settings' },
         { status: 500 }
@@ -45,7 +46,7 @@ export async function GET() {
       tone: business.ai_sms_tone || 'professional',
     });
   } catch (error) {
-    console.error('Error fetching AI SMS settings:', error);
+    apiLogger.error({ error, context: 'fetching AI SMS settings' });
     return NextResponse.json(
       { error: 'Failed to fetch AI SMS settings' },
       { status: 500 }
@@ -106,7 +107,7 @@ export async function PUT(request: NextRequest) {
       .eq('id', profile.business_id);
 
     if (error) {
-      console.error('Error updating AI SMS settings:', error);
+      apiLogger.error({ error, context: 'updating AI SMS settings' });
       return NextResponse.json(
         { error: 'Failed to update AI SMS settings' },
         { status: 500 }
@@ -115,7 +116,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error updating AI SMS settings:', error);
+    apiLogger.error({ error, context: 'updating AI SMS settings' });
     return NextResponse.json(
       { error: 'Failed to update AI SMS settings' },
       { status: 500 }

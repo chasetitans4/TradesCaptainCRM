@@ -8,12 +8,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getFeatureRequest,
   updateFeatureRequest,
-  upvoteFeatureRequest,
 } from '@/lib/feature-requests';
+import { apiLogger } from '@/lib/logger';
 
 // GET - Get single feature request
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
@@ -29,7 +29,7 @@ export async function GET(
 
     return NextResponse.json({ feature_request: featureRequest });
   } catch (error) {
-    console.error('Error fetching feature request:', error);
+    apiLogger.error({ message: 'Error fetching feature request', error });
     return NextResponse.json(
       { error: 'Failed to fetch feature request' },
       { status: 500 }
@@ -62,7 +62,7 @@ export async function PATCH(
 
     return NextResponse.json({ feature_request: updated });
   } catch (error) {
-    console.error('Error updating feature request:', error);
+    apiLogger.error({ message: 'Error updating feature request', error });
     return NextResponse.json(
       { error: 'Failed to update feature request' },
       { status: 500 }

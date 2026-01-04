@@ -6,9 +6,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { deleteJobPhoto } from '@/lib/photos';
+import { apiLogger } from '@/lib/logger';
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -23,10 +24,10 @@ export async function DELETE(
     await deleteJobPhoto(id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error deleting photo:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error deleting photo' });
     return NextResponse.json(
-      { error: error.message || 'Failed to delete photo' },
+      { error: error instanceof Error ? error.message : 'Failed to delete photo' },
       { status: 500 }
     );
   }

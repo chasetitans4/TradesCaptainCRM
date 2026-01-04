@@ -4,6 +4,7 @@
 
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { logger } from '@/lib/logger';
 
 /**
  * Create a Supabase client for server-side usage
@@ -85,7 +86,11 @@ export async function getServerUserProfile() {
     .single();
   
   if (error) {
-    console.error('Error fetching user profile:', error);
+    logger.error({
+      msg: 'Error fetching user profile (server)',
+      error: error ? { message: error.message, code: error.code, details: error.details } : undefined,
+      userId: user.id,
+    });
     return null;
   }
   

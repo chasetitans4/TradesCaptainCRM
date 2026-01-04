@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { verifyAdminAuth } from '@/lib/admin/auth';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
   request: NextRequest,
@@ -43,10 +44,13 @@ export async function GET(
     }
 
     return NextResponse.json({ commission });
-  } catch (error: any) {
-    console.error('Get commission error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Get commission error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to get commission' },
+      { error: error instanceof Error ? error.message : 'Failed to get commission' },
       { status: 500 }
     );
   }

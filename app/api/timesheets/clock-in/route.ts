@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { clockIn } from '@/lib/timesheets';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,10 +40,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ entry }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error in POST /api/timesheets/clock-in:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error in POST /api/timesheets/clock-in' });
     return NextResponse.json(
-      { error: error.message || 'Failed to clock in' },
+      { error: error instanceof Error ? error.message : 'Failed to clock in' },
       { status: 400 }
     );
   }

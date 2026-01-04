@@ -62,7 +62,12 @@ export async function createScoringRule(
 
     return { success: true, rule: transformRule(rule) };
   } catch (error: any) {
-    console.error('Error creating scoring rule:', error);
+    const { logger } = await import('@/lib/logger');
+    const leadsLogger = logger.child({ context: 'leads.scoring' });
+    leadsLogger.error({
+      msg: 'Error creating scoring rule',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }
@@ -96,7 +101,12 @@ export async function updateScoringRule(
 
     return { success: true, rule: transformRule(rule) };
   } catch (error: any) {
-    console.error('Error updating scoring rule:', error);
+    const { logger } = await import('@/lib/logger');
+    const leadsLogger = logger.child({ context: 'leads.scoring' });
+    leadsLogger.error({
+      msg: 'Error updating scoring rule',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }
@@ -114,7 +124,12 @@ export async function deleteScoringRule(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Error deleting scoring rule:', error);
+    const { logger } = await import('@/lib/logger');
+    const leadsLogger = logger.child({ context: 'leads.scoring' });
+    leadsLogger.error({
+      msg: 'Error deleting scoring rule',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }
@@ -355,7 +370,12 @@ export async function trackLeadEngagement(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Error tracking lead engagement:', error);
+    const { logger } = await import('@/lib/logger');
+    const leadsLogger = logger.child({ context: 'leads.scoring' });
+    leadsLogger.error({
+      msg: 'Error tracking lead engagement',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }

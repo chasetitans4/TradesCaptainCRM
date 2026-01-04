@@ -4,6 +4,7 @@
 // =====================================================
 
 import { createAdminClient } from '@/lib/supabase/server';
+import { jobLogger } from '@/lib/logger';
 import {
   LeadsCaptainConfig,
   LeadsCaptainConversation,
@@ -16,13 +17,12 @@ import {
   MessageProcessingResult,
   RuleEvaluationContext,
   IntentClassificationResult,
-  ConversationStatus,
 } from '@/types/leads-captain';
 import { handleCompliance, isOptedOut, sanitizeMessage } from './compliance';
 import { classifyIntent, extractCustomerName } from './intent-classifier';
 import { evaluateRules, executeRuleActions, isWithinBusinessHours, isWithinQuietHours } from './rule-engine';
 import { renderTemplate, buildTemplateVariables, addEmoji } from './template-renderer';
-import { generateAIResponse, requiresApproval, applyGuardrails } from './guardrails';
+import { generateAIResponse, requiresApproval } from './guardrails';
 import { canAccessFeature, checkPlanLimit } from './features';
 
 export interface ProcessorOptions {
@@ -449,7 +449,12 @@ export async function processInboundMessage(
 
         explanation = `AI fallback used (confidence: ${aiResult.confidence}%)`;
       } catch (error) {
-        console.error('[Leads Captain v2] AI generation failed:', error);
+        jobLogger.error({
+          msg: 'AI generation failed',
+          error: error instanceof Error
+            ? { name: error.name, message: error.message, stack: error.stack }
+            : String(error),
+        });
         explanation = 'AI generation failed - no response sent';
         decisionDetails.ai_error = error instanceof Error ? error.message : 'Unknown error';
       }
@@ -614,7 +619,7 @@ async function getOrCreateConversation(
   supabase: ReturnType<typeof createAdminClient>,
   configId: string,
   customerPhone: string,
-  isMissedCall?: boolean
+  _isMissedCall?: boolean
 ): Promise<{ conversation: LeadsCaptainConversation; isFirstMessage: boolean }> {
   // Look for existing active conversation
   const { data: existing } = await supabase

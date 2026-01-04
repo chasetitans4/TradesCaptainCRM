@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePortalSession } from '@/lib/portal/session';
 import { submitServiceRequest, getCustomerEquipment } from '@/lib/portal/data';
+import { apiLogger } from '@/lib/logger';
 
 // GET /api/portal/service-request - Get data for service request form
 export async function GET() {
@@ -26,12 +27,12 @@ export async function GET() {
         { value: 'emergency', label: 'Emergency', description: 'Need immediate assistance' },
       ],
     });
-  } catch (error: any) {
-    if (error.message === 'Portal authentication required') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Portal authentication required') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    console.error('Portal service request GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    apiLogger.error({ error, context: 'Portal service request GET error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -79,11 +80,11 @@ export async function POST(request: NextRequest) {
       success: true,
       requestId: result.id,
     });
-  } catch (error: any) {
-    if (error.message === 'Portal authentication required') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Portal authentication required') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    console.error('Portal service request POST error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    apiLogger.error({ error, context: 'Portal service request POST error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
   }
 }

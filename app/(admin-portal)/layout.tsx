@@ -33,6 +33,8 @@ import {
 } from 'lucide-react';
 import { useAdminKeyboardShortcuts } from '@/hooks/useAdminKeyboardShortcuts';
 import { AdminKeyboardShortcutsHelp } from '@/components/admin/keyboard-shortcuts-help';
+import { logger } from '@/lib/logger';
+const adminPortalLogger = logger.child({ context: 'admin.portal.layout' });
 
 interface AdminUser {
   id: string;
@@ -100,7 +102,10 @@ export default function AdminPortalLayout({
         const data = await res.json();
         setAdmin(data.admin);
       } catch (error) {
-        console.error('Auth check error:', error);
+        adminPortalLogger.error({
+          msg: 'Auth check error',
+          error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+        });
         router.push('/admin-portal/login');
       } finally {
         setLoading(false);
@@ -121,7 +126,10 @@ export default function AdminPortalLayout({
       await fetch('/api/admin/logout', { method: 'POST' });
       router.push('/admin-portal/login');
     } catch (error) {
-      console.error('Logout error:', error);
+      adminPortalLogger.error({
+        msg: 'Logout error',
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
     }
   };
 

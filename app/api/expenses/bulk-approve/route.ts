@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import { bulkApproveExpenses } from '@/lib/expenses';
 
 export async function POST(request: NextRequest) {
@@ -67,10 +68,10 @@ export async function POST(request: NextRequest) {
       success: true,
       approved: result.count,
     });
-  } catch (error: any) {
-    console.error('Error in POST /api/expenses/bulk-approve:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'POST /api/expenses/bulk-approve' });
     return NextResponse.json(
-      { error: error.message || 'Failed to bulk approve expenses' },
+      { error: error instanceof Error ? error.message : 'Failed to bulk approve expenses' },
       { status: 400 }
     );
   }

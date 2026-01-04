@@ -4,11 +4,11 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
+import { getServerUserProfile } from '@/lib/supabase/server';
 import { getTeamMembers } from '@/lib/team';
-import { hasPermission } from '@/lib/permissions';
+import { apiLogger } from '@/lib/logger';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const profile = await getServerUserProfile();
 
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ members });
   } catch (error) {
-    console.error('Error fetching team members:', error);
+    apiLogger.error({ error, message: 'Error fetching team members' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

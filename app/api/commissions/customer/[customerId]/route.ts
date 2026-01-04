@@ -7,9 +7,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getCustomerCommissionDetail } from '@/lib/admin/commission-tracker';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ customerId: string }> }
 ) {
   try {
@@ -32,10 +33,10 @@ export async function GET(
     }
 
     return NextResponse.json(detail);
-  } catch (error: any) {
-    console.error('Error in GET /api/commissions/customer/:customerId:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error in GET /api/commissions/customer/:customerId' });
     return NextResponse.json(
-      { error: error.message || 'Failed to get customer commission detail' },
+      { error: error instanceof Error ? error.message : 'Failed to get customer commission detail' },
       { status: 500 }
     );
   }

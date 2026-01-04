@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -91,7 +92,7 @@ If any field is unclear or not visible, use null. For total, make your best esti
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('OpenAI API error:', errorData);
+      apiLogger.error({ error: errorData, route: 'POST /api/expenses/scan-receipt', context: 'OpenAI API error' });
       return NextResponse.json(
         { error: 'OCR service error' },
         { status: 500 }
@@ -120,10 +121,10 @@ If any field is unclear or not visible, use null. For total, make your best esti
       success: true,
       data: ocrResult,
     });
-  } catch (error: any) {
-    console.error('Error in POST /api/expenses/scan-receipt:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'POST /api/expenses/scan-receipt' });
     return NextResponse.json(
-      { error: error.message || 'Failed to scan receipt' },
+      { error: error instanceof Error ? error.message : 'Failed to scan receipt' },
       { status: 500 }
     );
   }

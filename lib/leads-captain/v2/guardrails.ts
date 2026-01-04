@@ -7,7 +7,6 @@ import Anthropic from '@anthropic-ai/sdk';
 import {
   LeadsCaptainConfig,
   LeadsCaptainConversation,
-  LeadsCaptainTemplate,
   LeadsCaptainPriceItem,
   AIGenerationOptions,
   AIResponseResult,
@@ -16,6 +15,7 @@ import {
   CreativityLevel,
   LeadsCaptainMessage,
 } from '@/types/leads-captain';
+import { jobLogger } from '@/lib/logger';
 
 let anthropicClient: Anthropic | null = null;
 function getAnthropic(): Anthropic {
@@ -83,7 +83,12 @@ export async function generateAIResponse(
       guardrails_applied: guardrailsApplied,
     };
   } catch (error) {
-    console.error('[Leads Captain v2] AI generation error:', error);
+    jobLogger.error({
+      msg: 'AI generation error',
+      error: error instanceof Error
+        ? { name: error.name, message: error.message, stack: error.stack }
+        : String(error),
+    });
     throw error;
   }
 }
@@ -258,7 +263,7 @@ export function applyGuardrails(
   // 2. Remove any specific time promises
   const timePromises = /\b(will be there|arriving|on my way|be there in|tomorrow at \d|today at \d|next \w+ at \d)/gi;
   if (timePromises.test(result)) {
-    result = result.replace(timePromises, (match) => {
+    result = result.replace(timePromises, (_match) => {
       applied.push('time_promise_removed');
       return 'will reach out to schedule';
     });
@@ -280,7 +285,7 @@ export function applyGuardrails(
 
   for (const pattern of inappropriatePatterns) {
     if (pattern.test(result)) {
-      console.warn('[Leads Captain v2] AI response contained inappropriate content, flagging for review');
+      jobLogger.warn({ msg: 'AI response inappropriate content flagged' });
       applied.push('flagged_inappropriate');
     }
   }

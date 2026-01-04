@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { updateTask, completeTask } from '@/lib/admin/pipeline';
+import { apiLogger } from '@/lib/logger';
 
 export async function PATCH(
   request: NextRequest,
@@ -29,10 +30,10 @@ export async function PATCH(
     const task = await updateTask(taskId, body);
 
     return NextResponse.json({ task });
-  } catch (error: any) {
-    console.error('Update task error:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Update task error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update task' },
+      { error: error instanceof Error ? error.message : 'Failed to update task' },
       { status: 500 }
     );
   }

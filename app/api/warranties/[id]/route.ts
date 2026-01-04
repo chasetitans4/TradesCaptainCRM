@@ -14,6 +14,7 @@ import {
   getWarrantyClaims,
   getWarrantyCoverage,
 } from '@/lib/warranties';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
   request: NextRequest,
@@ -44,10 +45,10 @@ export async function GET(
     }
 
     return NextResponse.json({ ...warranty, coverage });
-  } catch (error: any) {
-    console.error('Error fetching warranty:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error fetching warranty' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch warranty' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch warranty' },
       { status: 500 }
     );
   }
@@ -75,10 +76,10 @@ export async function PATCH(
     const warranty = await updateWarrantyStatus(id, status);
 
     return NextResponse.json(warranty);
-  } catch (error: any) {
-    console.error('Error updating warranty:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error updating warranty' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update warranty' },
+      { error: error instanceof Error ? error.message : 'Failed to update warranty' },
       { status: 500 }
     );
   }
@@ -109,10 +110,10 @@ export async function POST(
     const claim = await createWarrantyClaim(id, issueDescription, profile.id, amountClaimed);
 
     return NextResponse.json(claim);
-  } catch (error: any) {
-    console.error('Error creating warranty claim:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error creating warranty claim' });
     return NextResponse.json(
-      { error: error.message || 'Failed to create warranty claim' },
+      { error: error instanceof Error ? error.message : 'Failed to create warranty claim' },
       { status: 500 }
     );
   }

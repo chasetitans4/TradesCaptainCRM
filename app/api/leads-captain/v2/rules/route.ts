@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { checkPlanLimit } from '@/lib/leads-captain/v2/features';
+import { apiLogger } from '@/lib/logger';
 import type { CreateRuleRequest } from '@/types/leads-captain';
 
 export async function GET(request: NextRequest) {
@@ -56,8 +57,11 @@ export async function GET(request: NextRequest) {
       custom_count: rules?.filter(r => !r.is_system).length || 0,
       limits: limitInfo,
     });
-  } catch (error: unknown) {
-    console.error('Error fetching rules:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error fetching rules',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch rules' },
       { status: 500 }
@@ -155,8 +159,11 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ rule }, { status: 201 });
-  } catch (error: unknown) {
-    console.error('Error creating rule:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error creating rule',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to create rule' },
       { status: 500 }

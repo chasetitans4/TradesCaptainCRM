@@ -13,13 +13,14 @@ import {
   Settings,
   LogOut,
   Menu,
-  X,
   Phone,
   Mail,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { logger } from '@/lib/logger';
+const portalLogger = logger.child({ context: 'portal.layout' });
 
 interface BusinessInfo {
   id: string;
@@ -74,7 +75,11 @@ export default function PortalLayout({
         setBusiness(data.business);
         setCustomer(data.customer);
       } catch (error) {
-        console.error('Error loading portal data:', error);
+        portalLogger.error({
+          msg: 'Error loading portal data',
+          businessId,
+          error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+        });
         router.push(`/portal/${businessId}/login`);
       } finally {
         setLoading(false);
@@ -98,7 +103,11 @@ export default function PortalLayout({
       });
       router.push(`/portal/${businessId}/login`);
     } catch (error) {
-      console.error('Error logging out:', error);
+      portalLogger.error({
+        msg: 'Error logging out',
+        businessId,
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
     }
   };
 

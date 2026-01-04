@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { captureSignature, getSignature } from '@/lib/signatures';
 import { createClient as createServerClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,10 +43,10 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
-  } catch (error: any) {
-    console.error('Error fetching signature:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'fetching signature' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch signature' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch signature' },
       { status: 500 }
     );
   }
@@ -82,10 +83,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ id: signatureId, success: true });
-  } catch (error: any) {
-    console.error('Error capturing signature:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'capturing signature' });
     return NextResponse.json(
-      { error: error.message || 'Failed to capture signature' },
+      { error: error instanceof Error ? error.message : 'Failed to capture signature' },
       { status: 500 }
     );
   }

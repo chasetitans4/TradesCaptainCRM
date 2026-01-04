@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Button,
@@ -19,11 +19,9 @@ import {
   ExternalLink,
   Loader2,
   Check,
-  MessageSquare,
-  Mail,
-  TrendingUp,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
 
 interface ReviewStats {
   totalSent: number;
@@ -40,19 +38,15 @@ export default function ReviewSettingsPage() {
   const [stats, setStats] = useState<ReviewStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    fetchSettings();
-  }, []);
-
-  async function fetchSettings() {
+  const fetchSettings = useCallback(async () => {
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) return;
 
-      // Get business settings
       const { data: profile } = await supabase
         .from('users')
         .select('business:businesses(review_link_google)')
@@ -63,19 +57,22 @@ export default function ReviewSettingsPage() {
         setGoogleLink((profile.business as any).review_link_google || '');
       }
 
-      // Get stats
       const res = await fetch('/api/reviews?stats=true');
       if (res.ok) {
         const data = await res.json();
         setStats(data.stats);
       }
-    } catch (err) {
-      console.error('Error fetching settings:', err);
+    } catch (_error) {
+      toast({ title: 'Failed to load settings', description: 'Please try again', variant: 'destructive' });
       setError('Failed to load settings');
     } finally {
       setLoading(false);
     }
-  }
+  }, [toast]);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
 
   async function handleSave() {
     setSaving(true);
@@ -107,9 +104,10 @@ export default function ReviewSettingsPage() {
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
-    } catch (err: any) {
-      console.error('Error saving settings:', err);
-      setError(err.message || 'Failed to save settings');
+      toast({ title: 'Saved review link', description: 'Your Google review link has been updated' });
+    } catch (_error: any) {
+      toast({ title: 'Failed to save settings', description: 'Please try again', variant: 'destructive' });
+      setError(_error.message || 'Failed to save settings');
     } finally {
       setSaving(false);
     }

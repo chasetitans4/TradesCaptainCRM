@@ -6,8 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getDashboardStats, getActivityLog } from '@/lib/admin';
+import { apiLogger } from '@/lib/logger';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const admin = await requireAgentOrHigher();
 
@@ -24,10 +25,14 @@ export async function GET(request: NextRequest) {
       stats,
       recentActivity: activities,
     });
-  } catch (error: any) {
-    console.error('Error in GET /api/admin/reports/dashboard:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Get dashboard stats error',
+      path: '/api/admin/reports/dashboard',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to get dashboard stats' },
+      { error: error instanceof Error ? error.message : 'Failed to get dashboard stats' },
       { status: 500 }
     );
   }

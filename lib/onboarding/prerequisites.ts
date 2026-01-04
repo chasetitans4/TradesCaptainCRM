@@ -6,6 +6,8 @@
 // =====================================================
 
 import { createClient } from '@/lib/supabase/client';
+import { logger } from '@/lib/logger';
+const onboardingLogger = logger.child({ context: 'onboarding.prerequisites' });
 
 // Available prerequisite checks
 export type PrerequisiteId =
@@ -237,7 +239,11 @@ async function checkPrerequisite(id: PrerequisiteId): Promise<boolean> {
         return false;
     }
   } catch (error) {
-    console.error(`Error checking prerequisite ${id}:`, error);
+    onboardingLogger.error({
+      msg: 'Error checking prerequisite',
+      prerequisiteId: id,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return false;
   }
 }

@@ -5,6 +5,7 @@ import {
   getHighRiskEvents,
   getSecuritySummary,
 } from '@/lib/auth/audit';
+import { apiLogger } from '@/lib/logger';
 
 // GET - Get security events
 export async function GET(request: NextRequest) {
@@ -79,8 +80,8 @@ export async function GET(request: NextRequest) {
         });
       }
     }
-  } catch (error: any) {
-    console.error('Get security events error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'Get security events error', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }

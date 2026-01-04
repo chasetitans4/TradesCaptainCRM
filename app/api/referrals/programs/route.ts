@@ -6,8 +6,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -36,13 +37,13 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching referral programs:', error);
+      apiLogger.error({ error, context: 'fetching referral programs' });
       return NextResponse.json({ error: 'Failed to fetch programs' }, { status: 500 });
     }
 
     return NextResponse.json({ programs });
   } catch (error) {
-    console.error('Error in GET /api/referrals/programs:', error);
+    apiLogger.error({ error, context: 'GET /api/referrals/programs' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -88,13 +89,13 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Error creating referral program:', error);
+      apiLogger.error({ error, context: 'creating referral program' });
       return NextResponse.json({ error: 'Failed to create program' }, { status: 500 });
     }
 
     return NextResponse.json({ program }, { status: 201 });
   } catch (error) {
-    console.error('Error in POST /api/referrals/programs:', error);
+    apiLogger.error({ error, context: 'POST /api/referrals/programs' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getJobExpenses, createExpense } from '@/lib/expenses';
 import { parseISO } from 'date-fns';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
   request: NextRequest,
@@ -50,10 +51,13 @@ export async function GET(
     const result = await getJobExpenses(id);
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Error in GET /api/jobs/[id]/expenses:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error in GET /api/jobs/[id]/expenses',
+      error,
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to get job expenses' },
+      { error: error instanceof Error ? error.message : 'Failed to get job expenses' },
       { status: 500 }
     );
   }
@@ -137,10 +141,13 @@ export async function POST(
     });
 
     return NextResponse.json({ expense }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error in POST /api/jobs/[id]/expenses:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error in POST /api/jobs/[id]/expenses',
+      error,
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to create expense' },
+      { error: error instanceof Error ? error.message : 'Failed to create expense' },
       { status: 400 }
     );
   }

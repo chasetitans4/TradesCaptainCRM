@@ -8,8 +8,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { createInvitation, getPendingInvitations } from '@/lib/team';
 import { hasPermission } from '@/lib/permissions';
+import { apiLogger } from '@/lib/logger';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const profile = await getServerUserProfile();
 
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ invitations });
   } catch (error) {
-    console.error('Error fetching invitations:', error);
+    apiLogger.error({ error, message: 'Error fetching invitations' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -71,10 +72,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ invitation });
-  } catch (error: any) {
-    console.error('Error creating invitation:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error creating invitation' });
     return NextResponse.json(
-      { error: error.message || 'Failed to create invitation' },
+      { error: error instanceof Error ? error.message : 'Failed to create invitation' },
       { status: 400 }
     );
   }

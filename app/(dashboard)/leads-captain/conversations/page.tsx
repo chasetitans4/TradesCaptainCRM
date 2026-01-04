@@ -42,11 +42,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { LeadsCaptainConversation, LeadsCaptainMessage, ConversationDetailResponse } from '@/types/leads-captain';
+import { logger } from '@/lib/logger';
 
 export default function LeadsCaptainConversationsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedId = searchParams.get('id');
+  const lcConversationsLogger = logger.child({ context: 'leads-captain.conversations' });
 
   const [loading, setLoading] = useState(true);
   const [conversations, setConversations] = useState<LeadsCaptainConversation[]>([]);
@@ -97,7 +99,12 @@ export default function LeadsCaptainConversationsPage() {
       const data = await res.json();
       setConversations(data.conversations || []);
     } catch (error) {
-      console.error('Error fetching conversations:', error);
+      lcConversationsLogger.error({
+        msg: 'Error fetching conversations',
+        error: error instanceof Error ? error.message : String(error),
+        statusFilter,
+        search,
+      });
       toast.error('Failed to load conversations');
     } finally {
       setLoading(false);
@@ -111,7 +118,11 @@ export default function LeadsCaptainConversationsPage() {
       const data = await res.json();
       setSelectedConversation(data);
     } catch (error) {
-      console.error('Error fetching conversation:', error);
+      lcConversationsLogger.error({
+        msg: 'Error fetching conversation detail',
+        error: error instanceof Error ? error.message : String(error),
+        id,
+      });
       toast.error('Failed to load conversation');
     } finally {
       setLoadingDetail(false);
@@ -145,7 +156,12 @@ export default function LeadsCaptainConversationsPage() {
       fetchConversationDetail(selectedConversation.conversation.id);
       fetchConversations();
     } catch (error) {
-      console.error('Error performing action:', error);
+      lcConversationsLogger.error({
+        msg: 'Error performing action',
+        error: error instanceof Error ? error.message : String(error),
+        action,
+        conversationId: selectedConversation.conversation.id,
+      });
       toast.error(error instanceof Error ? error.message : 'Failed to perform action');
     }
   };
@@ -170,7 +186,13 @@ export default function LeadsCaptainConversationsPage() {
       fetchConversationDetail(selectedConversation.conversation.id);
       fetchConversations();
     } catch (error) {
-      console.error('Error performing mute action:', error);
+      lcConversationsLogger.error({
+        msg: 'Error performing mute action',
+        error: error instanceof Error ? error.message : String(error),
+        action,
+        duration,
+        conversationId: selectedConversation.conversation.id,
+      });
       toast.error(error instanceof Error ? error.message : 'Failed to update mute status');
     }
   };
@@ -195,7 +217,11 @@ export default function LeadsCaptainConversationsPage() {
       setNewMessage('');
       fetchConversationDetail(selectedConversation.conversation.id);
     } catch (error) {
-      console.error('Error sending message:', error);
+      lcConversationsLogger.error({
+        msg: 'Error sending message',
+        error: error instanceof Error ? error.message : String(error),
+        conversationId: selectedConversation.conversation.id,
+      });
       toast.error(error instanceof Error ? error.message : 'Failed to send message');
     } finally {
       setSending(false);

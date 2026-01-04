@@ -5,6 +5,8 @@
 // =====================================================
 
 import { createAdminClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
+const consentLogger = logger.child({ context: 'consent.state-machine' });
 
 /**
  * Consent/Relationship states per Section 4.1
@@ -123,7 +125,11 @@ export async function updateContactRelationshipState(
     .eq('id', contactId);
 
   if (error) {
-    console.error(`Error updating relationship state for ${tableName}:`, error);
+    consentLogger.error({
+      msg: 'Error updating relationship state',
+      tableName,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw error;
   }
 }
@@ -144,7 +150,11 @@ export async function getContactRelationshipState(
     .single();
 
   if (error) {
-    console.error(`Error getting relationship state for ${tableName}:`, error);
+    consentLogger.error({
+      msg: 'Error getting relationship state',
+      tableName,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return 'unknown';
   }
 

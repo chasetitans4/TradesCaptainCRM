@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -11,19 +11,18 @@ import {
   CardTitle,
   Alert,
   AlertDescription,
-  Switch,
 } from '@/components/ui';
 import {
   ArrowLeft,
   Loader2,
   Check,
-  X,
   ExternalLink,
   RefreshCw,
   Unlink,
   Calendar,
   CreditCard,
 } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 interface QuickBooksInfo {
   connected: boolean;
@@ -51,9 +50,23 @@ export default function IntegrationsPage() {
   const [quickbooks, setQuickbooks] = useState<QuickBooksInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const fetchQuickBooksInfo = useCallback(async () => {
+    try {
+      const res = await fetch('/api/quickbooks');
+      if (res.ok) {
+        const data = await res.json();
+        setQuickbooks(data);
+      }
+    } catch (_error) {
+      toast({ title: 'Failed to load QuickBooks info', description: 'Please try again', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
-    // Check for success/error from OAuth callback
     const successParam = searchParams.get('success');
     const errorParam = searchParams.get('error');
 
@@ -70,21 +83,7 @@ export default function IntegrationsPage() {
     }
 
     fetchQuickBooksInfo();
-  }, [searchParams]);
-
-  async function fetchQuickBooksInfo() {
-    try {
-      const res = await fetch('/api/quickbooks');
-      if (res.ok) {
-        const data = await res.json();
-        setQuickbooks(data);
-      }
-    } catch (err) {
-      console.error('Error fetching QuickBooks info:', err);
-    } finally {
-      setLoading(false);
-    }
-  }
+  }, [searchParams, fetchQuickBooksInfo]);
 
   async function connectQuickBooks() {
     try {
@@ -96,7 +95,8 @@ export default function IntegrationsPage() {
         const data = await res.json();
         setError(data.error || 'Failed to start QuickBooks connection');
       }
-    } catch (err) {
+    } catch (_error) {
+      toast({ title: 'Failed to connect QuickBooks', description: 'Please try again', variant: 'destructive' });
       setError('Failed to connect to QuickBooks');
     }
   }
@@ -113,7 +113,8 @@ export default function IntegrationsPage() {
         const data = await res.json();
         setError(data.error || 'Failed to disconnect');
       }
-    } catch (err) {
+    } catch (_error) {
+      toast({ title: 'Failed to disconnect QuickBooks', description: 'Please try again', variant: 'destructive' });
       setError('Failed to disconnect QuickBooks');
     }
   }
@@ -132,7 +133,8 @@ export default function IntegrationsPage() {
       } else {
         setError(data.error || 'Sync failed');
       }
-    } catch (err) {
+    } catch (_error) {
+      toast({ title: 'Failed to sync with QuickBooks', description: 'Please try again', variant: 'destructive' });
       setError('Failed to sync with QuickBooks');
     } finally {
       setSyncing(false);

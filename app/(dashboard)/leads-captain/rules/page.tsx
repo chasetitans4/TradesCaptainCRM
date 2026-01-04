@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { LeadsCaptainRule } from '@/types/leads-captain';
+import { logger } from '@/lib/logger';
 
 export default function LeadsCaptainRulesPage() {
   const router = useRouter();
@@ -47,6 +48,7 @@ export default function LeadsCaptainRulesPage() {
   const [limits, setLimits] = useState<{ current: number; max: number; remaining: number } | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [ruleToDelete, setRuleToDelete] = useState<LeadsCaptainRule | null>(null);
+  const lcRulesLogger = logger.child({ context: 'leads-captain.rules' });
 
   useEffect(() => {
     fetchRules();
@@ -60,7 +62,10 @@ export default function LeadsCaptainRulesPage() {
       setRules(data.rules || []);
       setLimits(data.limits);
     } catch (error) {
-      console.error('Error fetching rules:', error);
+      lcRulesLogger.error({
+        msg: 'Error fetching rules',
+        error: error instanceof Error ? error.message : String(error),
+      });
       toast.error('Failed to load rules');
     } finally {
       setLoading(false);
@@ -77,7 +82,12 @@ export default function LeadsCaptainRulesPage() {
       toast.success(`Rule ${rule.is_active ? 'disabled' : 'enabled'}`);
       fetchRules();
     } catch (error) {
-      console.error('Error toggling rule:', error);
+      lcRulesLogger.error({
+        msg: 'Error toggling rule',
+        error: error instanceof Error ? error.message : String(error),
+        ruleId: rule.id,
+        isActive: rule.is_active,
+      });
       toast.error('Failed to update rule');
     }
   };
@@ -97,7 +107,11 @@ export default function LeadsCaptainRulesPage() {
       setRuleToDelete(null);
       fetchRules();
     } catch (error) {
-      console.error('Error deleting rule:', error);
+      lcRulesLogger.error({
+        msg: 'Error deleting rule',
+        error: error instanceof Error ? error.message : String(error),
+        ruleId: ruleToDelete.id,
+      });
       toast.error(error instanceof Error ? error.message : 'Failed to delete rule');
     }
   };

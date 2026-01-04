@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUrl, type NylasProvider } from '@/lib/nylas';
 import { getServerUserProfile } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(authUrl);
   } catch (error) {
-    console.error('Error starting Nylas OAuth:', error);
+    apiLogger.error({ msg: 'Error starting Nylas OAuth', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.redirect(
       new URL('/settings/calendar?error=oauth_start_failed', request.url)
     );

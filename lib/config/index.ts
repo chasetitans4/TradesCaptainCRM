@@ -4,6 +4,8 @@
 // =====================================================
 
 import { z } from 'zod';
+import { logger } from '@/lib/logger';
+const configLogger = logger.child({ context: 'config' });
 
 // Environment schema with validation
 const envSchema = z.object({
@@ -62,10 +64,10 @@ function validateEnv(): Env {
 
   if (!parsed.success) {
     const errors = parsed.error.format();
-    console.error('\n❌ INVALID ENVIRONMENT CONFIGURATION');
-    console.error('━'.repeat(50));
-    console.error(JSON.stringify(errors, null, 2));
-    console.error('━'.repeat(50));
+    configLogger.error({
+      msg: 'Invalid environment configuration',
+      errors,
+    });
 
     // FAIL LOUDLY - even in development
     // Silent defaults mask misconfigurations that cause debugging nightmares

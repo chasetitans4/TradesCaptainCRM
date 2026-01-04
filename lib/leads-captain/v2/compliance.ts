@@ -4,6 +4,7 @@
 
 import { createAdminClient } from '@/lib/supabase/server';
 import { COMPLIANCE_KEYWORDS } from '@/types/leads-captain';
+import { jobLogger } from '@/lib/logger';
 
 export interface ComplianceResult {
   is_compliance_message: boolean;
@@ -177,7 +178,7 @@ export async function sendComplianceResponse(
   to: string,
   from: string,
   message: string
-): Promise<{ success: boolean; sid?: string; error?: string }> {
+  ): Promise<{ success: boolean; sid?: string; error?: string }> {
   try {
     // Dynamic import to avoid issues if twilio not configured
     const { twilioClient } = await import('@/lib/twilio/client');
@@ -190,7 +191,12 @@ export async function sendComplianceResponse(
 
     return { success: true, sid: result.sid };
   } catch (error) {
-    console.error('[Leads Captain v2] Failed to send compliance response:', error);
+    jobLogger.error({
+      msg: 'Failed to send compliance response',
+      error: error instanceof Error
+        ? { name: error.name, message: error.message, stack: error.stack }
+        : String(error),
+    });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getCurrentUserProfile } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -9,13 +9,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/use-toast';
 import type { UserWithBusiness, AvailablePhoneNumber, CallForwardingMode } from '@/types';
 import {
   ArrowLeft,
   Phone,
   PhoneCall,
   PhoneForwarded,
-  Voicemail,
   Check,
   Loader2,
   Search,
@@ -37,10 +37,10 @@ export default function PhoneSettingsPage() {
   const [user, setUser] = useState<UserWithBusiness | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
 
   // Phone number state
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
-  const [phoneSid, setPhoneSid] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const [provisioning, setProvisioning] = useState(false);
   const [releasing, setReleasing] = useState(false);
@@ -55,11 +55,7 @@ export default function PhoneSettingsPage() {
   const [businessHoursOnly, setBusinessHoursOnly] = useState(false);
   const [afterHoursMode, setAfterHoursMode] = useState<CallForwardingMode>('voicemail');
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     const profile = await getCurrentUserProfile();
     if (!profile) {
       router.push('/login');
@@ -74,19 +70,22 @@ export default function PhoneSettingsPage() {
 
       if (response.ok) {
         setPhoneNumber(data.phone_number);
-        setPhoneSid(data.phone_sid);
         setForwardingMode(data.call_forwarding?.mode || 'voicemail');
         setForwardNumbers(data.call_forwarding?.forward_numbers || []);
         setRingTimeout(data.call_forwarding?.ring_timeout || 20);
         setBusinessHoursOnly(data.call_forwarding?.business_hours_only || false);
         setAfterHoursMode(data.call_forwarding?.after_hours_mode || 'voicemail');
       }
-    } catch (error) {
-      console.error('Error loading phone settings:', error);
+    } catch (_error) {
+      toast({ title: 'Failed to load phone settings', description: 'Please try again', variant: 'destructive' });
     }
 
     setLoading(false);
-  }
+  }, [router, toast]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   async function searchNumbers() {
     if (!areaCode || areaCode.length !== 3) return;
@@ -99,8 +98,8 @@ export default function PhoneSettingsPage() {
       if (response.ok) {
         setAvailableNumbers(data.numbers || []);
       }
-    } catch (error) {
-      console.error('Error searching numbers:', error);
+    } catch (_error) {
+      toast({ title: 'Failed to search numbers', description: 'Please try again', variant: 'destructive' });
     } finally {
       setSearching(false);
     }
@@ -118,12 +117,11 @@ export default function PhoneSettingsPage() {
       if (response.ok) {
         const data = await response.json();
         setPhoneNumber(data.phone_number);
-        setPhoneSid(data.phone_sid);
         setShowSearch(false);
         setAvailableNumbers([]);
       }
-    } catch (error) {
-      console.error('Error provisioning number:', error);
+    } catch (_error) {
+      toast({ title: 'Failed to provision number', description: 'Please try again', variant: 'destructive' });
     } finally {
       setProvisioning(false);
     }
@@ -140,10 +138,9 @@ export default function PhoneSettingsPage() {
 
       if (response.ok) {
         setPhoneNumber(null);
-        setPhoneSid(null);
       }
-    } catch (error) {
-      console.error('Error releasing number:', error);
+    } catch (_error) {
+      toast({ title: 'Failed to release number', description: 'Please try again', variant: 'destructive' });
     } finally {
       setReleasing(false);
     }
@@ -169,8 +166,8 @@ export default function PhoneSettingsPage() {
       if (!response.ok) {
         throw new Error('Failed to save settings');
       }
-    } catch (error) {
-      console.error('Error saving settings:', error);
+    } catch (_error) {
+      toast({ title: 'Failed to save settings', description: 'Please try again', variant: 'destructive' });
     } finally {
       setSaving(false);
     }

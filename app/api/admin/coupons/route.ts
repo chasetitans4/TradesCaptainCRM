@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCoupons, createCoupon } from '@/lib/admin/coupons';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { CouponStatus } from '@/lib/admin/types';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,10 +35,13 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Get coupons error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Get coupons error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to get coupons' },
+      { error: error instanceof Error ? error.message : 'Failed to get coupons' },
       { status: 500 }
     );
   }
@@ -74,10 +78,13 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true, coupon });
-  } catch (error: any) {
-    console.error('Create coupon error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Create coupon error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to create coupon' },
+      { error: error instanceof Error ? error.message : 'Failed to create coupon' },
       { status: 500 }
     );
   }

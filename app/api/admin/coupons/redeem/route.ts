@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { redeemCoupon } from '@/lib/admin/coupons';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,10 +34,13 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Redeem coupon error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Redeem coupon error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to redeem coupon' },
+      { error: error instanceof Error ? error.message : 'Failed to redeem coupon' },
       { status: 500 }
     );
   }

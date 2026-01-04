@@ -9,9 +9,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { getTeamMember, updateMemberRole, deactivateMember } from '@/lib/team';
 import { hasPermission } from '@/lib/permissions';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -24,10 +25,10 @@ export async function GET(
     const member = await getTeamMember(id, profile.id);
 
     return NextResponse.json({ member });
-  } catch (error: any) {
-    console.error('Error fetching member:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error fetching member' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch member' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch member' },
       { status: 400 }
     );
   }
@@ -59,17 +60,17 @@ export async function PUT(
     await updateMemberRole(id, role, profile.id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error updating member:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error updating member' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update member' },
+      { error: error instanceof Error ? error.message : 'Failed to update member' },
       { status: 400 }
     );
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -93,10 +94,10 @@ export async function DELETE(
     await deactivateMember(id, profile.id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error deactivating member:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error deactivating member' });
     return NextResponse.json(
-      { error: error.message || 'Failed to deactivate member' },
+      { error: error instanceof Error ? error.message : 'Failed to deactivate member' },
       { status: 400 }
     );
   }

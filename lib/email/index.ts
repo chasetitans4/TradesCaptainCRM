@@ -3,6 +3,7 @@
 // =====================================================
 
 import { Resend } from 'resend';
+import { emailLogger } from '@/lib/logger';
 
 let _resend: Resend | null = null;
 
@@ -47,7 +48,14 @@ export async function sendEmail(params: SendEmailParams) {
 
     return { success: true, data: result };
   } catch (error) {
-    console.error('Failed to send email:', error);
+    emailLogger.error({
+      msg: 'Failed to send email',
+      error: error instanceof Error
+        ? { name: error.name, message: error.message, stack: error.stack }
+        : { message: String(error) },
+      to,
+      subject,
+    });
     return { success: false, error };
   }
 }
@@ -979,6 +987,11 @@ export function getJobCompletedEmailHtml(params: {
           <p style="margin: 0; color: #6b7280; font-size: 14px; text-align: center;">
             Thank you for choosing ${businessName}!
           </p>
+          ${businessPhone ? `
+          <p style="margin: 0; color: #6b7280; font-size: 14px; text-align: center;">
+            Questions? Call us at ${businessPhone}
+          </p>
+          ` : ''}
         </div>
 
         <div style="background: #f9fafb; padding: 16px; text-align: center; border-top: 1px solid #e5e7eb;">

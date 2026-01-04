@@ -11,6 +11,7 @@ import {
   getTicketStats,
 } from '@/lib/tickets';
 import { CreateTicketInput } from '@/lib/admin/types';
+import { apiLogger } from '@/lib/logger';
 
 // GET /api/tickets - Get tickets
 export async function GET(request: NextRequest) {
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ tickets });
   } catch (error) {
-    console.error('Error fetching tickets:', error);
+    apiLogger.error({ error, message: 'Error fetching tickets' });
     return NextResponse.json(
       { error: 'Failed to fetch tickets' },
       { status: 500 }
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ticket }, { status: 201 });
   } catch (error) {
-    console.error('Error creating ticket:', error);
+    apiLogger.error({ error, message: 'Error creating ticket' });
     return NextResponse.json(
       { error: 'Failed to create ticket' },
       { status: 500 }

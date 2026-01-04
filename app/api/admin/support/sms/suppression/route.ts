@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminOrHigher } from '@/lib/admin/auth';
 import { removeFromSuppressionList } from '@/lib/admin/leads-captain-support';
+import { apiLogger } from '@/lib/logger';
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -40,10 +41,10 @@ export async function DELETE(request: NextRequest) {
       organization_id,
       message: 'Removed from suppression list. Customer can now receive messages.',
     });
-  } catch (error: any) {
-    console.error('Error in DELETE /api/admin/support/sms/suppression:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error in DELETE /api/admin/support/sms/suppression', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to remove from suppression list' },
+      { error: error instanceof Error ? error.message : 'Failed to remove from suppression list' },
       { status: 500 }
     );
   }

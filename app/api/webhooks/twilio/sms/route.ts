@@ -266,7 +266,8 @@ export async function POST(request: NextRequest) {
     // Step 2: Handle compliance keywords BEFORE any other processing (v6.4.2)
     const complianceResult = await handleComplianceKeywords(body, from, business.id, business.name || 'TradesCaptain');
     if (complianceResult.handled) {
-      console.info('[Twilio SMS] Compliance handled', {
+      smsLogger.info({
+        msg: 'Compliance handled',
         from,
         businessId: business.id,
         response: complianceResult.response,

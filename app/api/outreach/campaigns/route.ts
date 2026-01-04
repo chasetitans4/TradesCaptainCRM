@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCampaigns, createCampaign } from '@/lib/outreach/campaigns';
 import type { CampaignStatus, CampaignType } from '@/types/outreach';
+import { apiLogger } from '@/lib/logger';
 
 /**
  * GET /api/outreach/campaigns
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
       total: campaigns.length,
     });
   } catch (error) {
-    console.error('Error getting campaigns:', error);
+    apiLogger.error({ message: 'Error getting campaigns', error });
     return NextResponse.json(
       { error: 'Failed to get campaigns' },
       { status: 500 }
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
       campaign: result.campaign,
     });
   } catch (error) {
-    console.error('Error creating campaign:', error);
+    apiLogger.error({ message: 'Error creating campaign', error });
     return NextResponse.json(
       { error: 'Failed to create campaign' },
       { status: 500 }

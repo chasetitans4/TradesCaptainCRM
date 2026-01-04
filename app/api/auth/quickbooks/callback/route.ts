@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exchangeCodeForTokens } from '@/lib/quickbooks/client';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
 
   // Handle OAuth errors
   if (error) {
-    console.error('QuickBooks OAuth error:', error);
+    apiLogger.error({ msg: 'QuickBooks OAuth error', error });
     return NextResponse.redirect(
       new URL('/settings/integrations?error=quickbooks_denied', request.url)
     );
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
     // This prevents attackers from connecting their QuickBooks to another business
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      console.error('QuickBooks callback: No authenticated user');
+      apiLogger.error({ msg: 'QuickBooks callback: No authenticated user', error: 'No authenticated user' });
       return NextResponse.redirect(
         new URL('/settings/integrations?error=unauthorized', request.url)
       );
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (!profile || profile.business_id !== state) {
-      console.error('QuickBooks callback: Business mismatch - possible CSRF attack');
+      apiLogger.error({ msg: 'QuickBooks callback: Business mismatch - possible CSRF attack', error: 'Business mismatch' });
       return NextResponse.redirect(
         new URL('/settings/integrations?error=state_mismatch', request.url)
       );
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
 
     // Only owners can connect QuickBooks (financial integration)
     if (profile.role !== 'owner') {
-      console.error('QuickBooks callback: Non-owner attempted to connect');
+      apiLogger.error({ msg: 'QuickBooks callback: Non-owner attempted to connect', error: 'Permission denied' });
       return NextResponse.redirect(
         new URL('/settings/integrations?error=permission_denied', request.url)
       );
@@ -69,8 +70,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(
       new URL('/settings/integrations?success=quickbooks_connected', request.url)
     );
-  } catch (err: any) {
-    console.error('QuickBooks token exchange error:', err);
+  } catch (error) {
+    apiLogger.error({ msg: 'QuickBooks token exchange error', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.redirect(
       new URL('/settings/integrations?error=quickbooks_failed', request.url)
     );

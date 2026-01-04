@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 interface AuditLogEntry {
   id: string;
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       // If the view doesn't exist, fall back to direct query
-      console.error('Audit view query failed, trying direct query:', error);
+      apiLogger.error({ error, context: 'Audit view query failed, trying direct query' });
 
       let fallbackQuery = supabase
         .from('outreach_messages')
@@ -106,7 +107,7 @@ export async function GET(request: NextRequest) {
       const { data: fallbackData, error: fallbackError, count: fallbackCount } = await fallbackQuery;
 
       if (fallbackError) {
-        console.error('Fallback query also failed:', fallbackError);
+        apiLogger.error({ error: fallbackError, context: 'Fallback query also failed' });
         return NextResponse.json({ error: 'Failed to fetch audit log' }, { status: 500 });
       }
 
@@ -115,7 +116,7 @@ export async function GET(request: NextRequest) {
 
     return formatResponse(data || [], format, count || 0, offset, limit);
   } catch (error) {
-    console.error('Error in audit export:', error);
+    apiLogger.error({ error, context: 'Error in audit export' });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to export audit log' },
       { status: 500 }

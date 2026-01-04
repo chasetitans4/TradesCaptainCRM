@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { bulkApproveTimeEntries } from '@/lib/timesheets';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -67,10 +68,10 @@ export async function POST(request: NextRequest) {
       success: true,
       approved: result,
     });
-  } catch (error: any) {
-    console.error('Error in POST /api/timesheets/bulk-approve:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error in POST /api/timesheets/bulk-approve' });
     return NextResponse.json(
-      { error: error.message || 'Failed to bulk approve time entries' },
+      { error: error instanceof Error ? error.message : 'Failed to bulk approve time entries' },
       { status: 400 }
     );
   }

@@ -14,6 +14,7 @@ import {
   sendPushNotification,
   getUnreadCount,
 } from '@/lib/notifications/push';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,10 +38,10 @@ export async function GET(request: NextRequest) {
     const notifications = await getUserNotifications(profile.id, { unreadOnly, limit, offset });
 
     return NextResponse.json(notifications);
-  } catch (error: any) {
-    console.error('Error fetching notifications:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error fetching notifications', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch notifications' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch notifications' },
       { status: 500 }
     );
   }
@@ -79,10 +80,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error sending notification:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error sending notification', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to send notification' },
+      { error: error instanceof Error ? error.message : 'Failed to send notification' },
       { status: 500 }
     );
   }
@@ -111,10 +112,10 @@ export async function PATCH(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error marking notification read:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error marking notification read', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to mark notification read' },
+      { error: error instanceof Error ? error.message : 'Failed to mark notification read' },
       { status: 500 }
     );
   }

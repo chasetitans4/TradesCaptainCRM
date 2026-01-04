@@ -10,6 +10,7 @@ import { checkLoginRateLimit } from '@/lib/rate-limit';
 import { SignJWT } from 'jose';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { apiLogger } from '@/lib/logger';
 
 /**
  * Get JWT secret key - throws if not configured
@@ -174,14 +175,18 @@ export async function POST(request: NextRequest) {
     });
 
     // Return user (without sensitive fields)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password_hash, two_factor_secret, ...safeUser } = user;
 
     return NextResponse.json({
       success: true,
       user: safeUser,
     });
-  } catch (error: any) {
-    console.error('Admin login error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Admin login error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
       { error: 'Login failed' },
       { status: 500 }

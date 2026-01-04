@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import {
   uploadDocument,
   getDocuments,
@@ -65,10 +66,10 @@ export async function GET(request: NextRequest) {
 
     const documents = await getDocuments(entityType, entityId, documentType);
     return NextResponse.json(documents);
-  } catch (error: any) {
-    console.error('Error fetching documents:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'GET /api/documents' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch documents' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch documents' },
       { status: 500 }
     );
   }
@@ -113,10 +114,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(document);
-  } catch (error: any) {
-    console.error('Error uploading document:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'POST /api/documents' });
     return NextResponse.json(
-      { error: error.message || 'Failed to upload document' },
+      { error: error instanceof Error ? error.message : 'Failed to upload document' },
       { status: 500 }
     );
   }

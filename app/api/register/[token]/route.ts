@@ -14,9 +14,10 @@ import {
   CRM_PLANS,
   PlanType,
 } from '@/lib/admin';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
   try {
@@ -55,10 +56,10 @@ export async function GET(
       is_founders: submission.submission_type === 'founders',
       is_trial: submission.submission_type === 'trial',
     });
-  } catch (error: any) {
-    console.error('Error in GET /api/register/[token]:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'GET /api/register/[token]' });
     return NextResponse.json(
-      { error: error.message || 'Failed to validate invite' },
+      { error: error instanceof Error ? error.message : 'Failed to validate invite' },
       { status: 500 }
     );
   }
@@ -119,7 +120,7 @@ export async function POST(
     });
 
     if (authError) {
-      console.error('Auth error:', authError);
+      apiLogger.error({ error: authError, context: 'auth signup' });
       return NextResponse.json(
         { error: authError.message || 'Failed to create account' },
         { status: 400 }
@@ -162,7 +163,7 @@ export async function POST(
       .single();
 
     if (businessError) {
-      console.error('Business creation error:', businessError);
+      apiLogger.error({ error: businessError, context: 'business creation' });
     }
 
     // Create user profile
@@ -200,10 +201,10 @@ export async function POST(
         founders_end_date: crmAccount.founders_end_date,
       },
     }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error in POST /api/register/[token]:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'POST /api/register/[token]' });
     return NextResponse.json(
-      { error: error.message || 'Failed to complete registration' },
+      { error: error instanceof Error ? error.message : 'Failed to complete registration' },
       { status: 500 }
     );
   }

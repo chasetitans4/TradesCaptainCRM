@@ -7,8 +7,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getRecurringCommissions } from '@/lib/admin/commission-tracker';
+import { apiLogger } from '@/lib/logger';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const admin = await requireAgentOrHigher();
 
@@ -19,10 +20,10 @@ export async function GET(request: NextRequest) {
     const recurringData = await getRecurringCommissions(admin.id);
 
     return NextResponse.json(recurringData);
-  } catch (error: any) {
-    console.error('Error in GET /api/commissions/recurring:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error in GET /api/commissions/recurring' });
     return NextResponse.json(
-      { error: error.message || 'Failed to get recurring commissions' },
+      { error: error instanceof Error ? error.message : 'Failed to get recurring commissions' },
       { status: 500 }
     );
   }

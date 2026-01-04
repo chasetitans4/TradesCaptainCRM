@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { markCommissionPaid } from '@/lib/admin/commissions';
 import { verifyAdminAuth } from '@/lib/admin/auth';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -29,10 +30,13 @@ export async function POST(
     await markCommissionPaid(commissionId, payment_method, payment_reference);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Pay commission error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Pay commission error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to mark commission as paid' },
+      { error: error instanceof Error ? error.message : 'Failed to mark commission as paid' },
       { status: 500 }
     );
   }

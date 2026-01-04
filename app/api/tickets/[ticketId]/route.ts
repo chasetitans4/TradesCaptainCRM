@@ -8,16 +8,16 @@ import {
   getTicket,
   getTicketByNumber,
   updateTicket,
-  addTicketMessage,
 } from '@/lib/tickets';
 import { UpdateTicketInput } from '@/lib/admin/types';
+import { apiLogger } from '@/lib/logger';
 
 interface RouteParams {
   params: Promise<{ ticketId: string }>;
 }
 
 // GET /api/tickets/[ticketId] - Get ticket details
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { ticketId } = await params;
 
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ ticket });
   } catch (error) {
-    console.error('Error fetching ticket:', error);
+    apiLogger.error({ error, message: 'Error fetching ticket' });
     return NextResponse.json(
       { error: 'Failed to fetch ticket' },
       { status: 500 }
@@ -71,7 +71,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ ticket });
   } catch (error) {
-    console.error('Error updating ticket:', error);
+    apiLogger.error({ error, message: 'Error updating ticket' });
     return NextResponse.json(
       { error: 'Failed to update ticket' },
       { status: 500 }

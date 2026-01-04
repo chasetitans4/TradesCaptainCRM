@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
     const fileName = `receipts/${profile.business_id}/${profile.id}/${timestamp}.${extension}`;
 
     // Upload to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('expenses')
       .upload(fileName, file, {
         contentType: file.type,
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
       });
 
     if (uploadError) {
-      console.error('Upload error:', uploadError);
+      apiLogger.error({ message: 'Upload error', error: uploadError });
       return NextResponse.json(
         { error: 'Failed to upload file' },
         { status: 500 }
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
       try {
         ocrData = await extractReceiptData(fileUrl);
       } catch (ocrError) {
-        console.error('OCR error:', ocrError);
+        apiLogger.error({ message: 'OCR error', error: ocrError });
         // Don't fail the upload if OCR fails
       }
     }
@@ -101,10 +102,10 @@ export async function POST(request: NextRequest) {
       mime_type: file.type,
       ocr_data: ocrData,
     });
-  } catch (error: any) {
-    console.error('Error in POST /api/expenses/upload-receipt:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error in POST /api/expenses/upload-receipt', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to upload receipt' },
+      { error: error instanceof Error ? error.message : 'Failed to upload receipt' },
       { status: 500 }
     );
   }
@@ -177,7 +178,7 @@ If any field is unclear or not visible, use null. For total, make your best esti
 
     return JSON.parse(jsonStr);
   } catch (error) {
-    console.error('OCR extraction error:', error);
+    apiLogger.error({ message: 'OCR extraction error', error });
     return null;
   }
 }

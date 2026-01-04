@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient, getCurrentUserProfile } from '@/lib/supabase/client';
 import { hasPermission, DASHBOARD_SECTIONS } from '@/lib/permissions';
-import { cn, getGreeting, formatRelativeDate, formatCurrency, getUrgencyColor, formatAddress } from '@/lib/utils';
-import { getSmartNavigationUrl } from '@/lib/utils/navigation';
+import { cn, getGreeting, formatRelativeDate, getUrgencyColor } from '@/lib/utils';
+import { logger } from '@/lib/logger';
+const dashboardLogger = logger.child({ context: 'dashboard' });
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
@@ -23,13 +24,10 @@ import {
   Users,
   Briefcase,
   DollarSign,
-  AlertCircle,
   CheckCircle2,
   User,
   MapPin,
   RefreshCw,
-  Pause,
-  Play,
 } from 'lucide-react';
 import { GlobalPauseToggle } from '@/components/automation/global-pause-toggle';
 
@@ -78,7 +76,10 @@ export default function DashboardPage() {
         }
         setUser(profile as UserWithBusiness);
       } catch (error) {
-        console.error('Error loading user:', error);
+        dashboardLogger.error({
+          msg: 'Error loading user profile',
+          error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+        });
         router.push('/login');
       }
     }
@@ -259,7 +260,11 @@ export default function DashboardPage() {
         setUnrepliedMessages(unrepliedConvos.slice(0, 5));
       }
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
+      dashboardLogger.error({
+        msg: 'Error loading dashboard data',
+        userId: user?.id,
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -300,7 +305,12 @@ export default function DashboardPage() {
         setAutomationsPaused(paused);
       }
     } catch (error) {
-      console.error('Error toggling automation pause:', error);
+      dashboardLogger.error({
+        msg: 'Error toggling automation pause',
+        userId: user?.id,
+        paused,
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
     }
   };
 
@@ -612,7 +622,7 @@ function ReminderCard({ reminder }: { reminder: Reminder }) {
   );
 }
 
-function JobCard({ job, showDate = false }: { job: TodayJob; showDate?: boolean }) {
+function JobCard({ job, showDate: _showDate = false }: { job: TodayJob; showDate?: boolean }) {
   const statusColors: Record<string, string> = {
     scheduled: 'bg-info/10 text-info',
     in_progress: 'bg-warning/10 text-warning',

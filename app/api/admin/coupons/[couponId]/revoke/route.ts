@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revokeCoupon } from '@/lib/admin/coupons';
 import { verifyAdminAuth } from '@/lib/admin/auth';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -26,10 +27,13 @@ export async function POST(
     await revokeCoupon(couponId);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Revoke coupon error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Revoke coupon error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to revoke coupon' },
+      { error: error instanceof Error ? error.message : 'Failed to revoke coupon' },
       { status: 500 }
     );
   }

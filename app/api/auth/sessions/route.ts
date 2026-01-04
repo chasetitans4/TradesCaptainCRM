@@ -7,6 +7,7 @@ import {
   getActiveSessionCount,
 } from '@/lib/auth/sessions';
 import { cookies } from 'next/headers';
+import { apiLogger } from '@/lib/logger';
 
 // GET - Get user's active sessions
 export async function GET() {
@@ -27,9 +28,9 @@ export async function GET() {
       sessions,
       totalCount: count,
     });
-  } catch (error: any) {
-    console.error('Get sessions error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'Get sessions error', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }
 
@@ -79,8 +80,8 @@ export async function DELETE(request: NextRequest) {
         { status: 400 }
       );
     }
-  } catch (error: any) {
-    console.error('Revoke session error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'Revoke session error', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }

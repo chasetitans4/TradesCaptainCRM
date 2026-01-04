@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(business);
   } catch (error) {
-    console.error('Error in GET /api/portal/business:', error);
+    apiLogger.error({ error, context: 'Error in GET /api/portal/business' });
     return NextResponse.json(
       { error: 'Failed to get business' },
       { status: 500 }

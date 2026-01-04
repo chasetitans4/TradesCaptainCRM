@@ -68,7 +68,7 @@ export interface AgentSelectionResult {
 export async function selectAgentForCall(
   scheduledAt: Date,
   settings: CallDistributionSettings,
-  contact: OutreachContact
+  _contact: OutreachContact
 ): Promise<AgentSelectionResult> {
   const supabase = await createClient();
 

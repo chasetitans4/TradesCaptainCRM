@@ -6,9 +6,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getLeadsCaptainConversation } from '@/lib/admin/leads-captain-dashboard';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ conversationId: string }> }
 ) {
   try {
@@ -29,10 +30,13 @@ export async function GET(
     }
 
     return NextResponse.json(conversation);
-  } catch (error: any) {
-    console.error('Leads Captain conversation error:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Leads Captain conversation error',
+      error,
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch conversation' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch conversation' },
       { status: 500 }
     );
   }

@@ -4,6 +4,8 @@
 // =====================================================
 
 import { createClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
+const plansLogger = logger.child({ context: 'memberships.plans' });
 
 export interface MembershipPlan {
   id: string;
@@ -77,7 +79,11 @@ export async function createMembershipPlan(
         stripeProductId = product.id;
         stripePriceId = price.id;
       } catch (stripeError) {
-        console.error('Stripe product creation failed:', stripeError);
+        plansLogger.error({
+          msg: 'Stripe product creation failed',
+          businessId,
+          error: stripeError instanceof Error ? { name: stripeError.name, message: stripeError.message, stack: (stripeError as any).stack } : { message: String(stripeError) },
+        });
         // Continue without Stripe integration
       }
     }
@@ -109,7 +115,12 @@ export async function createMembershipPlan(
       plan: transformPlan(plan),
     };
   } catch (error: any) {
-    console.error('Error creating membership plan:', error);
+    plansLogger.error({
+      msg: 'Error creating membership plan',
+      businessId,
+      data,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }
@@ -216,7 +227,11 @@ export async function updateMembershipPlan(
 
         plan.stripe_price_id = newPrice.id;
       } catch (stripeError) {
-        console.error('Stripe price update failed:', stripeError);
+        plansLogger.error({
+          msg: 'Stripe price update failed',
+          planId,
+          error: stripeError instanceof Error ? { name: stripeError.name, message: stripeError.message, stack: (stripeError as any).stack } : { message: String(stripeError) },
+        });
       }
     }
 
@@ -225,7 +240,12 @@ export async function updateMembershipPlan(
       plan: transformPlan(plan),
     };
   } catch (error: any) {
-    console.error('Error updating membership plan:', error);
+    plansLogger.error({
+      msg: 'Error updating membership plan',
+      planId,
+      data,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }
@@ -260,7 +280,11 @@ export async function deleteMembershipPlan(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Error deleting membership plan:', error);
+    plansLogger.error({
+      msg: 'Error deleting membership plan',
+      planId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }

@@ -11,6 +11,7 @@ import {
   reportAIIssue,
   resolveAIIssue,
 } from '@/lib/admin/leads-captain-support';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -39,10 +40,10 @@ export async function GET(request: NextRequest) {
       summary,
       count: issues.length,
     });
-  } catch (error: any) {
-    console.error('Error in GET /api/admin/support/ai-issues:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error in GET /api/admin/support/ai-issues', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to get AI issues' },
+      { error: error instanceof Error ? error.message : 'Failed to get AI issues' },
       { status: 500 }
     );
   }
@@ -97,10 +98,10 @@ export async function POST(request: NextRequest) {
       success: true,
       issue,
     });
-  } catch (error: any) {
-    console.error('Error in POST /api/admin/support/ai-issues:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error in POST /api/admin/support/ai-issues', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to report AI issue' },
+      { error: error instanceof Error ? error.message : 'Failed to report AI issue' },
       { status: 500 }
     );
   }
@@ -138,10 +139,10 @@ export async function PATCH(request: NextRequest) {
       issue_id,
       status,
     });
-  } catch (error: any) {
-    console.error('Error in PATCH /api/admin/support/ai-issues:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error in PATCH /api/admin/support/ai-issues', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to resolve AI issue' },
+      { error: error instanceof Error ? error.message : 'Failed to resolve AI issue' },
       { status: 500 }
     );
   }

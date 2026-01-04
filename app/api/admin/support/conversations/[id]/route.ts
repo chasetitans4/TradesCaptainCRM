@@ -13,6 +13,7 @@ import {
   unblockConversation,
   getAIApiLogs,
 } from '@/lib/admin/leads-captain-support';
+import { apiLogger } from '@/lib/logger';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -56,10 +57,10 @@ export async function GET(
         ai_logs: aiLogs,
       },
     });
-  } catch (error: any) {
-    console.error('Error in GET /api/admin/support/conversations/[id]:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error in GET /api/admin/support/conversations/[id]', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to get conversation' },
+      { error: error instanceof Error ? error.message : 'Failed to get conversation' },
       { status: 500 }
     );
   }
@@ -125,10 +126,10 @@ export async function PATCH(
       action,
       conversation_id: id,
     });
-  } catch (error: any) {
-    console.error('Error in PATCH /api/admin/support/conversations/[id]:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error in PATCH /api/admin/support/conversations/[id]', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update conversation' },
+      { error: error instanceof Error ? error.message : 'Failed to update conversation' },
       { status: 500 }
     );
   }

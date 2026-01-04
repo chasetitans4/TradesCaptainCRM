@@ -6,9 +6,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getClientOnboarding } from '@/lib/admin/onboarding';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ clientId: string }> }
 ) {
   try {
@@ -26,10 +27,10 @@ export async function GET(
     }
 
     return NextResponse.json(onboarding);
-  } catch (error: any) {
-    console.error('Get client onboarding error:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Get client onboarding error', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch onboarding' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch onboarding' },
       { status: 500 }
     );
   }

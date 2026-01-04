@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server';
 import { revokeGrant } from '@/lib/nylas';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST() {
   try {
@@ -36,7 +37,7 @@ export async function POST() {
       .eq('user_id', profile.id);
 
     if (deleteError) {
-      console.error('Error deleting calendar connection:', deleteError);
+      apiLogger.error({ error: deleteError, context: 'Error deleting calendar connection' });
       return NextResponse.json(
         { error: 'Failed to disconnect calendar' },
         { status: 500 }
@@ -45,7 +46,7 @@ export async function POST() {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error disconnecting calendar:', error);
+    apiLogger.error({ error, context: 'Error disconnecting calendar' });
     return NextResponse.json(
       { error: 'Failed to disconnect calendar' },
       { status: 500 }

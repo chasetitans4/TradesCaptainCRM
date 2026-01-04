@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -10,6 +11,7 @@ import {
   MoreVertical,
   Copy,
   ExternalLink,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Invoice } from './types';
@@ -34,9 +36,47 @@ export function InvoiceHeader({
   onVoid,
   onDelete,
 }: InvoiceHeaderProps) {
+  const [isDownloading, setIsDownloading] = useState(false);
   const statusConfig = STATUS_CONFIG[invoice.status] || STATUS_CONFIG.draft;
   const isOverdue = invoice.status === 'overdue';
   const canEdit = invoice.status === 'draft';
+
+  async function handleDownloadPdf() {
+    setIsDownloading(true);
+    try {
+      const response = await fetch(`/api/invoices/${invoice.id}/download`);
+      if (!response.ok) {
+        throw new Error('Failed to download PDF');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+
+      // Get filename from Content-Disposition header or generate one
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `${invoice.invoice_number}.pdf`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/);
+        if (match) {
+          filename = match[1];
+        }
+      }
+
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setShowMenu(false);
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      alert('Failed to download PDF. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  }
 
   return (
     <div className="bg-card border-b border-border sticky top-0 z-10">
@@ -94,9 +134,17 @@ export function InvoiceHeader({
                 <ExternalLink className="h-4 w-4" />
                 Preview
               </a>
-              <button className="w-full flex items-center gap-2 px-4 py-2 hover:bg-muted text-sm text-left">
-                <Download className="h-4 w-4" />
-                Download PDF
+              <button
+                onClick={handleDownloadPdf}
+                disabled={isDownloading}
+                className="w-full flex items-center gap-2 px-4 py-2 hover:bg-muted text-sm text-left disabled:opacity-50"
+              >
+                {isDownloading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {isDownloading ? 'Generating...' : 'Download PDF'}
               </button>
               {!['paid', 'void', 'draft'].includes(invoice.status) && (
                 <button

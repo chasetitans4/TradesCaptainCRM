@@ -6,9 +6,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
 import { generatePaymentLinkForInvoice } from '@/lib/invoices';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -55,15 +56,15 @@ export async function POST(
     try {
       const url = await generatePaymentLinkForInvoice(id);
       return NextResponse.json({ url });
-    } catch (error: any) {
-      console.error('Error generating payment link:', error);
+    } catch (error) {
+      apiLogger.error({ message: 'Error generating payment link', error });
       return NextResponse.json(
-        { error: error.message || 'Failed to generate payment link' },
+        { error: error instanceof Error ? error.message : 'Failed to generate payment link' },
         { status: 500 }
       );
     }
   } catch (error) {
-    console.error('Error in payment link API:', error);
+    apiLogger.error({ message: 'Error in payment link API', error });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

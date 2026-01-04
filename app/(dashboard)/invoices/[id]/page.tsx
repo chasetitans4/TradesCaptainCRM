@@ -25,6 +25,7 @@ import { InvoiceHeader } from './_components/invoice-header';
 import { InvoiceLineItems } from './_components/invoice-line-items';
 import { PaymentHistory } from './_components/payment-history';
 import { PaymentModal } from './_components/payment-modal';
+import { RefundModal } from './_components/refund-modal';
 import { InvoiceActions } from './_components/invoice-actions';
 
 export default function InvoiceDetailPage() {
@@ -38,6 +39,7 @@ export default function InvoiceDetailPage() {
   const [sending, setSending] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showRefundModal, setShowRefundModal] = useState(false);
   const [generatingPaymentLink, setGeneratingPaymentLink] = useState(false);
   const [recordingPayment, setRecordingPayment] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -399,6 +401,7 @@ export default function InvoiceDetailPage() {
         onSend={handleSendInvoice}
         onGeneratePaymentLink={handleGeneratePaymentLink}
         onRecordPayment={() => setShowPaymentModal(true)}
+        onRefund={() => setShowRefundModal(true)}
       />
 
       {/* Click outside to close menu */}
@@ -415,6 +418,13 @@ export default function InvoiceDetailPage() {
         setPaymentNotes={setPaymentNotes}
         onSubmit={handleRecordPayment}
         isSubmitting={recordingPayment}
+      />
+
+      <RefundModal
+        isOpen={showRefundModal}
+        onClose={() => setShowRefundModal(false)}
+        invoice={invoice}
+        onRefundSuccess={() => loadData()}
       />
     </div>
   );

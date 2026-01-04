@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendSMS, clearHumanAttention } from '@/lib/twilio';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const { data: messages, error: msgError } = await query;
 
     if (msgError) {
-      console.error('Error fetching messages:', msgError);
+      apiLogger.error({ error: msgError, context: 'fetching messages' });
       return NextResponse.json(
         { error: 'Failed to fetch messages' },
         { status: 500 }
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       has_more: messages?.length === limit,
     });
   } catch (error) {
-    console.error('Error fetching messages:', error);
+    apiLogger.error({ error, context: 'fetching messages' });
     return NextResponse.json(
       { error: 'Failed to fetch messages' },
       { status: 500 }
@@ -144,7 +145,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       twilio_sid: result.twilioSid,
     });
   } catch (error) {
-    console.error('Error sending message:', error);
+    apiLogger.error({ error, context: 'sending message' });
     return NextResponse.json(
       { error: 'Failed to send message' },
       { status: 500 }

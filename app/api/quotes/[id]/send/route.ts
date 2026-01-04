@@ -6,9 +6,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
 import { sendQuoteViaSms } from '@/lib/quotes';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -43,15 +44,15 @@ export async function POST(
     try {
       await sendQuoteViaSms(id);
       return NextResponse.json({ success: true });
-    } catch (error: any) {
-      console.error('Error sending quote:', error);
+    } catch (error) {
+      apiLogger.error({ error, context: 'sending quote' });
       return NextResponse.json(
-        { error: error.message || 'Failed to send quote' },
+        { error: error instanceof Error ? error.message : 'Failed to send quote' },
         { status: 500 }
       );
     }
   } catch (error) {
-    console.error('Error in send quote API:', error);
+    apiLogger.error({ error, context: 'send quote API' });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

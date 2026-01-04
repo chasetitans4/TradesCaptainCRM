@@ -10,9 +10,10 @@ import type {
   OnboardingTemplateTask,
   ClientOnboarding,
   ClientOnboardingTask,
-  OnboardingStatus,
   OnboardingTaskStatus,
 } from './types';
+import { logger } from '@/lib/logger';
+const onboardingLogger = logger.child({ context: 'admin.onboarding' });
 
 // =====================================================
 // ONBOARDING TEMPLATES
@@ -170,7 +171,12 @@ export async function createClientOnboarding(
       .insert(tasks);
 
     if (tasksError) {
-      console.error('Failed to create onboarding tasks:', tasksError);
+      onboardingLogger.error({
+        msg: 'Failed to create onboarding tasks',
+        clientId,
+        planTrack,
+        error: tasksError instanceof Error ? { name: tasksError.name, message: tasksError.message, stack: (tasksError as any).stack } : { message: String(tasksError) },
+      });
     }
   }
 
@@ -270,7 +276,7 @@ export async function addOnboardingNote(
  */
 export async function markOnboardingStalled(
   clientId: string,
-  reason: string
+  _reason: string
 ): Promise<void> {
   const supabase = createAdminClient();
 

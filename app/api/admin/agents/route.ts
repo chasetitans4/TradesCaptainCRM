@@ -8,6 +8,7 @@ import { createAdminClient } from '@/lib/supabase/server';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   const auth = await verifyAdminAuth(request);
@@ -96,10 +97,13 @@ export async function GET(request: NextRequest) {
     );
 
     return NextResponse.json({ agents: agentsWithStats });
-  } catch (error: any) {
-    console.error('Error fetching agents:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Error fetching agents',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch agents' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch agents' },
       { status: 500 }
     );
   }
@@ -177,10 +181,13 @@ export async function POST(request: NextRequest) {
       agent,
       message: 'Agent created successfully',
     });
-  } catch (error: any) {
-    console.error('Error creating agent:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Error creating agent',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to create agent' },
+      { error: error instanceof Error ? error.message : 'Failed to create agent' },
       { status: 500 }
     );
   }

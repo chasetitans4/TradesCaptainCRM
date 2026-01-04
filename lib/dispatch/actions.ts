@@ -81,7 +81,11 @@ export async function assignJob(
       }
     } catch (e) {
       // Log but don't fail the assignment
-      console.error('Failed to notify technician:', e);
+      const { smsLogger } = await import('@/lib/logger');
+      smsLogger.error({
+        msg: 'Failed to notify technician',
+        error: e instanceof Error ? { name: e.name, message: e.message, stack: e.stack } : { message: String(e) },
+      });
     }
   }
 
@@ -112,7 +116,11 @@ export async function assignJob(
       }
     } catch (e) {
       // Log but don't fail the assignment
-      console.error('Failed to notify customer:', e);
+      const { smsLogger } = await import('@/lib/logger');
+      smsLogger.error({
+        msg: 'Failed to notify customer',
+        error: e instanceof Error ? { name: e.name, message: e.message, stack: e.stack } : { message: String(e) },
+      });
     }
   }
 
@@ -266,7 +274,11 @@ export async function rescheduleJob(
         });
       }
     } catch (e) {
-      console.error('Failed to notify technician of reschedule:', e);
+      const { smsLogger } = await import('@/lib/logger');
+      smsLogger.error({
+        msg: 'Failed to notify technician of reschedule',
+        error: e instanceof Error ? { name: e.name, message: e.message, stack: e.stack } : { message: String(e) },
+      });
     }
   }
 
@@ -286,7 +298,11 @@ export async function rescheduleJob(
         });
       }
     } catch (e) {
-      console.error('Failed to notify customer of reschedule:', e);
+      const { smsLogger } = await import('@/lib/logger');
+      smsLogger.error({
+        msg: 'Failed to notify customer of reschedule',
+        error: e instanceof Error ? { name: e.name, message: e.message, stack: e.stack } : { message: String(e) },
+      });
     }
   }
 

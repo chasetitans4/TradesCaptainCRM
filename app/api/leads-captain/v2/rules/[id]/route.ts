@@ -8,13 +8,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import type { UpdateRuleRequest } from '@/types/leads-captain';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const profile = await getServerUserProfile();
     if (!profile) {
@@ -59,8 +60,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     return NextResponse.json({ rule, template: templateInfo });
-  } catch (error: unknown) {
-    console.error('Error fetching rule:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error fetching rule',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch rule' },
       { status: 500 }
@@ -154,8 +158,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     });
 
     return NextResponse.json({ rule });
-  } catch (error: unknown) {
-    console.error('Error updating rule:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error updating rule',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to update rule' },
       { status: 500 }
@@ -163,7 +170,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
     const profile = await getServerUserProfile();
     if (!profile) {
@@ -220,8 +227,11 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: unknown) {
-    console.error('Error deleting rule:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error deleting rule',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to delete rule' },
       { status: 500 }

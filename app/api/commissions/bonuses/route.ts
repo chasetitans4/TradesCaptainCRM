@@ -7,8 +7,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getBonusData } from '@/lib/admin/commission-tracker';
+import { apiLogger } from '@/lib/logger';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const admin = await requireAgentOrHigher();
 
@@ -19,10 +20,10 @@ export async function GET(request: NextRequest) {
     const bonusData = await getBonusData(admin.id);
 
     return NextResponse.json(bonusData);
-  } catch (error: any) {
-    console.error('Error in GET /api/commissions/bonuses:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error in GET /api/commissions/bonuses' });
     return NextResponse.json(
-      { error: error.message || 'Failed to get bonus data' },
+      { error: error instanceof Error ? error.message : 'Failed to get bonus data' },
       { status: 500 }
     );
   }

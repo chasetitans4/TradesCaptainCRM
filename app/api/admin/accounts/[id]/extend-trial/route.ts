@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminOrHigher } from '@/lib/admin/auth';
 import { extendTrial, logAdminActivity } from '@/lib/admin';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -29,10 +30,14 @@ export async function POST(
     await logAdminActivity(admin.id, 'extended_trial', 'crm_account', id, { days }, ip);
 
     return NextResponse.json({ account });
-  } catch (error: any) {
-    console.error('Error in POST /api/admin/accounts/[id]/extend-trial:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Error extending trial',
+      path: '/api/admin/accounts/[id]/extend-trial',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to extend trial' },
+      { error: error instanceof Error ? error.message : 'Failed to extend trial' },
       { status: 400 }
     );
   }

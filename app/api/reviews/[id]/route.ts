@@ -12,6 +12,7 @@ import {
   markReviewCompleted,
 } from '@/lib/reviews';
 import { isFeatureEnabled } from '@/lib/features';
+import { apiLogger } from '@/lib/logger';
 
 export async function PUT(
   request: NextRequest,
@@ -79,10 +80,10 @@ export async function PUT(
           { status: 400 }
         );
     }
-  } catch (error: any) {
-    console.error('Error updating review request:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'updating review request' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update review request' },
+      { error: error instanceof Error ? error.message : 'Failed to update review request' },
       { status: 500 }
     );
   }

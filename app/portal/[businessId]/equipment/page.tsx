@@ -3,18 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import {
-  Wrench,
-  Calendar,
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  Shield,
-  Plus,
-} from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Wrench, Clock, Shield, Plus } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { logger } from '@/lib/logger';
+const portalEquipmentLogger = logger.child({ context: 'portal.equipment' });
 
 interface Equipment {
   id: string;
@@ -46,7 +40,11 @@ export default function EquipmentPage() {
         const data = await response.json();
         setEquipment(data || []);
       } catch (error) {
-        console.error('Error loading equipment:', error);
+        portalEquipmentLogger.error({
+          msg: 'Error loading equipment',
+          businessId,
+          error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+        });
       } finally {
         setLoading(false);
       }

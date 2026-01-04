@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLead, updateLead, deleteLead, getLeadActivities } from '@/lib/admin/leads';
 import { verifyAdminAuth } from '@/lib/admin/auth';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
   request: NextRequest,
@@ -35,10 +36,13 @@ export async function GET(
     const activities = await getLeadActivities(leadId);
 
     return NextResponse.json({ lead, activities });
-  } catch (error: any) {
-    console.error('Get lead error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Get lead error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to get lead' },
+      { error: error instanceof Error ? error.message : 'Failed to get lead' },
       { status: 500 }
     );
   }
@@ -72,10 +76,13 @@ export async function PATCH(
     const updatedLead = await updateLead(leadId, body, auth.user.id);
 
     return NextResponse.json({ success: true, lead: updatedLead });
-  } catch (error: any) {
-    console.error('Update lead error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Update lead error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to update lead' },
+      { error: error instanceof Error ? error.message : 'Failed to update lead' },
       { status: 500 }
     );
   }
@@ -100,10 +107,13 @@ export async function DELETE(
     await deleteLead(leadId);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Delete lead error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Delete lead error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to delete lead' },
+      { error: error instanceof Error ? error.message : 'Failed to delete lead' },
       { status: 500 }
     );
   }

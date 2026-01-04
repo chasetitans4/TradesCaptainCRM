@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { upvoteFeatureRequest } from '@/lib/feature-requests';
+import { apiLogger } from '@/lib/logger';
 
 // POST - Toggle upvote on a feature request
 export async function POST(
@@ -34,7 +35,7 @@ export async function POST(
 
     return NextResponse.json({ upvotes: result.upvotes });
   } catch (error) {
-    console.error('Error upvoting feature request:', error);
+    apiLogger.error({ message: 'Error upvoting feature request', error });
     return NextResponse.json(
       { error: 'Failed to upvote feature request' },
       { status: 500 }

@@ -46,6 +46,7 @@ export function useOptimizedFetch<T>(
     useSWR = true,
     deps = [],
   } = options;
+  const depsKey = JSON.stringify(deps);
 
   const [data, setData] = useState<T | undefined>(initialData);
   const [error, setError] = useState<Error | undefined>();
@@ -109,7 +110,7 @@ export function useOptimizedFetch<T>(
     return () => {
       isMounted.current = false;
     };
-  }, [key, ...deps]);
+  }, [fetchData, key, depsKey]);
 
   // Refetch on window focus
   useEffect(() => {

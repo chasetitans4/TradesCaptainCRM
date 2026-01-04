@@ -8,9 +8,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { getAgreement, updateAgreement, cancelAgreement } from '@/lib/agreements';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -28,10 +29,10 @@ export async function GET(
     }
 
     return NextResponse.json(agreement);
-  } catch (error: any) {
-    console.error('Error fetching agreement:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error fetching agreement' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch agreement' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch agreement' },
       { status: 500 }
     );
   }
@@ -63,10 +64,10 @@ export async function PATCH(
     });
 
     return NextResponse.json(agreement);
-  } catch (error: any) {
-    console.error('Error updating agreement:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error updating agreement' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update agreement' },
+      { error: error instanceof Error ? error.message : 'Failed to update agreement' },
       { status: 500 }
     );
   }
@@ -89,10 +90,10 @@ export async function DELETE(
     await cancelAgreement(id, body.reason);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error cancelling agreement:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error cancelling agreement' });
     return NextResponse.json(
-      { error: error.message || 'Failed to cancel agreement' },
+      { error: error instanceof Error ? error.message : 'Failed to cancel agreement' },
       { status: 500 }
     );
   }

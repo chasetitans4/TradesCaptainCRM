@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { createRetentionCommission } from '@/lib/admin/commissions';
+import { apiLogger } from '@/lib/logger';
 
 // Verify cron secret to prevent unauthorized access
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
   // SECURITY: Verify authorization - require CRON_SECRET to be configured
   const authHeader = request.headers.get('authorization');
   if (!CRON_SECRET) {
-    console.error('CRON_SECRET not configured - denying cron access');
+    apiLogger.error({ msg: 'CRON_SECRET not configured - denying cron access' });
     return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
   }
   if (authHeader !== `Bearer ${CRON_SECRET}`) {
@@ -195,7 +196,7 @@ export async function GET(request: NextRequest) {
 
     // === EXPIRE OLD COUPONS ===
     const now = new Date().toISOString();
-    const { data: expiredCoupons, error: couponError } = await supabase
+    const { data: expiredCoupons } = await supabase
       .from('crm_coupons')
       .update({ status: 'expired' })
       .eq('status', 'active')
@@ -230,10 +231,10 @@ export async function GET(request: NextRequest) {
       results,
       timestamp: now,
     });
-  } catch (error: any) {
-    console.error('Retention cron error:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Retention cron error', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Cron job failed' },
+      { error: error instanceof Error ? error.message : 'Cron job failed' },
       { status: 500 }
     );
   }

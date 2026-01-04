@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import { getExpenseExportData } from '@/lib/expenses';
 import { parseISO, startOfMonth, endOfMonth, format } from 'date-fns';
 
@@ -133,10 +134,10 @@ export async function GET(request: NextRequest) {
         'Content-Disposition': `attachment; filename="expenses-${format(start, 'yyyy-MM-dd')}-to-${format(end, 'yyyy-MM-dd')}.csv"`,
       },
     });
-  } catch (error: any) {
-    console.error('Error in GET /api/expenses/export:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'GET /api/expenses/export' });
     return NextResponse.json(
-      { error: error.message || 'Failed to export expenses' },
+      { error: error instanceof Error ? error.message : 'Failed to export expenses' },
       { status: 500 }
     );
   }

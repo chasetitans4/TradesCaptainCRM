@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { rejectTimeEntry } from '@/lib/timesheets';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -66,10 +67,10 @@ export async function POST(
     const updatedEntry = await rejectTimeEntry(id, reason);
 
     return NextResponse.json({ entry: updatedEntry });
-  } catch (error: any) {
-    console.error('Error in POST /api/timesheets/[id]/reject:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error in POST /api/timesheets/[id]/reject' });
     return NextResponse.json(
-      { error: error.message || 'Failed to reject time entry' },
+      { error: error instanceof Error ? error.message : 'Failed to reject time entry' },
       { status: 400 }
     );
   }

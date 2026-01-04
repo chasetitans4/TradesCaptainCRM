@@ -2,20 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import {
-  Calendar,
-  Clock,
-  User,
-  Phone,
-  Mail,
-  MapPin,
-  CheckCircle,
-  ArrowRight,
-  ArrowLeft,
-  Loader2,
-  AlertCircle,
-} from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { CheckCircle, ArrowRight, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,6 +16,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { logger } from '@/lib/logger';
+const bookingLogger = logger.child({ context: 'booking' });
 
 interface BusinessInfo {
   id: string;
@@ -95,7 +85,11 @@ export default function BookingPage() {
 
         setBusiness(data.business);
         setServiceTypes(data.serviceTypes || []);
-      } catch (err) {
+      } catch (_err) {
+        bookingLogger.error({
+          msg: 'Booking page load error',
+          businessId,
+        });
         setError('Unable to load booking page');
       } finally {
         setLoading(false);
@@ -117,7 +111,13 @@ export default function BookingPage() {
         const data = await response.json();
         setAvailableSlots(data.slots || []);
       } catch (err) {
-        console.error('Error loading slots:', err);
+        bookingLogger.error({
+          msg: 'Error loading booking slots',
+          businessId,
+          date: selectedDate,
+          serviceType: formData.serviceType,
+          error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { message: String(err) }
+        });
       } finally {
         setLoadingSlots(false);
       }

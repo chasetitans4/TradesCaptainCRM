@@ -10,6 +10,8 @@ import {
   OwnerNotification,
   UrgencyLevel
 } from './types';
+import { logger } from '@/lib/logger';
+const lcNotifyLogger = logger.child({ context: 'leads-captain.notifications' });
 
 // Urgency emoji mapping
 const URGENCY_EMOJI: Record<UrgencyLevel, string> = {
@@ -63,7 +65,6 @@ export function generateSmsNotificationBody(
   lead: CapturedLead,
   isEmergency: boolean
 ): string {
-  const urgencyEmoji = URGENCY_EMOJI[lead.serviceRequest.urgency];
   const displayPhone = formatPhoneForDisplay(lead.customer.phone);
 
   if (isEmergency) {
@@ -102,7 +103,7 @@ ${lead.serviceRequest.serviceNeeded}
  */
 export function generateEmailNotification(
   lead: CapturedLead,
-  settings: BusinessSettings
+  _settings: BusinessSettings
 ): { subject: string; body: string; html: string } {
   const urgencyEmoji = URGENCY_EMOJI[lead.serviceRequest.urgency];
   const urgencyLabel = URGENCY_LABEL[lead.serviceRequest.urgency];
@@ -278,7 +279,7 @@ async function sendSmsNotification(
   }
 
   try {
-    const message = await twilioClient.messages.create({
+    await twilioClient.messages.create({
       body: notification.body,
       to: settings.forwardTo,
       from: settings.phoneNumber,
@@ -287,7 +288,14 @@ async function sendSmsNotification(
 
     return { success: true };
   } catch (error) {
-    console.error('Failed to send SMS notification:', error);
+    lcNotifyLogger.error({
+      msg: 'Failed to send SMS notification',
+      businessId: notification.businessId,
+      recipientPhone: notification.recipientPhone,
+      urgency: notification.urgency,
+      leadId: notification.leadId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -330,7 +338,13 @@ async function queueEmailNotification(
 
     return { success: true };
   } catch (error) {
-    console.error('Failed to queue email notification:', error);
+    lcNotifyLogger.error({
+      msg: 'Failed to queue email notification',
+      businessId: settings.businessId,
+      leadId: lead.leadId,
+      recipientEmail: settings.forwardTo,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -348,14 +362,20 @@ async function sendPushNotification(
   isEmergency: boolean
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const pushContent = generatePushNotification(lead, isEmergency);
+    generatePushNotification(lead, isEmergency);
 
     // TODO: Integrate with your push notification service (e.g., Firebase, OneSignal)
     // Push notification service not yet configured - return success silently
 
     return { success: true };
   } catch (error) {
-    console.error('Failed to send push notification:', error);
+    lcNotifyLogger.error({
+      msg: 'Failed to send push notification',
+      businessId: settings.businessId,
+      leadId: lead.leadId,
+      isEmergency,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -482,7 +502,12 @@ export async function queueNotificationForMorning(
 
     return { success: true, scheduledFor: tomorrow };
   } catch (error) {
-    console.error('Failed to queue morning notification:', error);
+    lcNotifyLogger.error({
+      msg: 'Failed to queue morning notification',
+      businessId: settings.businessId,
+      leadId: lead.leadId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return {
       success: false,
       scheduledFor: new Date(),

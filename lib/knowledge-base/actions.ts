@@ -201,7 +201,7 @@ export function findAction(query: string): ActionDefinition | null {
 // Extract parameters from user message
 export function extractParameters(
   message: string,
-  action: ActionDefinition
+  _action: ActionDefinition
 ): Record<string, any> {
   const params: Record<string, any> = {};
 

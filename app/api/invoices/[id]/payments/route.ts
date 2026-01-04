@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
 import { recordManualPayment } from '@/lib/invoices';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -21,7 +22,9 @@ export async function POST(
     const body = await request.json();
     const { amount, method, notes } = body;
 
-    if (!amount || amount <= 0) {
+    // Parse and validate amount
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount <= 0) {
       return NextResponse.json({ error: 'Valid amount is required' }, { status: 400 });
     }
 
@@ -34,7 +37,7 @@ export async function POST(
     // Verify invoice belongs to user's business
     const { data: invoice, error: fetchError } = await supabase
       .from('invoices')
-      .select('id, status, amount_due')
+      .select('id, status, amount_due, total')
       .eq('id', id)
       .eq('business_id', profile.business_id)
       .single();
@@ -59,18 +62,30 @@ export async function POST(
       );
     }
 
+    // Cap payment amount at amount due to prevent overpayments
+    const validatedAmount = Math.min(numericAmount, invoice.amount_due);
+    if (validatedAmount !== numericAmount) {
+      apiLogger.warn({
+        msg: 'Payment amount capped to amount due',
+        invoiceId: id,
+        requestedAmount: numericAmount,
+        cappedAmount: validatedAmount,
+        amountDue: invoice.amount_due,
+      });
+    }
+
     try {
-      await recordManualPayment(id, amount, method, notes);
+      await recordManualPayment(id, validatedAmount, method, notes);
       return NextResponse.json({ success: true });
-    } catch (error: any) {
-      console.error('Error recording payment:', error);
+    } catch (error) {
+      apiLogger.error({ message: 'Error recording payment', error });
       return NextResponse.json(
-        { error: error.message || 'Failed to record payment' },
+        { error: error instanceof Error ? error.message : 'Failed to record payment' },
         { status: 500 }
       );
     }
   } catch (error) {
-    console.error('Error in record payment API:', error);
+    apiLogger.error({ message: 'Error in record payment API', error });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

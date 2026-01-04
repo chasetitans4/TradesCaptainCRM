@@ -1,12 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Button,
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
   Input,
   Label,
   Select,
@@ -21,18 +19,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui';
+import { useToast } from '@/components/ui/use-toast';
 import {
   Receipt,
   Plus,
   Camera,
-  Upload,
   Loader2,
-  Filter,
   Check,
   X,
-  Calendar,
   DollarSign,
-  Tag,
   Briefcase,
   Image as ImageIcon,
 } from 'lucide-react';
@@ -69,29 +64,33 @@ export default function ReceiptsPage() {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    fetchReceipts();
-  }, [filterStatus, filterCategory]);
-
-  async function fetchReceipts() {
+  const fetchReceipts = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (filterStatus !== 'all') params.set('status', filterStatus);
       if (filterCategory !== 'all') params.set('category', filterCategory);
-
       const res = await fetch(`/api/receipts?${params}`);
       if (!res.ok) throw new Error('Failed to fetch receipts');
       const data = await res.json();
       setReceipts(data.receipts || []);
-    } catch (err) {
-      console.error('Error fetching receipts:', err);
+    } catch (_err) {
       setError('Failed to load receipts');
+      toast({
+        title: 'Failed to load receipts',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
-  }
+  }, [filterStatus, filterCategory, toast]);
+
+  useEffect(() => {
+    fetchReceipts();
+  }, [fetchReceipts]);
 
   const pendingCount = receipts.filter((r) => r.status === 'pending').length;
   const totalAmount = receipts
@@ -190,7 +189,7 @@ export default function ReceiptsPage() {
         ) : (
           <div className="space-y-3">
             {receipts.map((receipt) => (
-              <ReceiptCard key={receipt.id} receipt={receipt} onUpdate={fetchReceipts} />
+              <ReceiptCard key={receipt.id} receipt={receipt} _onUpdate={fetchReceipts} />
             ))}
           </div>
         )}
@@ -211,10 +210,10 @@ export default function ReceiptsPage() {
 
 function ReceiptCard({
   receipt,
-  onUpdate,
+  _onUpdate,
 }: {
   receipt: ReceiptItem;
-  onUpdate: () => void;
+  _onUpdate: () => void;
 }) {
   const statusColors = {
     pending: 'bg-warning/10 text-warning',

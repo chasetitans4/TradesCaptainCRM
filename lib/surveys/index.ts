@@ -44,7 +44,7 @@ export async function createSurvey(
 
   const accessToken = uuidv4();
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('survey_responses')
     .insert({
       business_id: businessId,
@@ -54,8 +54,7 @@ export async function createSurvey(
       sent_via: sendVia,
       sent_at: new Date().toISOString(),
     })
-    .select()
-    .single();
+    ;
 
   if (error) throw error;
 
@@ -198,15 +197,8 @@ export async function sendSurvey(
     .eq('id', customerId)
     .single();
 
-  const { data: business } = await supabase
-    .from('businesses')
-    .select('name, twilio_phone_number')
-    .eq('id', businessId)
-    .single();
-
   // Create survey
-  const accessToken = await createSurvey(businessId, customerId, jobId, 'sms');
-  const surveyUrl = `${process.env.NEXT_PUBLIC_APP_URL}/survey/${accessToken}`;
+  await createSurvey(businessId, customerId, jobId, 'sms');
 
   // TODO: Send SMS via Twilio
   if (customer?.phone) {

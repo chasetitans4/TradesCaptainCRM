@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLead, reassignLead } from '@/lib/admin/leads';
 import { verifyAdminAuth } from '@/lib/admin/auth';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -48,10 +49,13 @@ export async function POST(
     }, auth.user.id);
 
     return NextResponse.json({ success: true, lead: updatedLead });
-  } catch (error: any) {
-    console.error('Reassign lead error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Reassign lead error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to reassign lead' },
+      { error: error instanceof Error ? error.message : 'Failed to reassign lead' },
       { status: 500 }
     );
   }

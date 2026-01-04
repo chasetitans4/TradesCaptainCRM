@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getOfferCodes } from '@/lib/admin/offers';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,10 +25,10 @@ export async function GET(request: NextRequest) {
       standard: offers.filter((o) => !o.requires_approval),
       restricted: offers.filter((o) => o.requires_approval),
     });
-  } catch (error: any) {
-    console.error('Get offers error:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Get offers error', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch offers' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch offers' },
       { status: 500 }
     );
   }

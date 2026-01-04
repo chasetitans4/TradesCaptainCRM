@@ -1,5 +1,5 @@
 import * as Admin from '@/lib/admin';
-import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 
 jest.mock('@/lib/supabase/server', () => {
   const state: any = {
@@ -102,12 +102,14 @@ describe('admin index: admin users', () => {
   it('creates admin user with hashed password and lowercased email', async () => {
     const input = { email: 'New@Example.com', name: 'New User', role: 'agent', password: 'secret' } as any;
     const created = (await Admin.createAdminUser(input)) as any;
-    const expectedHash = crypto.createHash('sha256').update('secret').digest('hex');
     expect(created.id).toBe('new-id');
     expect(created.email).toBe('new@example.com');
     expect(created.role).toBe('agent');
     expect(created.is_active).toBe(true);
-    expect(created.password_hash).toBe(expectedHash);
+    expect(typeof created.password_hash).toBe('string');
+    expect(created.password_hash.startsWith('$2')).toBe(true);
+    const matches = await bcrypt.compare('secret', created.password_hash);
+    expect(matches).toBe(true);
   });
 
   it('updates last login timestamp', async () => {

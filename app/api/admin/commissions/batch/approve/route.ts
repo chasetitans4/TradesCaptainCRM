@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { batchApproveCommissions } from '@/lib/admin/commissions';
 import { verifyAdminAuth } from '@/lib/admin/auth';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,10 +33,13 @@ export async function POST(request: NextRequest) {
     const count = await batchApproveCommissions(commission_ids, auth.user.id);
 
     return NextResponse.json({ success: true, approved_count: count });
-  } catch (error: any) {
-    console.error('Batch approve commissions error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Batch approve commissions error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to approve commissions' },
+      { error: error instanceof Error ? error.message : 'Failed to approve commissions' },
       { status: 500 }
     );
   }

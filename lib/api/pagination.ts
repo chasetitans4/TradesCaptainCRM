@@ -3,7 +3,6 @@
 // Utilities for optimized API responses
 // =====================================================
 
-import { NextRequest } from 'next/server';
 
 // =====================================================
 // PAGINATION
@@ -75,7 +74,7 @@ export function buildPaginatedResponse<T>(
 /**
  * Apply cursor-based pagination to Supabase query
  */
-export function applyCursorPagination<T>(
+export function applyCursorPagination(
   query: any,
   cursor: string | undefined,
   cursorField: string = 'created_at',

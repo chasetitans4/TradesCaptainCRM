@@ -6,6 +6,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { randomBytes, createHash } from 'crypto';
 import bcrypt from 'bcryptjs';
+import { logger } from '@/lib/logger';
+const portalAuthLogger = logger.child({ context: 'portal.auth' });
 
 const MAGIC_LINK_EXPIRY_MINUTES = 15;
 
@@ -94,7 +96,12 @@ export async function sendMagicLink(
   } catch (error) {
     // Email sending failed - in production, this should trigger an alert
     // Magic link was still generated but customer won't receive it
-    console.error('Failed to send magic link email:', error instanceof Error ? error.message : 'Unknown error');
+    portalAuthLogger.error({
+      msg: 'Failed to send magic link email',
+      businessId,
+      email,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
   }
 
   return { success: true };

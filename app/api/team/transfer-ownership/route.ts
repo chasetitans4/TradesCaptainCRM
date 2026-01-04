@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { transferOwnership } from '@/lib/team';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,10 +44,10 @@ export async function POST(request: NextRequest) {
     await transferOwnership(profile.id, new_owner_id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error transferring ownership:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error transferring ownership' });
     return NextResponse.json(
-      { error: error.message || 'Failed to transfer ownership' },
+      { error: error instanceof Error ? error.message : 'Failed to transfer ownership' },
       { status: 400 }
     );
   }

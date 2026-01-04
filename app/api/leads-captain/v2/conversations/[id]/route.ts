@@ -9,13 +9,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { sendSMS } from '@/lib/twilio';
+import { apiLogger } from '@/lib/logger';
 import type { ConversationDetailResponse } from '@/types/leads-captain';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const profile = await getServerUserProfile();
     if (!profile) {
@@ -66,8 +67,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     };
 
     return NextResponse.json(response);
-  } catch (error: unknown) {
-    console.error('Error fetching conversation:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error fetching conversation',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch conversation' },
       { status: 500 }
@@ -211,8 +215,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     });
 
     return NextResponse.json({ conversation, action_performed: action });
-  } catch (error: unknown) {
-    console.error('Error updating conversation:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error updating conversation',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to update conversation' },
       { status: 500 }
@@ -320,7 +327,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       return NextResponse.json({ message, sent: true });
     } catch (sendError) {
-      console.error('Failed to send SMS:', sendError);
+      apiLogger.error({
+        message: 'Failed to send SMS',
+        error: sendError,
+      });
       await supabase
         .from('leads_captain_messages_v2')
         .update({
@@ -334,8 +344,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         error: 'Message created but failed to send',
       });
     }
-  } catch (error: unknown) {
-    console.error('Error sending message:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error sending message',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to send message' },
       { status: 500 }

@@ -8,6 +8,7 @@ import {
   markContactConverted,
   updateContactScore,
 } from '@/lib/outreach/contacts';
+import { apiLogger } from '@/lib/logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json(contact);
   } catch (error) {
-    console.error('Error getting contact:', error);
+    apiLogger.error({ message: 'Error getting contact', error });
     return NextResponse.json(
       { error: 'Failed to get contact' },
       { status: 500 }
@@ -119,7 +120,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       }
     }
   } catch (error) {
-    console.error('Error updating contact:', error);
+    apiLogger.error({ message: 'Error updating contact', error });
     return NextResponse.json(
       { error: 'Failed to update contact' },
       { status: 500 }

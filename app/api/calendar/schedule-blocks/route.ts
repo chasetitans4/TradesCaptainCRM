@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
 import type { CreateScheduleBlockInput } from '@/types';
+import { apiLogger } from '@/lib/logger';
 
 // GET - Fetch schedule blocks
 export async function GET() {
@@ -27,7 +28,7 @@ export async function GET() {
       .order('start_time');
 
     if (error) {
-      console.error('Error fetching schedule blocks:', error);
+      apiLogger.error({ error, context: 'Error fetching schedule blocks' });
       return NextResponse.json(
         { error: 'Failed to fetch schedule blocks' },
         { status: 500 }
@@ -36,7 +37,7 @@ export async function GET() {
 
     return NextResponse.json({ blocks: blocks || [] });
   } catch (error) {
-    console.error('Error fetching schedule blocks:', error);
+    apiLogger.error({ error, context: 'Error fetching schedule blocks' });
     return NextResponse.json(
       { error: 'Failed to fetch schedule blocks' },
       { status: 500 }
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Error creating schedule block:', error);
+      apiLogger.error({ error, context: 'Error creating schedule block' });
       return NextResponse.json(
         { error: 'Failed to create schedule block' },
         { status: 500 }
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ block: data });
   } catch (error) {
-    console.error('Error creating schedule block:', error);
+    apiLogger.error({ error, context: 'Error creating schedule block' });
     return NextResponse.json(
       { error: 'Failed to create schedule block' },
       { status: 500 }

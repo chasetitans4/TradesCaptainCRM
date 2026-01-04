@@ -9,9 +9,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getLead, updateLead, deleteLead, moveLeadToStage } from '@/lib/admin/pipeline';
 import type { PipelineStage } from '@/lib/admin/types';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ leadId: string }> }
 ) {
   try {
@@ -28,10 +29,10 @@ export async function GET(
     }
 
     return NextResponse.json(lead);
-  } catch (error: any) {
-    console.error('Get lead error:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Get lead error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch lead' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch lead' },
       { status: 500 }
     );
   }
@@ -64,17 +65,17 @@ export async function PATCH(
     const lead = await updateLead(leadId, admin.id, body);
 
     return NextResponse.json({ lead });
-  } catch (error: any) {
-    console.error('Update lead error:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Update lead error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update lead' },
+      { error: error instanceof Error ? error.message : 'Failed to update lead' },
       { status: 500 }
     );
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ leadId: string }> }
 ) {
   try {
@@ -88,10 +89,10 @@ export async function DELETE(
     await deleteLead(leadId);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Delete lead error:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Delete lead error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to delete lead' },
+      { error: error instanceof Error ? error.message : 'Failed to delete lead' },
       { status: 500 }
     );
   }

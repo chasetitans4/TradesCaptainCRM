@@ -6,8 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getClockStatus, getActiveJobTimer, getActiveBreak } from '@/lib/timesheets';
+import { apiLogger } from '@/lib/logger';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -40,10 +41,10 @@ export async function GET(request: NextRequest) {
       activeJobTimer,
       activeBreak,
     });
-  } catch (error: any) {
-    console.error('Error in GET /api/timesheets/current:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error in GET /api/timesheets/current' });
     return NextResponse.json(
-      { error: error.message || 'Failed to get current status' },
+      { error: error instanceof Error ? error.message : 'Failed to get current status' },
       { status: 500 }
     );
   }

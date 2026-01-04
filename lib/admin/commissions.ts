@@ -479,7 +479,6 @@ export async function batchPayCommissions(
   paidVia: string,
   paymentReference?: string
 ): Promise<{ success: number; failed: number; totalAmount: number }> {
-  const supabase = createAdminClient();
   let success = 0;
   let failed = 0;
   let totalAmount = 0;

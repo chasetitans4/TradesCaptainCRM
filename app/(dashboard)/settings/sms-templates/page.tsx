@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -20,6 +20,7 @@ import {
   Tag,
 } from 'lucide-react';
 import type { SMSTemplate } from '@/types';
+import { useToast } from '@/components/ui/use-toast';
 
 type TemplateCategory = 'appointment' | 'follow_up' | 'quote' | 'invoice' | 'general';
 
@@ -50,6 +51,7 @@ export default function SMSTemplatesPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   // Form state
   const [formName, setFormName] = useState('');
@@ -57,23 +59,23 @@ export default function SMSTemplatesPage() {
   const [formCategory, setFormCategory] = useState<TemplateCategory>('general');
   const [formIsDefault, setFormIsDefault] = useState(false);
 
-  useEffect(() => {
-    loadTemplates();
-  }, []);
-
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     try {
       const response = await fetch('/api/sms/templates');
       if (response.ok) {
         const data = await response.json();
         setTemplates(data.templates || []);
       }
-    } catch (error) {
-      console.error('Error loading templates:', error);
+    } catch (_error) {
+      toast({ title: 'Failed to load templates', description: 'Please try again', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadTemplates();
+  }, [loadTemplates]);
 
   const resetForm = () => {
     setFormName('');
@@ -124,11 +126,10 @@ export default function SMSTemplatesPage() {
         resetForm();
       } else {
         const data = await response.json();
-        alert(data.error || 'Failed to save template');
+        toast({ title: 'Failed to save template', description: data.error || 'Please try again', variant: 'destructive' });
       }
-    } catch (error) {
-      console.error('Error saving template:', error);
-      alert('Failed to save template');
+    } catch (_error) {
+      toast({ title: 'Failed to save template', description: 'Please try again', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -148,11 +149,10 @@ export default function SMSTemplatesPage() {
           resetForm();
         }
       } else {
-        alert('Failed to delete template');
+        toast({ title: 'Failed to delete template', description: 'Please try again', variant: 'destructive' });
       }
-    } catch (error) {
-      console.error('Error deleting template:', error);
-      alert('Failed to delete template');
+    } catch (_error) {
+      toast({ title: 'Failed to delete template', description: 'Please try again', variant: 'destructive' });
     }
   };
 
@@ -166,10 +166,6 @@ export default function SMSTemplatesPage() {
     setFormContent((prev) => prev + variable);
   };
 
-  const getCategoryIcon = (category: string) => {
-    const cat = CATEGORIES.find((c) => c.value === category);
-    return cat?.icon || Tag;
-  };
 
   if (loading) {
     return (
@@ -373,8 +369,6 @@ export default function SMSTemplatesPage() {
 
                   <div className="space-y-2">
                     {categoryTemplates.map((template) => {
-                      const CategoryIcon = getCategoryIcon(template.category || 'general');
-
                       return (
                         <div
                           key={template.id}

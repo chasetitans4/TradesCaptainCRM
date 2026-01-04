@@ -199,7 +199,7 @@ export interface CustomerCommissionDetail {
 }
 
 // Helper functions
-function formatPeriodLabel(start: Date, end: Date): string {
+function formatPeriodLabel(start: Date, _end: Date): string {
   const months = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
   return `${months[start.getMonth()]} ${start.getFullYear()}`;
@@ -424,11 +424,6 @@ export async function getPendingCommissions(agentId: string): Promise<PendingDat
 
 export async function getRecurringCommissions(agentId: string): Promise<RecurringData> {
   const supabase = await createClient();
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const monthStartStr = monthStart.toISOString().split('T')[0];
-  const monthEndStr = monthEnd.toISOString().split('T')[0];
 
   // Get this month's recurring
   const { data: recurringInitial } = await supabase
@@ -557,10 +552,6 @@ export async function getBonusData(agentId: string): Promise<BonusData> {
   }).filter(b => b.bonus > 0);
 
   // Get earned bonuses this month
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const monthStartStr = monthStart.toISOString().split('T')[0];
-  const monthEndStr = monthEnd.toISOString().split('T')[0];
 
   const { data: earnedInitial } = await supabase
     .from('agent_commissions')
@@ -686,7 +677,6 @@ export async function getPerformanceData(agentId: string): Promise<PerformanceDa
 
   // Quarterly data
   const quarter = Math.floor(now.getMonth() / 3);
-  const quarterStart = new Date(now.getFullYear(), quarter * 3, 1);
 
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];

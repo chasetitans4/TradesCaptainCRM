@@ -1,5 +1,6 @@
 // SMS Service using Twilio
 import twilio from 'twilio';
+import { smsLogger } from '@/lib/logger';
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -38,7 +39,10 @@ export async function sendSms({ to, body }: SendSmsParams): Promise<SendSmsResul
       messageId: message.sid,
     };
   } catch (error) {
-    console.error('Failed to send SMS:', error);
+    smsLogger.error({
+      msg: 'Failed to send SMS',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error),
+    });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

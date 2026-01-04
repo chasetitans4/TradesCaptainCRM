@@ -24,7 +24,7 @@ const getConnection = (): ConnectionOptions => {
 export const emailWorker = new Worker(
   'email',
   async (job: Job) => {
-    const { to, subject, html, text, businessId, customerId, replyTo, attachments } = job.data;
+    const { to, subject, html, text } = job.data;
 
     // Dynamic import to avoid circular dependencies
     const { sendEmail } = await import('@/lib/email');
@@ -55,17 +55,17 @@ export const emailWorker = new Worker(
 export const smsWorker = new Worker(
   'sms',
   async (job: Job) => {
-    const { to, message, businessId, customerId, mediaUrl } = job.data;
-
     // Handle different SMS job types
     if (job.name === 'send_survey') {
+      const { businessId, customerId, jobId } = job.data;
       const { sendSurvey } = await import('@/lib/surveys');
-      await sendSurvey(businessId, customerId, job.data.jobId);
+      await sendSurvey(businessId, customerId, jobId);
       return { sent: true, type: 'survey' };
     }
 
     // Regular SMS
     const { sendSMS } = await import('@/lib/twilio');
+    const { to, message, businessId } = job.data;
 
     const result = await sendSMS({ to, body: message, businessId });
 
@@ -139,7 +139,7 @@ export const notificationWorker = new Worker(
 export const syncWorker = new Worker(
   'sync',
   async (job: Job) => {
-    const { businessId, entityType, entityId, userId, action, jobId: relatedJobId } = job.data;
+    const { businessId, entityType, entityId, action } = job.data;
 
     if (job.name === 'sync_quickbooks') {
       const qbSync = await import('@/lib/quickbooks/sync');
@@ -182,7 +182,7 @@ export const reminderWorker = new Worker(
   'reminder',
   async (job: Job) => {
     if (job.name === 'appointment_reminder') {
-      const { to, message, businessId, customerId, jobId } = job.data;
+      const { to, message, businessId } = job.data;
 
       const { sendSMS } = await import('@/lib/twilio');
       const result = await sendSMS({ to, body: message, businessId });
@@ -220,7 +220,7 @@ export const reminderWorker = new Worker(
 export const reportWorker = new Worker(
   'report',
   async (job: Job) => {
-    const { businessId, reportType, params, userId, schedule } = job.data;
+    const { businessId, reportType, userId } = job.data;
 
     // Example: Generate and store report
     // const report = await generateReport(businessId, reportType, params);
@@ -283,6 +283,7 @@ export const webhookWorker = new Worker(
 // =====================================================
 // WORKER EVENT HANDLERS
 // =====================================================
+import { queueLogger } from '@/lib/logger';
 const workers = [
   emailWorker,
   smsWorker,
@@ -295,11 +296,19 @@ const workers = [
 
 workers.forEach(worker => {
   worker.on('failed', (job: Job | undefined, err: Error) => {
-    console.error(`Job ${job?.id} (${job?.name}) failed:`, err.message);
+    queueLogger.error({
+      msg: 'Job failed',
+      jobId: job?.id,
+      jobName: job?.name,
+      error: { message: err.message, stack: err.stack },
+    });
   });
 
   worker.on('error', (err: Error) => {
-    console.error('Worker error:', err);
+    queueLogger.error({
+      msg: 'Worker error',
+      error: { message: err.message, stack: err.stack },
+    });
   });
 });
 

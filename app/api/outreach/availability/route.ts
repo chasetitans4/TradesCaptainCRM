@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAvailableCallSlots } from '@/lib/outreach/scheduling';
+import { apiLogger } from '@/lib/logger';
 
 /**
  * GET /api/outreach/availability
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error getting availability:', error);
+    apiLogger.error({ message: 'Error getting availability', error });
     return NextResponse.json(
       { error: 'Failed to get availability' },
       { status: 500 }

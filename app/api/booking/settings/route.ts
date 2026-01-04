@@ -8,9 +8,10 @@ import {
   isSlugAvailable,
   getBusinessServices,
 } from '@/lib/booking/settings';
+import { apiLogger } from '@/lib/logger';
 
 // GET /api/booking/settings - Get booking settings for current business
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const supabase = await createClient();
     const {
@@ -47,9 +48,9 @@ export async function GET(request: NextRequest) {
       settings,
       availableServices: services,
     });
-  } catch (error: any) {
-    console.error('Error fetching booking settings:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error fetching booking settings' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to fetch booking settings' }, { status: 500 });
   }
 }
 
@@ -93,8 +94,8 @@ export async function POST(request: NextRequest) {
     const settings = await upsertBookingSettings(userData.business_id, data);
 
     return NextResponse.json({ settings });
-  } catch (error: any) {
-    console.error('Error updating booking settings:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error updating booking settings' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to update booking settings' }, { status: 500 });
   }
 }

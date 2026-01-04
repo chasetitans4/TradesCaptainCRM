@@ -26,6 +26,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Save, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import type { LeadsCaptainConfig, LeadsCaptainIntent, UpdateConfigRequest } from '@/types/leads-captain';
+import { logger } from '@/lib/logger';
 
 const TIMEZONES = [
   { value: 'America/New_York', label: 'Eastern Time' },
@@ -55,6 +56,7 @@ export default function LeadsCaptainSettingsPage() {
   const [intents, setIntents] = useState<LeadsCaptainIntent[]>([]);
   const [formData, setFormData] = useState<UpdateConfigRequest>({});
   const [intentChanges, setIntentChanges] = useState<Record<string, boolean>>({});
+  const lcSettingsLogger = logger.child({ context: 'leads-captain.settings' });
 
   useEffect(() => {
     fetchSettings();
@@ -80,7 +82,10 @@ export default function LeadsCaptainSettingsPage() {
       setIntents(intentsData.intents || []);
       setFormData(configData.config);
     } catch (error) {
-      console.error('Error fetching settings:', error);
+      lcSettingsLogger.error({
+        msg: 'Error fetching settings',
+        error: error instanceof Error ? error.message : String(error),
+      });
       toast.error('Failed to load settings');
     } finally {
       setLoading(false);
@@ -120,7 +125,10 @@ export default function LeadsCaptainSettingsPage() {
       setIntentChanges({});
       fetchSettings();
     } catch (error) {
-      console.error('Error saving settings:', error);
+      lcSettingsLogger.error({
+        msg: 'Error saving settings',
+        error: error instanceof Error ? error.message : String(error),
+      });
       toast.error('Failed to save settings');
     } finally {
       setSaving(false);

@@ -37,12 +37,6 @@ export async function summarizeConversation(
     return { summary: cachedSummary, recentMessages };
   }
 
-  // Generate summary using a lightweight model
-  // This is a placeholder - actual implementation would call your AI provider
-  const summaryPrompt = `Summarize this conversation in 2-3 sentences, focusing on key points and context:\n\n${
-    olderMessages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n')
-  }`;
-
   // For now, create a basic summary from the messages
   const summary = createBasicSummary(olderMessages);
 

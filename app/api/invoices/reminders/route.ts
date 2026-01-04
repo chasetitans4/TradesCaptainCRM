@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { sendPaymentReminder, updateOverdueInvoices } from '@/lib/invoices';
 import { isEmailConfigured } from '@/lib/email';
+import { apiLogger } from '@/lib/logger';
 
 // Verify cron secret for automated calls
 function verifyCronSecret(request: NextRequest): boolean {
@@ -149,9 +150,9 @@ export async function POST(request: NextRequest) {
           try {
             await sendPaymentReminder(invoice.id);
             results.sent++;
-          } catch (error: any) {
+          } catch (error) {
             results.failed++;
-            results.errors.push(`Invoice ${invoice.invoice_number}: ${error.message}`);
+            results.errors.push(`Invoice ${invoice.invoice_number}: ${error instanceof Error ? error.message : 'Unknown error'}`);
           }
         }
       }
@@ -161,17 +162,17 @@ export async function POST(request: NextRequest) {
       success: true,
       ...results,
     });
-  } catch (error: any) {
-    console.error('Error sending payment reminders:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error sending payment reminders', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to send reminders' },
+      { error: error instanceof Error ? error.message : 'Failed to send reminders' },
       { status: 500 }
     );
   }
 }
 
 // GET endpoint to check reminder configuration
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     return NextResponse.json({
       configured: isEmailConfigured(),
@@ -181,7 +182,7 @@ export async function GET(request: NextRequest) {
         maxRemindersPerInvoice: 5,
       },
     });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json({ error: 'Failed to get reminder config' }, { status: 500 });
   }
 }

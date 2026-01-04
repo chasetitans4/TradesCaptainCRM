@@ -49,6 +49,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { LeadsCaptainTemplate, CreateTemplateRequest } from '@/types/leads-captain';
+import { logger } from '@/lib/logger';
 
 const TEMPLATE_VARIABLES = [
   { key: 'business_name', description: 'Your business name' },
@@ -77,6 +78,7 @@ export default function LeadsCaptainTemplatesPage() {
     content: '',
   });
   const [preview, setPreview] = useState<string>('');
+  const lcTemplatesLogger = logger.child({ context: 'leads-captain.templates' });
 
   useEffect(() => {
     fetchTemplates();
@@ -90,7 +92,10 @@ export default function LeadsCaptainTemplatesPage() {
       setTemplates(data.templates || []);
       setLimits(data.limits);
     } catch (error) {
-      console.error('Error fetching templates:', error);
+      lcTemplatesLogger.error({
+        msg: 'Error fetching templates',
+        error: error instanceof Error ? error.message : String(error),
+      });
       toast.error('Failed to load templates');
     } finally {
       setLoading(false);
@@ -182,7 +187,12 @@ export default function LeadsCaptainTemplatesPage() {
       setEditDialogOpen(false);
       fetchTemplates();
     } catch (error) {
-      console.error('Error saving template:', error);
+      lcTemplatesLogger.error({
+        msg: 'Error saving template',
+        error: error instanceof Error ? error.message : String(error),
+        isCreating,
+        templateId: selectedTemplate?.id,
+      });
       toast.error(error instanceof Error ? error.message : 'Failed to save template');
     } finally {
       setSaving(false);
@@ -204,7 +214,11 @@ export default function LeadsCaptainTemplatesPage() {
       setSelectedTemplate(null);
       fetchTemplates();
     } catch (error) {
-      console.error('Error deleting template:', error);
+      lcTemplatesLogger.error({
+        msg: 'Error deleting template',
+        error: error instanceof Error ? error.message : String(error),
+        templateId: selectedTemplate.id,
+      });
       toast.error(error instanceof Error ? error.message : 'Failed to delete template');
     }
   };

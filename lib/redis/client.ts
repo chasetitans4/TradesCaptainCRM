@@ -4,6 +4,7 @@
 // =====================================================
 
 import Redis from 'ioredis';
+import { cacheLogger } from '@/lib/logger';
 
 const getRedisConfig = () => {
   const url = process.env.REDIS_URL;
@@ -39,7 +40,7 @@ export function getRedis(): Redis {
     });
 
     redis.on('error', (err) => {
-      console.error('Redis connection error:', err.message);
+      cacheLogger.error({ msg: 'Redis connection error', error: { message: err.message } });
     });
 
   }

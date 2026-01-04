@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { getCustomerTimeline, addNote, logActivity, type ActivityType } from '@/lib/activity';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,10 +34,10 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json(activities);
-  } catch (error: any) {
-    console.error('Error fetching activities:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error fetching activities' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch activities' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch activities' },
       { status: 500 }
     );
   }
@@ -84,10 +85,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error logging activity:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error logging activity' });
     return NextResponse.json(
-      { error: error.message || 'Failed to log activity' },
+      { error: error instanceof Error ? error.message : 'Failed to log activity' },
       { status: 500 }
     );
   }

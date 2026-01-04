@@ -5,6 +5,7 @@ import {
   getSpeedReport,
   getCampaignPerformance,
 } from '@/lib/outreach/analytics';
+import { apiLogger } from '@/lib/logger';
 
 /**
  * GET /api/outreach/analytics
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
         );
     }
   } catch (error) {
-    console.error('Error getting analytics:', error);
+    apiLogger.error({ message: 'Error getting analytics', error });
     return NextResponse.json(
       { error: 'Failed to get analytics' },
       { status: 500 }

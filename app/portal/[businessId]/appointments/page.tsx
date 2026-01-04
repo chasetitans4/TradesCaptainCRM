@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Calendar, Clock, User, Phone, CheckCircle, AlertCircle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Calendar, Clock, User, Phone, CheckCircle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AddressLink } from '@/components/ui/address-link';
+import { logger } from '@/lib/logger';
+const portalAppointmentsLogger = logger.child({ context: 'portal.appointments' });
 
 interface Appointment {
   id: string;
@@ -41,7 +43,11 @@ export default function AppointmentsPage() {
         setUpcoming(data.upcoming || []);
         setHistory(data.history || []);
       } catch (error) {
-        console.error('Error loading appointments:', error);
+        portalAppointmentsLogger.error({
+          msg: 'Error loading appointments',
+          businessId,
+          error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+        });
       } finally {
         setLoading(false);
       }

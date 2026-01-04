@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { addFeatureComment, getFeatureComments } from '@/lib/feature-requests';
+import { apiLogger } from '@/lib/logger';
 
 // POST - Add a comment
 export async function POST(
@@ -41,7 +42,7 @@ export async function POST(
 
     return NextResponse.json({ comment: newComment }, { status: 201 });
   } catch (error) {
-    console.error('Error adding comment:', error);
+    apiLogger.error({ message: 'Error adding comment', error });
     return NextResponse.json(
       { error: 'Failed to add comment' },
       { status: 500 }
@@ -51,7 +52,7 @@ export async function POST(
 
 // GET - Get all comments for a feature request
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
@@ -60,7 +61,7 @@ export async function GET(
 
     return NextResponse.json({ comments });
   } catch (error) {
-    console.error('Error fetching comments:', error);
+    apiLogger.error({ message: 'Error fetching comments', error });
     return NextResponse.json(
       { error: 'Failed to fetch comments' },
       { status: 500 }

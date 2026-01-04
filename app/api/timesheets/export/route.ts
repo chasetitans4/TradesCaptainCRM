@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { startOfWeek, endOfWeek, parseISO, format } from 'date-fns';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -149,10 +150,10 @@ export async function GET(request: NextRequest) {
         'Content-Disposition': `attachment; filename="timesheets-${format(rangeStart, 'yyyy-MM-dd')}-to-${format(rangeEnd, 'yyyy-MM-dd')}.csv"`,
       },
     });
-  } catch (error: any) {
-    console.error('Error in GET /api/timesheets/export:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error in GET /api/timesheets/export' });
     return NextResponse.json(
-      { error: error.message || 'Failed to export timesheets' },
+      { error: error instanceof Error ? error.message : 'Failed to export timesheets' },
       { status: 500 }
     );
   }

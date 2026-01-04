@@ -4,6 +4,8 @@
 
 import { createAdminClient } from '@/lib/supabase/server';
 import { sendEmail, getOwnershipTransferEmailHtml } from '@/lib/email';
+import { logger } from '@/lib/logger';
+const teamLogger = logger.child({ context: 'team.members' });
 
 /**
  * Get all team members for a business
@@ -19,7 +21,11 @@ export async function getTeamMembers(businessId: string) {
     .order('name');
 
   if (error) {
-    console.error('Error fetching team members:', error);
+    teamLogger.error({
+      msg: 'Error fetching team members',
+      businessId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw error;
   }
 
@@ -73,7 +79,13 @@ export async function updateMemberRole(
     .eq('id', memberId);
 
   if (error) {
-    console.error('Error updating role:', error);
+    teamLogger.error({
+      msg: 'Error updating role',
+      memberId,
+      newRole,
+      updatedBy,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to update role');
   }
 }
@@ -125,7 +137,12 @@ export async function deactivateMember(memberId: string, deactivatedBy: string) 
     .eq('id', memberId);
 
   if (error) {
-    console.error('Error deactivating member:', error);
+    teamLogger.error({
+      msg: 'Error deactivating member',
+      memberId,
+      deactivatedBy,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to deactivate member');
   }
 }
@@ -172,7 +189,12 @@ export async function reactivateMember(memberId: string, reactivatedBy: string) 
     .eq('id', memberId);
 
   if (error) {
-    console.error('Error reactivating member:', error);
+    teamLogger.error({
+      msg: 'Error reactivating member',
+      memberId,
+      reactivatedBy,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to reactivate member');
   }
 }

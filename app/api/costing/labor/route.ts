@@ -10,6 +10,7 @@ import {
   getActiveClockIn,
   getLaborSummary,
 } from '@/lib/costing/labor';
+import { apiLogger } from '@/lib/logger';
 
 // GET /api/costing/labor - Get labor entries
 export async function GET(request: NextRequest) {
@@ -54,9 +55,9 @@ export async function GET(request: NextRequest) {
       { error: 'Job ID or date range is required' },
       { status: 400 }
     );
-  } catch (error: any) {
-    console.error('Error fetching labor:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error fetching labor' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to fetch labor' }, { status: 500 });
   }
 }
 
@@ -141,8 +142,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Error with labor action:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'Error with labor action', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to process labor action' }, { status: 500 });
   }
 }

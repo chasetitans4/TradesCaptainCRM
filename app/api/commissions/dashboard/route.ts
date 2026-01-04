@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getCommissionDashboard } from '@/lib/admin/commission-tracker';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,10 +23,10 @@ export async function GET(request: NextRequest) {
     const dashboard = await getCommissionDashboard(admin.id, period);
 
     return NextResponse.json(dashboard);
-  } catch (error: any) {
-    console.error('Error in GET /api/commissions/dashboard:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error in GET /api/commissions/dashboard' });
     return NextResponse.json(
-      { error: error.message || 'Failed to get commission dashboard' },
+      { error: error instanceof Error ? error.message : 'Failed to get commission dashboard' },
       { status: 500 }
     );
   }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePortalSession } from '@/lib/portal/session';
 import { getCustomerAppointments, getCustomerJobHistory } from '@/lib/portal/data';
+import { apiLogger } from '@/lib/logger';
 
 // GET /api/portal/appointments - Get customer appointments
 export async function GET(request: NextRequest) {
@@ -20,11 +21,11 @@ export async function GET(request: NextRequest) {
     // Get job history
     const result = await getCustomerJobHistory(session.customerId, { limit, offset });
     return NextResponse.json(result);
-  } catch (error: any) {
-    if (error.message === 'Portal authentication required') {
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Portal authentication required') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    console.error('Portal appointments error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    apiLogger.error({ error, context: 'Portal appointments error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 });
   }
 }

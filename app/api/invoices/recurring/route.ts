@@ -10,6 +10,7 @@ import {
   generateRecurringInvoices,
   getUpcomingRecurringInvoices,
 } from '@/lib/invoices/recurring';
+import { apiLogger } from '@/lib/logger';
 
 // Verify cron secret for automated calls
 function verifyCronSecret(request: NextRequest): boolean {
@@ -18,7 +19,7 @@ function verifyCronSecret(request: NextRequest): boolean {
 
   // SECURITY: Require CRON_SECRET to be configured - deny access if not set
   if (!cronSecret) {
-    console.error('CRON_SECRET not configured - denying cron access');
+    apiLogger.error({ message: 'CRON_SECRET not configured - denying cron access' });
     return false;
   }
   return authHeader === `Bearer ${cronSecret}`;
@@ -54,10 +55,10 @@ export async function POST(request: NextRequest) {
       success: true,
       ...result,
     });
-  } catch (error: any) {
-    console.error('Error generating recurring invoices:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error generating recurring invoices', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to generate invoices' },
+      { error: error instanceof Error ? error.message : 'Failed to generate invoices' },
       { status: 500 }
     );
   }
@@ -79,10 +80,10 @@ export async function GET(request: NextRequest) {
     );
 
     return NextResponse.json({ upcoming });
-  } catch (error: any) {
-    console.error('Error fetching recurring invoices:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error fetching recurring invoices', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch upcoming invoices' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch upcoming invoices' },
       { status: 500 }
     );
   }

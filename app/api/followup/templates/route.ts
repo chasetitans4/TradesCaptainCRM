@@ -7,6 +7,7 @@ import {
   applyTemplate,
   getTemplateCategories,
 } from '@/lib/followup/templates';
+import { apiLogger } from '@/lib/logger';
 
 // GET /api/followup/templates - Get available templates
 export async function GET(request: NextRequest) {
@@ -35,9 +36,9 @@ export async function GET(request: NextRequest) {
     const categories = getTemplateCategories();
 
     return NextResponse.json({ templates, categories });
-  } catch (error: any) {
-    console.error('Error fetching templates:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ message: 'Error fetching templates', error });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to fetch templates' }, { status: 500 });
   }
 }
 
@@ -79,8 +80,8 @@ export async function POST(request: NextRequest) {
       created: result.created,
       errors: result.errors,
     });
-  } catch (error: any) {
-    console.error('Error applying template:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ message: 'Error applying template', error });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to apply template' }, { status: 500 });
   }
 }

@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { getCalendarConnection } from '@/lib/nylas';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { CALENDAR_PROVIDERS } from '@/lib/nylas';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET() {
   try {
@@ -37,7 +38,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error('Error fetching calendar connection:', error);
+    apiLogger.error({ error, context: 'Error fetching calendar connection' });
     return NextResponse.json(
       { error: 'Failed to fetch calendar connection' },
       { status: 500 }

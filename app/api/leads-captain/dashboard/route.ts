@@ -9,6 +9,7 @@ import {
   getLeadsCaptainDashboardSummary,
   getSmsUsageOverview,
 } from '@/lib/admin/leads-captain-dashboard';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,10 +34,13 @@ export async function GET(request: NextRequest) {
         label: period === 'this_month' ? 'This Month' : 'Last Month',
       },
     });
-  } catch (error: any) {
-    console.error('Leads Captain dashboard error:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Leads Captain dashboard error',
+      error,
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch dashboard data' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch dashboard data' },
       { status: 500 }
     );
   }

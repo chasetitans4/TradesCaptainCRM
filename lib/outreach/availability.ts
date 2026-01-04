@@ -9,7 +9,6 @@ import type {
   AgentBreakTime,
   AgentTimeBlock,
   AgentBlackoutDay,
-  GlobalBlackoutDate,
   CallDistributionSettings,
 } from '@/types/outreach';
 
@@ -253,7 +252,6 @@ export async function getAgentAvailableSlotsForDate(
 ): Promise<TimeSlot[]> {
   const supabase = await createClient();
   const dayOfWeek = date.getDay();
-  const dateStr = date.toISOString().split('T')[0];
 
   // Check if agent is blacked out
   if (await isAgentBlackedOut(agentId, date)) {

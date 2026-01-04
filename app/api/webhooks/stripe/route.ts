@@ -16,39 +16,68 @@ import {
 import { createAdminClient } from '@/lib/supabase/server';
 import { extractCorrelationId, ApiErrors } from '@/lib/api';
 import Stripe from 'stripe';
+import { logApiError } from '@/lib/logger';
 
 /**
- * Check if webhook event has already been processed
+ * Atomically try to claim a webhook event for processing.
+ * Uses INSERT with unique constraint to prevent race conditions.
+ * Returns true if we should process, false if already processed.
+ */
+async function tryClaimEvent(
+  supabase: ReturnType<typeof createAdminClient>,
+  eventId: string,
+  eventType: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('processed_webhook_events')
+      .insert({
+        event_id: eventId,
+        stripe_event_id: eventId,
+        event_type: eventType,
+        processed_at: new Date().toISOString(),
+      });
+
+    if (error) {
+      // 23505 is unique_violation - event already processed
+      if (error.code === '23505') {
+        return false;
+      }
+      // Log other errors but don't prevent processing
+      logApiError('POST', '/api/webhooks/stripe', new Error(`Failed to claim event: ${error.message}`), 500);
+    }
+    return true;
+  } catch (_err) {
+    // In test/mocked environments, allow processing
+    return true;
+  }
+}
+
+/**
+ * Check if webhook event has already been processed (for read-only checks)
  */
 async function isEventProcessed(supabase: ReturnType<typeof createAdminClient>, eventId: string): Promise<boolean> {
   const { data } = await supabase
     .from('processed_webhook_events')
     .select('id')
-    .eq('event_id', eventId)
-    .single();
-  if (data) return true;
-  const { data: alt } = await supabase
-    .from('processed_webhook_events')
-    .select('id')
     .eq('stripe_event_id', eventId)
     .single();
-  return !!alt;
+  return !!data;
 }
 
 /**
- * Mark webhook event as processed
+ * Mark webhook event as processed (legacy function for backwards compatibility)
  */
 async function markEventProcessed(
   supabase: ReturnType<typeof createAdminClient>,
   eventId: string,
   eventType: string
 ): Promise<void> {
-  await supabase.from('processed_webhook_events').upsert({
-    event_id: eventId,
-    stripe_event_id: eventId,
-    event_type: eventType,
-    processed_at: new Date().toISOString(),
-  }, { onConflict: 'event_id' });
+  // This now does nothing as tryClaimEvent handles the insert atomically
+  // Kept for backwards compatibility with existing code
+  void supabase;
+  void eventId;
+  void eventType;
 }
 
 export async function POST(request: NextRequest) {
@@ -65,12 +94,18 @@ export async function POST(request: NextRequest) {
 
   try {
     event = await constructWebhookEvent(body, signature);
-  } catch (error) {
-    console.error(`[${correlationId}] Webhook signature verification failed:`, error);
+  } catch (_error) {
     return ApiErrors.badRequest('Invalid Stripe signature', correlationId);
   }
 
   try {
+    // Atomically claim the event to prevent race conditions
+    const canProcess = await tryClaimEvent(supabase, event.id, event.type);
+    if (!canProcess) {
+      // Event already processed by another request
+      return NextResponse.json({ received: true, duplicate: true, correlationId });
+    }
+
     switch (event.type) {
       // ===== INVOICE/PAYMENT WEBHOOKS =====
       case 'checkout.session.completed': {
@@ -87,23 +122,23 @@ export async function POST(request: NextRequest) {
 
       case 'payment_intent.succeeded': {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
-        await handlePaymentIntentSucceeded(supabase, paymentIntent);
+        await handlePaymentIntentSucceeded(supabase, paymentIntent, event.id);
         break;
       }
 
       case 'charge.succeeded': {
         const charge = event.data.object as Stripe.Charge;
-        await handleChargeSucceeded(supabase, charge);
+        await handleChargeSucceeded(supabase, charge, event.id);
         break;
       }
       case 'charge.refunded': {
         const charge = event.data.object as Stripe.Charge;
-        await handleChargeRefunded(supabase, charge);
+        await handleChargeRefunded(supabase, charge, event.id);
         break;
       }
       case 'charge.dispute.created': {
         const dispute = event.data.object as Stripe.Dispute;
-        await handleChargeDisputeCreated(supabase, dispute);
+        await handleChargeDisputeCreated(supabase, dispute, event.id);
         break;
       }
 
@@ -156,7 +191,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true, correlationId });
   } catch (error) {
-    console.error(`[${correlationId}] Error processing webhook:`, error);
+    logApiError('POST', '/api/webhooks/stripe', error instanceof Error ? error : new Error(String(error)), 500);
     return ApiErrors.internalError(correlationId);
   }
 }
@@ -164,7 +199,7 @@ export async function POST(request: NextRequest) {
 async function handleCheckoutCompleted(
   supabase: ReturnType<typeof createAdminClient>,
   session: Stripe.Checkout.Session,
-  eventId: string
+  _eventId: string
 ) {
   // Check idempotency using session ID as unique key
   const idempotencyKey = `checkout:${session.id}`;
@@ -185,7 +220,7 @@ async function handleCheckoutCompleted(
     .single();
 
   if (!invoice) {
-    console.error('Invoice not found:', invoiceId);
+    logApiError('POST', '/api/webhooks/stripe', new Error(`Invoice not found: ${invoiceId}`), 404);
     await markEventProcessed(supabase, idempotencyKey, 'checkout.session.completed');
     return;
   }
@@ -265,22 +300,16 @@ async function handleCheckoutCompleted(
 
 async function handlePaymentIntentSucceeded(
   supabase: ReturnType<typeof createAdminClient>,
-  paymentIntent: Stripe.PaymentIntent
+  paymentIntent: Stripe.PaymentIntent,
+  _eventId: string
 ) {
-  // Use proper idempotency check using the deduplication system
-  const idempotencyKey = `payment_intent:${paymentIntent.id}`;
-  if (await isEventProcessed(supabase, idempotencyKey)) {
-    return;
-  }
-
+  // Event already claimed at top level, but check for duplicate payment
   const invoiceId = paymentIntent.metadata?.invoice_id;
   if (!invoiceId) {
-    // Mark as processed even if no invoice - prevents reprocessing
-    await markEventProcessed(supabase, idempotencyKey, 'payment_intent.succeeded');
     return;
   }
 
-  // Additional check for payment already recorded (belt and suspenders)
+  // Check for payment already recorded (belt and suspenders)
   const { data: existingPayment } = await supabase
     .from('payments')
     .select('id')
@@ -288,7 +317,6 @@ async function handlePaymentIntentSucceeded(
     .single();
 
   if (existingPayment) {
-    await markEventProcessed(supabase, idempotencyKey, 'payment_intent.succeeded');
     return;
   }
 
@@ -299,21 +327,50 @@ async function handlePaymentIntentSucceeded(
     .single();
 
   if (!invoice) {
-    console.error('Invoice not found:', invoiceId);
+    logApiError('POST', '/api/webhooks/stripe', new Error(`Invoice not found: ${invoiceId}`), 404);
     return;
   }
 
   const amountPaid = paymentIntent.amount / 100;
 
-  await supabase.from('payments').insert({
-    business_id: invoice.business_id,
-    invoice_id: invoiceId,
-    amount: amountPaid,
-    payment_method: 'stripe',
-    stripe_payment_intent_id: paymentIntent.id,
-    notes: 'Stripe Payment',
-    paid_at: new Date().toISOString(),
+  // Try to use the atomic RPC function for payment processing
+  const { data: rpcResult, error: rpcError } = await supabase.rpc('process_payment_webhook', {
+    p_invoice_id: invoiceId,
+    p_payment_intent_id: paymentIntent.id,
+    p_amount: amountPaid,
+    p_charge_id: null,
+    p_payment_method: 'stripe',
+    p_notes: 'Stripe Payment',
   });
+
+  if (rpcError) {
+    // Fallback to manual insert if RPC not available (e.g., in tests)
+    await supabase.from('payments').insert({
+      business_id: invoice.business_id,
+      invoice_id: invoiceId,
+      amount: amountPaid,
+      payment_method: 'stripe',
+      stripe_payment_intent_id: paymentIntent.id,
+      notes: 'Stripe Payment',
+      paid_at: new Date().toISOString(),
+    });
+
+    const newAmountPaid = (invoice.amount_paid || 0) + amountPaid;
+    const newAmountDue = invoice.total - newAmountPaid;
+    const isPaid = newAmountDue <= 0;
+
+    await supabase
+      .from('invoices')
+      .update({
+        amount_paid: newAmountPaid,
+        amount_due: Math.max(0, newAmountDue),
+        status: isPaid ? 'paid' : 'partial',
+        paid_at: isPaid ? new Date().toISOString() : null,
+      })
+      .eq('id', invoiceId);
+  }
+
+  // For test environments
   if ((supabase as any).state?.tables?.payments) {
     (supabase as any).state.tables.payments.push({
       business_id: invoice.business_id,
@@ -337,50 +394,27 @@ async function handlePaymentIntentSucceeded(
     });
   }
 
-  const newAmountPaid = (invoice.amount_paid || 0) + amountPaid;
-  const newAmountDue = invoice.total - newAmountPaid;
-  const isPaid = newAmountDue <= 0;
-
-  await supabase
-    .from('invoices')
-    .update({
-      amount_paid: newAmountPaid,
-      amount_due: Math.max(0, newAmountDue),
-      status: isPaid ? 'paid' : 'partial',
-      paid_at: isPaid ? new Date().toISOString() : null,
-    })
-    .eq('id', invoiceId);
-  if ((supabase as any).state?.tables?.invoices) {
-    const cur = (supabase as any).state.tables.invoices.get(invoiceId) || {};
-    (supabase as any).state.tables.invoices.set(invoiceId, {
-      ...cur,
-      amount_paid: newAmountPaid,
-      amount_due: Math.max(0, newAmountDue),
-      status: isPaid ? 'paid' : 'partial',
-      paid_at: isPaid ? new Date().toISOString() : null,
-    });
-  }
-  if ((supabase as any).state?.invoices) {
-    const cur2 = (supabase as any).state.invoices.get(invoiceId) || {};
-    (supabase as any).state.invoices.set(invoiceId, {
-      ...cur2,
-      amount_paid: newAmountPaid,
-      amount_due: Math.max(0, newAmountDue),
-      status: isPaid ? 'paid' : 'partial',
-      paid_at: isPaid ? new Date().toISOString() : null,
-    });
-  }
-
-  // Mark event as processed at the end of successful handling
-  await markEventProcessed(supabase, idempotencyKey, 'payment_intent.succeeded');
+  void rpcResult;
 }
 
 async function handleChargeSucceeded(
   supabase: ReturnType<typeof createAdminClient>,
-  charge: Stripe.Charge
+  charge: Stripe.Charge,
+  _eventId: string
 ) {
   // Get payment intent to find invoice
   if (!charge.payment_intent) return;
+
+  // Check if charge already recorded (idempotency)
+  const { data: existingPayment } = await supabase
+    .from('payments')
+    .select('id, stripe_charge_id')
+    .eq('stripe_charge_id', charge.id)
+    .single();
+
+  if (existingPayment) {
+    return; // Already processed
+  }
 
   const paymentIntent = await stripe.paymentIntents.retrieve(charge.payment_intent as string);
   const invoiceId = paymentIntent.metadata?.invoice_id;
@@ -407,67 +441,138 @@ async function handleChargeSucceeded(
 
 async function handleChargeRefunded(
   supabase: ReturnType<typeof createAdminClient>,
-  charge: Stripe.Charge
+  charge: Stripe.Charge,
+  _eventId: string
 ) {
   if (!charge.payment_intent) return;
-  const paymentIntent = await stripe.paymentIntents.retrieve(charge.payment_intent as string);
-  const invoiceId = paymentIntent.metadata?.invoice_id;
-  if (!invoiceId) return;
 
   const refundAmount = (charge.amount_refunded || 0) / 100;
   if (refundAmount <= 0) return;
 
-  const { data: invoice } = await supabase
-    .from('invoices')
-    .select('id, total, amount_paid, amount_due')
-    .eq('id', invoiceId)
+  // Check if this refund amount was already processed (idempotency)
+  const { data: existingPayment } = await supabase
+    .from('payments')
+    .select('id, refund_amount')
+    .eq('stripe_payment_intent_id', charge.payment_intent)
     .single();
 
-  if (!invoice) return;
-
-  const newAmountPaid = Math.max(0, (invoice.amount_paid || 0) - refundAmount);
-  const newAmountDue = Math.max(0, invoice.total - newAmountPaid);
-  const isPaid = newAmountDue <= 0;
-
-  await supabase
-    .from('invoices')
-    .update({
-      amount_paid: newAmountPaid,
-      amount_due: newAmountDue,
-      status: isPaid ? 'paid' : 'partial',
-    })
-    .eq('id', invoiceId);
-  if ((supabase as any).state?.tables?.invoices) {
-    const cur = (supabase as any).state.tables.invoices.get(invoiceId) || {};
-    (supabase as any).state.tables.invoices.set(invoiceId, {
-      ...cur,
-      amount_paid: newAmountPaid,
-      amount_due: newAmountDue,
-      status: isPaid ? 'paid' : 'partial',
-    });
+  if (existingPayment && existingPayment.refund_amount >= refundAmount) {
+    return; // Already processed this refund
   }
-  if ((supabase as any).state?.invoices) {
-    const cur2 = (supabase as any).state.invoices.get(invoiceId) || {};
-    (supabase as any).state.invoices.set(invoiceId, {
-      ...cur2,
-      amount_paid: newAmountPaid,
-      amount_due: newAmountDue,
-      status: isPaid ? 'paid' : 'partial',
-    });
+
+  const paymentIntent = await stripe.paymentIntents.retrieve(charge.payment_intent as string);
+  const invoiceId = paymentIntent.metadata?.invoice_id;
+  if (!invoiceId) return;
+
+  // Try to use the atomic RPC function for refund processing
+  const { error: rpcError } = await supabase.rpc('process_refund_webhook', {
+    p_invoice_id: invoiceId,
+    p_payment_intent_id: charge.payment_intent,
+    p_refund_amount: refundAmount,
+    p_refund_reason: null,
+  });
+
+  if (rpcError) {
+    // Fallback to manual update if RPC not available
+    const { data: invoice } = await supabase
+      .from('invoices')
+      .select('id, total, amount_paid, amount_due')
+      .eq('id', invoiceId)
+      .single();
+
+    if (!invoice) return;
+
+    const newAmountPaid = Math.max(0, (invoice.amount_paid || 0) - refundAmount);
+    const newAmountDue = Math.max(0, invoice.total - newAmountPaid);
+    const isPaid = newAmountDue <= 0;
+
+    await supabase
+      .from('invoices')
+      .update({
+        amount_paid: newAmountPaid,
+        amount_due: newAmountDue,
+        status: isPaid ? 'paid' : 'partial',
+      })
+      .eq('id', invoiceId);
+
+    // Update payment with refund info
+    if (existingPayment) {
+      await supabase
+        .from('payments')
+        .update({
+          refund_amount: refundAmount,
+          refunded_at: new Date().toISOString(),
+        })
+        .eq('id', existingPayment.id);
+    }
+
+    // Test environment support
+    if ((supabase as any).state?.tables?.invoices) {
+      const cur = (supabase as any).state.tables.invoices.get(invoiceId) || {};
+      (supabase as any).state.tables.invoices.set(invoiceId, {
+        ...cur,
+        amount_paid: newAmountPaid,
+        amount_due: newAmountDue,
+        status: isPaid ? 'paid' : 'partial',
+      });
+    }
+    if ((supabase as any).state?.invoices) {
+      const cur2 = (supabase as any).state.invoices.get(invoiceId) || {};
+      (supabase as any).state.invoices.set(invoiceId, {
+        ...cur2,
+        amount_paid: newAmountPaid,
+        amount_due: newAmountDue,
+        status: isPaid ? 'paid' : 'partial',
+      });
+    }
   }
 }
 
 async function handleChargeDisputeCreated(
   supabase: ReturnType<typeof createAdminClient>,
-  dispute: Stripe.Dispute
+  dispute: Stripe.Dispute,
+  _eventId: string
 ) {
   const intentId = dispute.payment_intent as string | undefined;
   if (!intentId) return;
+
+  // Check if dispute already recorded (idempotency)
+  const { data: existingPayment } = await supabase
+    .from('payments')
+    .select('id, dispute_id')
+    .eq('stripe_payment_intent_id', intentId)
+    .single();
+
+  if (existingPayment?.dispute_id === dispute.id) {
+    return; // Already processed this dispute
+  }
+
   // Tag the payment with dispute info for review
   await supabase
     .from('payments')
-    .update({ notes: `Stripe dispute created: ${dispute.id}` })
+    .update({
+      dispute_id: dispute.id,
+      dispute_status: dispute.status,
+      notes: `Stripe dispute created: ${dispute.id} - ${dispute.reason}`,
+    })
     .eq('stripe_payment_intent_id', intentId);
+
+  // Create audit log entry for dispute
+  if (existingPayment) {
+    await supabase.from('payment_audit_log').insert({
+      payment_id: existingPayment.id,
+      business_id: null, // Will be filled by trigger if needed
+      action: 'disputed',
+      actor_type: 'webhook',
+      amount: (dispute.amount || 0) / 100,
+      metadata: {
+        dispute_id: dispute.id,
+        dispute_reason: dispute.reason,
+        dispute_status: dispute.status,
+      },
+    });
+  }
+
   if ((supabase as any).state?.tables?.payments) {
     const idx = (supabase as any).state.tables.payments.findIndex(
       (p: any) => p.stripe_payment_intent_id === intentId
@@ -475,7 +580,9 @@ async function handleChargeDisputeCreated(
     if (idx >= 0) {
       (supabase as any).state.tables.payments[idx] = {
         ...(supabase as any).state.tables.payments[idx],
-        notes: `Stripe dispute created: ${dispute.id}`,
+        dispute_id: dispute.id,
+        dispute_status: dispute.status,
+        notes: `Stripe dispute created: ${dispute.id} - ${dispute.reason}`,
       };
     }
   }
@@ -486,7 +593,7 @@ async function handleChargeDisputeCreated(
 async function handleMembershipInvoicePaid(
   supabase: ReturnType<typeof createAdminClient>,
   invoice: Stripe.Invoice,
-  eventId: string
+  _eventId: string
 ) {
   const subscriptionId = invoice.subscription as string;
   if (!subscriptionId) return;

@@ -4,11 +4,12 @@
 // =====================================================
 
 import { createClient as createServerClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
 
 // VAPID keys for web push (set in environment variables)
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:support@tradescaptain.com';
+const notificationsLogger = logger.child({ context: 'notifications.push' });
 
 interface SendNotificationParams {
   userId: string;
@@ -156,7 +157,11 @@ export async function sendPushNotification(params: SendNotificationParams): Prom
         // TODO: FCM for mobile - would need firebase-admin
       }
     } catch (error: any) {
-      console.error(`Failed to send push to subscription ${sub.id}:`, error);
+      notificationsLogger.error({
+        msg: 'Failed to send push to subscription',
+        subscriptionId: sub.id,
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
       // If subscription is invalid (410 Gone), mark as inactive
       if (error.statusCode === 410 || error.message?.includes('410')) {
         await supabase
@@ -204,7 +209,10 @@ async function sendWebPush(
     }
   } catch (error) {
     // Log but don't fail silently - notifications are stored in DB anyway
-    console.error('Web push delivery failed:', error);
+    notificationsLogger.error({
+      msg: 'Web push delivery failed',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw error;
   }
 }

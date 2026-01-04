@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { sendSMS } from '@/lib/twilio';
+import { apiLogger } from '@/lib/logger';
 import type { ApprovalActionRequest } from '@/types/leads-captain';
 
 interface RouteParams {
@@ -161,7 +162,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           details: { after_approval: true },
         });
       } catch (sendError) {
-        console.error('Failed to send SMS:', sendError);
+        apiLogger.error({
+          message: 'Failed to send SMS',
+          error: sendError,
+        });
         await supabase
           .from('leads_captain_messages_v2')
           .update({
@@ -183,8 +187,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       action_performed: body.action,
       sent: shouldSend,
     });
-  } catch (error: unknown) {
-    console.error('Error processing approval:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error processing approval',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to process approval' },
       { status: 500 }

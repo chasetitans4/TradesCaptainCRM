@@ -5,6 +5,9 @@
 import { createAdminClient } from '@/lib/supabase/server';
 import { randomBytes } from 'crypto';
 import { sendEmail, getInvitationEmailHtml } from '@/lib/email';
+import { logger } from '@/lib/logger';
+import { getUserPricingInfo } from '@/lib/billing/per-user';
+const invitationsLogger = logger.child({ context: 'team.invitations' });
 
 interface InviteParams {
   businessId: string;
@@ -45,6 +48,16 @@ export async function createInvitation(params: InviteParams) {
     throw new Error('An invitation is already pending for this email');
   }
 
+  // Check user limit (v5.9.2 - hard block when at limit)
+  const pricingInfo = await getUserPricingInfo(businessId);
+  if (pricingInfo && pricingInfo.billableUserCount >= pricingInfo.includedUsers) {
+    const tierName = pricingInfo.planTier.charAt(0).toUpperCase() + pricingInfo.planTier.slice(1);
+    throw new Error(
+      `User limit reached. Your ${tierName} plan includes ${pricingInfo.includedUsers} user(s). ` +
+      `Add extra users at $10/mo each in Settings → Billing.`
+    );
+  }
+
   // Generate token
   const token = randomBytes(32).toString('hex');
 
@@ -67,7 +80,14 @@ export async function createInvitation(params: InviteParams) {
     .single();
 
   if (error) {
-    console.error('Error creating invitation:', error);
+    invitationsLogger.error({
+      msg: 'Error creating invitation',
+      businessId,
+      email: email.toLowerCase(),
+      role,
+      invitedBy,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw new Error('Failed to create invitation');
   }
 
@@ -314,7 +334,11 @@ export async function getPendingInvitations(businessId: string) {
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching invitations:', error);
+    invitationsLogger.error({
+      msg: 'Error fetching invitations',
+      businessId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     throw error;
   }
 

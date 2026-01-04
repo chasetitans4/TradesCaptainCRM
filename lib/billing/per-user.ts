@@ -5,9 +5,12 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { stripe, isStripeConfigured } from '@/lib/stripe/client';
+import { logger } from '@/lib/logger';
+const billingLogger = logger.child({ context: 'billing.users' });
 
 export interface UserPricingInfo {
   businessId: string;
+  planTier: 'starter' | 'pro' | 'enterprise';
   billableUserCount: number;
   includedUsers: number;
   additionalUsers: number;
@@ -15,13 +18,13 @@ export interface UserPricingInfo {
   monthlyUserCharge: number;
 }
 
-// Pricing configuration
+// Pricing configuration - User Allocation v5.9.2
 export const USER_PRICING = {
   // Number of users included in base subscription
   includedInBase: {
-    starter: 1,
-    growth: 3,
-    pro: 5,
+    starter: 1,     // Blue/Gold Starter
+    pro: 3,         // Blue/Gold Pro
+    enterprise: 10, // Blue/Gold Enterprise
   },
   // Price per additional user per month
   perAdditionalUser: 10, // $10/user/month
@@ -40,7 +43,11 @@ export async function countActiveUsers(businessId: string): Promise<number> {
     .eq('status', 'active');
 
   if (error) {
-    console.error('Error counting active users:', error);
+    billingLogger.error({
+      msg: 'Error counting active users',
+      businessId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return 0;
   }
 
@@ -63,13 +70,14 @@ export async function getUserPricingInfo(businessId: string): Promise<UserPricin
     return null;
   }
 
-  const planTier = (business.plan_tier || 'starter') as 'starter' | 'growth' | 'pro';
+  const planTier = (business.plan_tier || 'starter') as 'starter' | 'pro' | 'enterprise';
   const includedUsers = USER_PRICING.includedInBase[planTier];
   const activeUsers = await countActiveUsers(businessId);
   const additionalUsers = Math.max(0, activeUsers - includedUsers);
 
   return {
     businessId,
+    planTier,
     billableUserCount: activeUsers,
     includedUsers,
     additionalUsers,
@@ -128,6 +136,14 @@ export async function reportUserUsageToStripe(businessId: string): Promise<boole
     );
 
     if (!meteredItem) {
+      // Log warning - this could indicate misconfigured Stripe subscription
+      billingLogger.warn({
+        msg: 'No metered subscription item found - per-user billing not configured for this subscription',
+        businessId,
+        subscriptionId: business.stripe_subscription_id,
+        planTier: business.plan_tier,
+        itemCount: subscription.items.data.length,
+      });
       return false;
     }
 
@@ -147,7 +163,11 @@ export async function reportUserUsageToStripe(businessId: string): Promise<boole
 
     return true;
   } catch (error) {
-    console.error('Error reporting usage to Stripe:', error);
+    billingLogger.error({
+      msg: 'Error reporting usage to Stripe',
+      businessId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return false;
   }
 }
@@ -200,9 +220,9 @@ export async function getBillingPreview(businessId: string): Promise<{
 
   // Get base subscription cost from plan
   const basePrices: Record<string, number> = {
-    starter: 0,
-    growth: 49,
+    starter: 49,
     pro: 99,
+    enterprise: 199,
   };
 
   const baseCharge = basePrices[(business?.plan_tier || 'starter') as string] || 0;

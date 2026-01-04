@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getTodaysTasks, getOverdueTasks } from '@/lib/admin/pipeline';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,10 +26,10 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ tasks });
-  } catch (error: any) {
-    console.error('Get tasks error:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Get tasks error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch tasks' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch tasks' },
       { status: 500 }
     );
   }

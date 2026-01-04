@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { sendOutreachMessage } from '@/lib/outreach/sms';
+import { apiLogger } from '@/lib/logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       total: data?.length || 0,
     });
   } catch (error) {
-    console.error('Error getting messages:', error);
+    apiLogger.error({ message: 'Error getting messages', error });
     return NextResponse.json(
       { error: 'Failed to get messages' },
       { status: 500 }
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       message: result.message,
     });
   } catch (error) {
-    console.error('Error sending message:', error);
+    apiLogger.error({ message: 'Error sending message', error });
     return NextResponse.json(
       { error: 'Failed to send message' },
       { status: 500 }

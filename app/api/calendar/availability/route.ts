@@ -10,6 +10,7 @@ import {
   suggestNextAvailableSlot,
 } from '@/lib/calendar';
 import { getServerUserProfile } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
       })),
     });
   } catch (error) {
-    console.error('Error checking availability:', error);
+    apiLogger.error({ error, context: 'Error checking availability' });
     return NextResponse.json(
       { error: 'Failed to check availability' },
       { status: 500 }

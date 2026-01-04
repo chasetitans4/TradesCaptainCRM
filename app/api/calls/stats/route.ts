@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getCallStats, getTodayCallSummary } from '@/lib/calls';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(stats);
   } catch (error) {
-    console.error('Error in GET /api/calls/stats:', error);
+    apiLogger.error({ error, context: 'Error in GET /api/calls/stats' });
     return NextResponse.json(
       { error: 'Failed to fetch call stats' },
       { status: 500 }

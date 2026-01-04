@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { GlobalPauseToggle } from '@/components/automation/global-pause-toggle';
 import type { LeadsCaptainConfig, LeadsCaptainConversation } from '@/types/leads-captain';
+import { logger } from '@/lib/logger';
+const lcDashboardLogger = logger.child({ context: 'leads-captain.dashboard' });
 
 interface DashboardStats {
   conversations: {
@@ -97,7 +99,10 @@ export default function LeadsCaptainDashboardPage() {
         hot_leads: hotLeads,
       });
     } catch (error) {
-      console.error('Error fetching dashboard:', error);
+      lcDashboardLogger.error({
+        msg: 'Error fetching Leads Captain dashboard',
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
     } finally {
       setLoading(false);
     }
@@ -117,7 +122,10 @@ export default function LeadsCaptainDashboardPage() {
         router.push('/leads-captain/settings');
       }
     } catch (error) {
-      console.error('Error setting up Leads Captain:', error);
+      lcDashboardLogger.error({
+        msg: 'Error setting up Leads Captain',
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
     }
   };
 
@@ -205,7 +213,11 @@ export default function LeadsCaptainDashboardPage() {
         setConfig((prev) => prev ? { ...prev, global_mode: paused ? 'paused' : 'normal' } : null);
       }
     } catch (error) {
-      console.error('Error toggling pause:', error);
+      lcDashboardLogger.error({
+        msg: 'Error toggling global pause',
+        error: error instanceof Error ? error.message : String(error),
+        paused,
+      });
     }
   };
 

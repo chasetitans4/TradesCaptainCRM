@@ -3,6 +3,7 @@
 // =====================================================
 
 import { createBrowserClient } from '@supabase/ssr';
+import { logger } from '@/lib/logger';
 
 /**
  * Create a Supabase client for browser/client-side usage
@@ -44,7 +45,11 @@ export async function getCurrentUserProfile() {
     .single();
   
   if (error) {
-    console.error('Error fetching user profile:', error);
+    logger.error({
+      msg: 'Error fetching user profile',
+      error: error ? { message: error.message, code: error.code, details: error.details } : undefined,
+      userId: user.id,
+    });
     return null;
   }
   

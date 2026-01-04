@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getClientUpgradeOptions } from '@/lib/admin/plans';
 import { createAdminClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
   request: NextRequest,
@@ -54,10 +55,14 @@ export async function GET(
       },
       ...upgradeOptions,
     });
-  } catch (error: any) {
-    console.error('Error in GET /api/admin/clients/:clientId/upgrade-options:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Get upgrade options error',
+      path: '/api/admin/clients/[clientId]/upgrade-options',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to get upgrade options' },
+      { error: error instanceof Error ? error.message : 'Failed to get upgrade options' },
       { status: 500 }
     );
   }

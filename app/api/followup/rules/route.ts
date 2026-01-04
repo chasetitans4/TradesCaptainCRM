@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getFollowUpRules, createFollowUpRule } from '@/lib/followup/engine';
+import { apiLogger } from '@/lib/logger';
 
 // GET /api/followup/rules - Get follow-up rules
 export async function GET(request: NextRequest) {
@@ -34,9 +35,9 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({ rules });
-  } catch (error: any) {
-    console.error('Error fetching follow-up rules:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ message: 'Error fetching follow-up rules', error });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to fetch follow-up rules' }, { status: 500 });
   }
 }
 
@@ -91,8 +92,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ rule });
-  } catch (error: any) {
-    console.error('Error creating follow-up rule:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ message: 'Error creating follow-up rule', error });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to create follow-up rule' }, { status: 500 });
   }
 }

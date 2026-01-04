@@ -8,7 +8,6 @@ import { createAdminClient } from '@/lib/supabase/server';
 import type {
   LeadsCaptainConversation,
   LeadsCaptainMessage,
-  ClientSmsUsage,
   LeadsCaptainDashboardSummary,
   LeadsCaptainClientSummary,
   LeadsCaptainAlert,

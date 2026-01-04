@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getPayrollExport } from '@/lib/timesheets';
 import { startOfWeek, endOfWeek, parseISO, format } from 'date-fns';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -57,10 +58,10 @@ export async function GET(request: NextRequest) {
       weekEnd: format(weekEnd, 'yyyy-MM-dd'),
       payroll: payrollData,
     });
-  } catch (error: any) {
-    console.error('Error in GET /api/timesheets/report/payroll:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error in GET /api/timesheets/report/payroll' });
     return NextResponse.json(
-      { error: error.message || 'Failed to get payroll report' },
+      { error: error instanceof Error ? error.message : 'Failed to get payroll report' },
       { status: 500 }
     );
   }

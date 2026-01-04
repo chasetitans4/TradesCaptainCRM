@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import {
   createScoringRule,
   updateScoringRule,
@@ -84,9 +85,12 @@ export async function GET(request: NextRequest) {
     // Default: get scoring rules
     const scoringRules = await getScoringRules(userData.business_id);
     return NextResponse.json({ rules: scoringRules });
-  } catch (error: any) {
-    console.error('Error fetching scoring data:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error fetching scoring data',
+      error,
+    });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to fetch scoring data' }, { status: 500 });
   }
 }
 
@@ -172,8 +176,11 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(result || { success: true });
-  } catch (error: any) {
-    console.error('Error with scoring action:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error with scoring action',
+      error,
+    });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed with scoring action' }, { status: 500 });
   }
 }

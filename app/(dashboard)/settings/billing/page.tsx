@@ -23,7 +23,10 @@ import {
   Loader2,
   Zap,
   Building2,
+  Users,
   X,
+  Plus,
+  Minus,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
@@ -52,18 +55,38 @@ interface Invoice {
   pdfUrl: string | null;
 }
 
+interface UserPricingInfo {
+  businessId: string;
+  planTier: 'starter' | 'pro' | 'enterprise';
+  billableUserCount: number;
+  includedUsers: number;
+  additionalUsers: number;
+  perUserPrice: number;
+  monthlyUserCharge: number;
+}
+
+// Updated for v5.9.2 - renamed growth→pro, pro→enterprise
 const PLAN_DETAILS = {
-  growth: {
-    name: 'Growth Plan',
-    price: 199,
-    leads: 200,
-    features: ['200 leads/month', 'AI SMS responses', 'Micro CRM included'],
+  starter: {
+    name: 'Starter Plan',
+    price: 49,
+    leads: 0,
+    users: 1,
+    features: ['1 user included', 'Contact management', 'Calendar & scheduling', 'Mobile app access'],
   },
   pro: {
     name: 'Pro Plan',
-    price: 399,
+    price: 99,
+    leads: 200,
+    users: 3,
+    features: ['3 users included', 'AI SMS (1,000/mo)', 'Full pipeline', 'Invoicing & payments'],
+  },
+  enterprise: {
+    name: 'Enterprise Plan',
+    price: 199,
     leads: 300,
-    features: ['300 leads/month', 'AI SMS responses', 'Micro CRM included', 'Priority support'],
+    users: 10,
+    features: ['10 users included', 'AI SMS (1,500/mo)', 'Team management', 'Priority support'],
   },
 };
 
@@ -73,12 +96,14 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [subscription, setSubscription] = useState<SubscriptionDetails | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [priceIds, setPriceIds] = useState<{ growth: string; pro: string } | null>(null);
+  const [priceIds, setPriceIds] = useState<{ starter: string; pro: string; enterprise: string } | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showPlanModal, setShowPlanModal] = useState(false);
+  const [userPricing, setUserPricing] = useState<UserPricingInfo | null>(null);
+  const [extraUsersToAdd, setExtraUsersToAdd] = useState(1);
 
   // Check for success/cancel params
   useEffect(() => {
@@ -98,14 +123,22 @@ export default function BillingPage() {
 
   async function fetchBillingData() {
     try {
-      const res = await fetch('/api/billing/subscription');
-      if (!res.ok) throw new Error('Failed to fetch billing data');
-      const data = await res.json();
+      const [billingRes, pricingRes] = await Promise.all([
+        fetch('/api/billing/subscription'),
+        fetch('/api/billing/user-pricing'),
+      ]);
+
+      if (!billingRes.ok) throw new Error('Failed to fetch billing data');
+      const data = await billingRes.json();
       setSubscription(data.subscription);
       setInvoices(data.invoices || []);
       setPriceIds(data.priceIds);
-    } catch (err) {
-      console.error('Error fetching billing:', err);
+
+      if (pricingRes.ok) {
+        const pricingData = await pricingRes.json();
+        setUserPricing(pricingData);
+      }
+    } catch (_err) {
       setError('Failed to load billing information');
     } finally {
       setLoading(false);
@@ -119,19 +152,19 @@ export default function BillingPage() {
       if (!res.ok) throw new Error('Failed to create portal session');
       const { url } = await res.json();
       window.location.href = url;
-    } catch (err) {
+    } catch (_err) {
       setError('Failed to open billing portal');
       setActionLoading(null);
     }
   }
 
-  async function handleChangePlan(newTier: 'growth' | 'pro') {
+  async function handleChangePlan(newTier: 'starter' | 'pro' | 'enterprise') {
     if (!priceIds) return;
     setActionLoading('changePlan');
     setError(null);
 
     try {
-      const priceId = newTier === 'growth' ? priceIds.growth : priceIds.pro;
+      const priceId = priceIds[newTier];
       const res = await fetch('/api/billing/subscription', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -148,6 +181,25 @@ export default function BillingPage() {
       fetchBillingData();
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleAddExtraUsers() {
+    if (extraUsersToAdd < 1) return;
+    setActionLoading('addUsers');
+    setError(null);
+
+    try {
+      // This would call an API to add extra user seats
+      // For now, redirect to Stripe portal for subscription modification
+      const res = await fetch('/api/billing/portal', { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to open billing portal');
+      const { url } = await res.json();
+      window.location.href = url;
+    } catch (err: any) {
+      setError(err.message || 'Failed to add users');
     } finally {
       setActionLoading(null);
     }
@@ -342,6 +394,98 @@ export default function BillingPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Extra Users Section */}
+        {subscription?.status === 'active' && userPricing && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" />
+                Team Users
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-text">
+                    {userPricing.billableUserCount} of {userPricing.includedUsers} users
+                  </p>
+                  <p className="text-sm text-text-muted">
+                    Your {userPricing.planTier.charAt(0).toUpperCase() + userPricing.planTier.slice(1)} plan includes {userPricing.includedUsers} user{userPricing.includedUsers !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                {userPricing.additionalUsers > 0 && (
+                  <Badge variant="primary">
+                    +{userPricing.additionalUsers} extra
+                  </Badge>
+                )}
+              </div>
+
+              {/* User usage bar */}
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all ${
+                    userPricing.billableUserCount >= userPricing.includedUsers
+                      ? 'bg-amber-500'
+                      : 'bg-primary'
+                  }`}
+                  style={{
+                    width: `${Math.min(
+                      (userPricing.billableUserCount / userPricing.includedUsers) * 100,
+                      100
+                    )}%`,
+                  }}
+                />
+              </div>
+
+              {/* Add extra users */}
+              <div className="pt-4 border-t border-border">
+                <p className="text-sm text-text-muted mb-3">
+                  Need more seats? Add extra users at $10/month each.
+                </p>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center border border-border rounded-lg">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 px-2"
+                      onClick={() => setExtraUsersToAdd(Math.max(1, extraUsersToAdd - 1))}
+                      disabled={extraUsersToAdd <= 1}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <span className="w-10 text-center font-medium">{extraUsersToAdd}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 px-2"
+                      onClick={() => setExtraUsersToAdd(extraUsersToAdd + 1)}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Button
+                    variant="primary"
+                    onClick={handleAddExtraUsers}
+                    disabled={actionLoading === 'addUsers'}
+                    className="flex-1"
+                  >
+                    {actionLoading === 'addUsers' ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : null}
+                    Add {extraUsersToAdd} User{extraUsersToAdd !== 1 ? 's' : ''} (+${extraUsersToAdd * 10}/mo)
+                  </Button>
+                </div>
+              </div>
+
+              {userPricing.monthlyUserCharge > 0 && (
+                <p className="text-xs text-text-muted">
+                  Current extra user charges: ${userPricing.monthlyUserCharge}/month
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Multi-Location Add-on */}
         {subscription?.status === 'active' && (
@@ -538,7 +682,7 @@ export default function BillingPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {(['growth', 'pro'] as const).map((tier) => {
+              {(['starter', 'pro', 'enterprise'] as const).map((tier) => {
                 const plan = PLAN_DETAILS[tier];
                 const isCurrentPlan = subscription?.planTier === tier;
                 return (

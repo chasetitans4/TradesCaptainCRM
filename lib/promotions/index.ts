@@ -4,6 +4,8 @@
 // =====================================================
 
 import { createClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
+const promotionsLogger = logger.child({ context: 'promotions' });
 
 export interface Promotion {
   id: string;
@@ -93,7 +95,11 @@ export async function createPromotion(
 
     return { success: true, promotion: transformPromotion(promo) };
   } catch (error: any) {
-    console.error('Error creating promotion:', error);
+    promotionsLogger.error({
+      msg: 'Error creating promotion',
+      businessId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }
@@ -135,7 +141,11 @@ export async function updatePromotion(
 
     return { success: true, promotion: transformPromotion(promo) };
   } catch (error: any) {
-    console.error('Error updating promotion:', error);
+    promotionsLogger.error({
+      msg: 'Error updating promotion',
+      promotionId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }
@@ -156,7 +166,11 @@ export async function deletePromotion(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Error deleting promotion:', error);
+    promotionsLogger.error({
+      msg: 'Error deleting promotion',
+      promotionId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }
@@ -321,7 +335,13 @@ export async function applyPromotion(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Error applying promotion:', error);
+    promotionsLogger.error({
+      msg: 'Error applying promotion',
+      promotionId,
+      customerId,
+      discountAmount,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }

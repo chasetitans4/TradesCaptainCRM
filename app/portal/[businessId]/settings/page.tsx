@@ -1,18 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import {
-  User,
-  Mail,
-  Phone,
-  MapPin,
-  Bell,
-  Lock,
-  Save,
-  Loader2,
-  CheckCircle,
-} from 'lucide-react';
+import { useParams } from 'next/navigation';
+import { User, Bell, Lock, Save, Loader2, CheckCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,7 +29,6 @@ interface NotificationPreferences {
 
 export default function SettingsPage() {
   const params = useParams();
-  const router = useRouter();
   const businessId = params.businessId as string;
 
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
@@ -67,8 +56,8 @@ export default function SettingsPage() {
         const data = await response.json();
         setProfile(data.profile);
         setNotifications(data.notifications || { email: true, sms: true });
-      } catch (error) {
-        console.error('Error loading settings:', error);
+      } catch (_error) {
+        setError('Failed to load settings');
       } finally {
         setLoading(false);
       }

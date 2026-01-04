@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminOrHigher } from '@/lib/admin/auth';
 import { cancelAccount, logAdminActivity } from '@/lib/admin';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -29,10 +30,14 @@ export async function POST(
     await logAdminActivity(admin.id, 'cancelled_account', 'crm_account', id, { reason }, ip);
 
     return NextResponse.json({ account });
-  } catch (error: any) {
-    console.error('Error in POST /api/admin/accounts/[id]/cancel:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Error cancelling account',
+      path: '/api/admin/accounts/[id]/cancel',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to cancel account' },
+      { error: error instanceof Error ? error.message : 'Failed to cancel account' },
       { status: 400 }
     );
   }

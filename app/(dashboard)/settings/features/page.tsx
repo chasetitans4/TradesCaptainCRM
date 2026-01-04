@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Button,
@@ -24,6 +24,7 @@ import {
   Star,
   Route,
 } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 interface FeatureSettings {
   ai_sms_enabled: boolean;
@@ -137,24 +138,25 @@ export default function FeaturesSettingsPage() {
   const [settings, setSettings] = useState<FeatureSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    fetchSettings();
-  }, []);
-
-  async function fetchSettings() {
+  const fetchSettings = useCallback(async () => {
     try {
       const res = await fetch('/api/features');
       if (!res.ok) throw new Error('Failed to fetch settings');
       const data = await res.json();
       setSettings(data.settings);
-    } catch (err) {
-      console.error('Error fetching settings:', err);
+    } catch (_error) {
+      toast({ title: 'Failed to load features', description: 'Please try again', variant: 'destructive' });
       setError('Failed to load feature settings');
     } finally {
       setLoading(false);
     }
-  }
+  }, [toast]);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
 
   async function toggleFeature(key: keyof FeatureSettings) {
     if (!settings) return;
@@ -179,10 +181,11 @@ export default function FeaturesSettingsPage() {
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
-    } catch (err) {
+    } catch (_error) {
       // Revert on error
       setSettings({ ...settings, [key]: !newValue });
       setError('Failed to save setting');
+      toast({ title: 'Failed to save setting', description: 'Please try again', variant: 'destructive' });
     } finally {
       setSaving(false);
     }

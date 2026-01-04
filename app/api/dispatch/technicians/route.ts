@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import { getDispatchTechnicians, getTechnicianSchedule, getDispatchStats } from '@/lib/dispatch/data';
 import { updateTechnicianLocation, updateTechnicianStatus, setTechnicianSchedule, addTimeOff } from '@/lib/dispatch/actions';
 import { findQualifiedTechnicians, getWorkloadDistribution } from '@/lib/dispatch/routing';
@@ -60,9 +61,9 @@ export async function GET(request: NextRequest) {
     const technicians = await getDispatchTechnicians(userData.business_id);
 
     return NextResponse.json({ technicians });
-  } catch (error: any) {
-    console.error('Error fetching technicians:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ error, route: 'GET /api/dispatch/technicians' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to fetch technicians' }, { status: 500 });
   }
 }
 
@@ -146,8 +147,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Error updating technician:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ error, route: 'POST /api/dispatch/technicians' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to update technician' }, { status: 500 });
   }
 }

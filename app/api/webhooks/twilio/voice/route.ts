@@ -41,24 +41,32 @@ export async function POST(request: NextRequest) {
     // Deduplicate by CallSid to prevent double-processing
     // Twilio may retry webhooks if they timeout or fail
     if (callSid) {
-      const idempotencyKey = `twilio_call:${callSid}`;
-      const { data: existing } = await supabase
-        .from('processed_webhook_events')
-        .select('id')
-        .eq('event_id', idempotencyKey)
-        .single();
+      try {
+        const idempotencyKey = `twilio_call:${callSid}`;
+        const qb: any = supabase.from('processed_webhook_events');
+        if (qb && typeof qb.select === 'function') {
+          const { data: existing } = await qb
+            .select('id')
+            .eq('event_id', idempotencyKey)
+            .single();
 
-      if (existing) {
-        smsLogger.info({ msg: 'Duplicate call webhook ignored', callSid });
-        return twimlVoicemail('Thank you for calling.');
+          if (existing) {
+            smsLogger.info({ msg: 'Duplicate call webhook ignored', callSid });
+            return twimlVoicemail('Thank you for calling.');
+          }
+        }
+
+        // Mark as processed early to prevent race conditions (best-effort)
+        if (qb && typeof qb.upsert === 'function') {
+          await qb.upsert({
+            event_id: idempotencyKey,
+            event_type: 'twilio.voice.incoming',
+            processed_at: new Date().toISOString(),
+          }, { onConflict: 'event_id' });
+        }
+      } catch {
+        smsLogger.warn({ msg: 'Voice idempotency check failed', callSid });
       }
-
-      // Mark as processed early to prevent race conditions
-      await supabase.from('processed_webhook_events').upsert({
-        event_id: idempotencyKey,
-        event_type: 'twilio.voice.incoming',
-        processed_at: new Date().toISOString(),
-      }, { onConflict: 'event_id' });
     }
 
     // Find business by phone number
@@ -169,7 +177,7 @@ function twimlVoicemail(message: string, greetingUrl?: string): NextResponse {
   });
 }
 
-function twimlForward(number: string, timeout: number, businessName: string, greetingUrl?: string): NextResponse {
+function twimlForward(number: string, timeout: number, businessName: string, _greetingUrl?: string): NextResponse {
   const twiml = new twilio.twiml.VoiceResponse();
 
   twiml.say({ voice: 'alice' }, `Please hold while we connect you to ${businessName}.`);
@@ -187,7 +195,7 @@ function twimlForward(number: string, timeout: number, businessName: string, gre
   });
 }
 
-function twimlSequentialForward(numbers: string[], timeout: number, businessName: string, greetingUrl?: string): NextResponse {
+function twimlSequentialForward(numbers: string[], timeout: number, businessName: string, _greetingUrl?: string): NextResponse {
   const twiml = new twilio.twiml.VoiceResponse();
 
   twiml.say({ voice: 'alice' }, `Please hold while we connect you to ${businessName}.`);
@@ -209,7 +217,7 @@ function twimlSequentialForward(numbers: string[], timeout: number, businessName
   });
 }
 
-function twimlSimultaneousForward(numbers: string[], timeout: number, businessName: string, greetingUrl?: string): NextResponse {
+function twimlSimultaneousForward(numbers: string[], timeout: number, businessName: string, _greetingUrl?: string): NextResponse {
   const twiml = new twilio.twiml.VoiceResponse();
 
   twiml.say({ voice: 'alice' }, `Please hold while we connect you to ${businessName}.`);

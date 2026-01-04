@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listAvailableNumbers } from '@/lib/twilio';
 import { getServerUserProfile } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ numbers });
   } catch (error) {
-    console.error('Error searching phone numbers:', error);
+    apiLogger.error({ error, context: 'Error searching phone numbers' });
     return NextResponse.json(
       { error: 'Failed to search phone numbers' },
       { status: 500 }

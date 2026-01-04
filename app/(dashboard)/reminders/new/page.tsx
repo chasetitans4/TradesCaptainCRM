@@ -3,15 +3,15 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient, getCurrentUserProfile } from '@/lib/supabase/client';
-import { cn, formatPhoneNumber, formatDate } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/components/ui/use-toast';
 import type { UserWithBusiness, Customer, Job, Lead } from '@/types';
 import {
   ArrowLeft,
   Bell,
-  Calendar,
   Clock,
   User,
   Briefcase,
@@ -42,6 +42,7 @@ export default function NewReminderPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   // Linked entity state
   const [linkType, setLinkType] = useState<LinkType>('none');
@@ -261,7 +262,7 @@ export default function NewReminderPage() {
         `${formData.due_date}T${formData.due_time || '09:00'}:00`
       ).toISOString();
 
-      const { data, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from('reminders')
         .insert({
           business_id: user!.business_id,
@@ -279,8 +280,12 @@ export default function NewReminderPage() {
       if (insertError) throw insertError;
 
       router.push('/reminders');
-    } catch (err) {
-      console.error('Error creating reminder:', err);
+    } catch (_err) {
+      toast({
+        title: 'Failed to create reminder',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
       setError('Failed to create reminder. Please try again.');
       setSubmitting(false);
     }

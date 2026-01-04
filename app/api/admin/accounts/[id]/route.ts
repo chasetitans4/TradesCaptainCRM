@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher, requireAdminOrHigher } from '@/lib/admin/auth';
 import { getCRMAccount, updateCRMAccount, logAdminActivity } from '@/lib/admin';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
   request: NextRequest,
@@ -32,10 +33,14 @@ export async function GET(
     }
 
     return NextResponse.json({ account });
-  } catch (error: any) {
-    console.error('Error in GET /api/admin/accounts/[id]:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Error fetching account',
+      path: '/api/admin/accounts/[id]',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to get account' },
+      { error: error instanceof Error ? error.message : 'Failed to get account' },
       { status: 500 }
     );
   }
@@ -77,10 +82,14 @@ export async function PUT(
     await logAdminActivity(admin.id, 'updated_account', 'crm_account', id, updates, ip);
 
     return NextResponse.json({ account: updatedAccount });
-  } catch (error: any) {
-    console.error('Error in PUT /api/admin/accounts/[id]:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Error updating account',
+      path: '/api/admin/accounts/[id]',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to update account' },
+      { error: error instanceof Error ? error.message : 'Failed to update account' },
       { status: 400 }
     );
   }

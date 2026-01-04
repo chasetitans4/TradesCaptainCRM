@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { reactivateSubscription } from '@/lib/stripe/subscriptions';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST() {
   try {
@@ -26,10 +27,10 @@ export async function POST() {
     await reactivateSubscription(profile.business_id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error reactivating subscription:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error reactivating subscription', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to reactivate subscription' },
+      { error: error instanceof Error ? error.message : 'Failed to reactivate subscription' },
       { status: 400 }
     );
   }

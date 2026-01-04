@@ -4,7 +4,7 @@
 
 import type { PlanTier } from '@/types';
 
-// Features available at each tier
+// Features available at each tier (v5.9.2 - renamed growth→pro, pro→enterprise)
 export const TIER_FEATURES = {
   starter: [
     'website',
@@ -12,14 +12,14 @@ export const TIER_FEATURES = {
     'call_tracking',
     'basic_chat'
   ],
-  growth: [
+  pro: [
     'lead_forms',
     'ai_sms',
     'lead_notifications',
     'scheduling',
     'smart_chat'
   ],
-  pro: [
+  enterprise: [
     'crm',
     'jobs',
     'quotes',
@@ -37,24 +37,27 @@ export const TIER_FEATURES = {
   ]
 } as const;
 
-// Plan configuration
+// Plan configuration (v5.9.2 - renamed growth→pro, pro→enterprise)
 export const PLAN_CONFIG = {
   starter: {
     name: 'Starter',
-    price: 199,
+    price: 49,
     leadsLimit: null,
+    usersIncluded: 1,
     description: 'Perfect for getting started'
-  },
-  growth: {
-    name: 'Growth',
-    price: 299,
-    leadsLimit: 200,
-    description: 'AI-powered lead response'
   },
   pro: {
     name: 'Pro',
-    price: 399,
+    price: 99,
+    leadsLimit: 200,
+    usersIncluded: 3,
+    description: 'AI-powered lead response'
+  },
+  enterprise: {
+    name: 'Enterprise',
+    price: 199,
     leadsLimit: 300,
+    usersIncluded: 10,
     description: 'Complete business management'
   }
 } as const;
@@ -63,7 +66,7 @@ export const PLAN_CONFIG = {
 export const MULTI_LOCATION_CONFIG = {
   price: 249,
   additionalLeads: 200,
-  availableTiers: ['growth', 'pro'] as PlanTier[]
+  availableTiers: ['pro', 'enterprise'] as PlanTier[]
 };
 
 // Lead usage thresholds
@@ -74,10 +77,10 @@ export const LEAD_USAGE = {
 
 /**
  * Check if a user's tier has access to a specific feature
- * Features accumulate - Pro gets everything Growth has, etc.
+ * Features accumulate - Enterprise gets everything Pro has, etc.
  */
 export function hasFeature(userTier: PlanTier, feature: string): boolean {
-  const tierHierarchy: PlanTier[] = ['starter', 'growth', 'pro'];
+  const tierHierarchy: PlanTier[] = ['starter', 'pro', 'enterprise'];
   const userTierIndex = tierHierarchy.indexOf(userTier);
   
   for (let i = 0; i <= userTierIndex; i++) {
@@ -90,24 +93,24 @@ export function hasFeature(userTier: PlanTier, feature: string): boolean {
 }
 
 /**
- * Check if user can access the CRM (Pro tier only)
+ * Check if user can access the CRM (Enterprise tier only)
  */
 export function canAccessCRM(userTier: PlanTier): boolean {
-  return userTier === 'pro';
+  return userTier === 'enterprise';
 }
 
 /**
- * Check if user can access AI SMS (Growth+ tiers)
+ * Check if user can access AI SMS (Pro+ tiers)
  */
 export function canAccessAISMS(userTier: PlanTier): boolean {
-  return userTier === 'growth' || userTier === 'pro';
+  return userTier === 'pro' || userTier === 'enterprise';
 }
 
 /**
- * Check if user can add team members (Pro tier only)
+ * Check if user can add team members (Enterprise tier only)
  */
 export function canAddTeamMembers(userTier: PlanTier): boolean {
-  return userTier === 'pro';
+  return userTier === 'enterprise';
 }
 
 /**
@@ -152,7 +155,7 @@ export function isAtLeadLimit(used: number, limit: number | null): boolean {
  * Get all features available to a tier (accumulated)
  */
 export function getAllFeatures(userTier: PlanTier): string[] {
-  const tierHierarchy: PlanTier[] = ['starter', 'growth', 'pro'];
+  const tierHierarchy: PlanTier[] = ['starter', 'pro', 'enterprise'];
   const userTierIndex = tierHierarchy.indexOf(userTier);
   
   const features: string[] = [];
@@ -166,12 +169,12 @@ export function getAllFeatures(userTier: PlanTier): string[] {
  * Get upgrade path message
  */
 export function getUpgradeMessage(currentTier: PlanTier, requiredFeature: string): string {
-  if (currentTier === 'pro') {
+  if (currentTier === 'enterprise') {
     return 'You have access to all features.';
   }
 
   // Find which tier has this feature
-  const tierHierarchy: PlanTier[] = ['starter', 'growth', 'pro'];
+  const tierHierarchy: PlanTier[] = ['starter', 'pro', 'enterprise'];
   for (const tier of tierHierarchy) {
     if ((TIER_FEATURES[tier] as readonly string[]).includes(requiredFeature)) {
       const tierConfig = PLAN_CONFIG[tier];
@@ -233,7 +236,12 @@ export async function isFeatureEnabled(businessId: string, feature: keyof Featur
     const settings = data.feature_settings as FeatureSettings;
     return settings[feature] ?? DEFAULT_FEATURE_SETTINGS[feature];
   } catch (error) {
-    console.error('Error checking feature enabled:', error);
+    const { logger } = await import('@/lib/logger');
+    const featureLogger = logger.child({ context: 'features' });
+    featureLogger.error({
+      msg: 'Error checking feature enabled',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return DEFAULT_FEATURE_SETTINGS[feature];
   }
 }
@@ -260,7 +268,12 @@ export async function getFeatureSettings(businessId: string): Promise<FeatureSet
       ...(data.feature_settings as Partial<FeatureSettings>),
     };
   } catch (error) {
-    console.error('Error getting feature settings:', error);
+    const { logger } = await import('@/lib/logger');
+    const featureLogger = logger.child({ context: 'features' });
+    featureLogger.error({
+      msg: 'Error getting feature settings',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return DEFAULT_FEATURE_SETTINGS;
   }
 }
@@ -294,7 +307,12 @@ export async function updateFeatureSettings(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Error updating feature settings:', error);
+    const { logger } = await import('@/lib/logger');
+    const featureLogger = logger.child({ context: 'features' });
+    featureLogger.error({
+      msg: 'Error updating feature settings',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }

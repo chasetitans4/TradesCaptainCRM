@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getAllPlanPricing, getPlanTracksSummary } from '@/lib/admin/plans';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,10 +28,14 @@ export async function GET(request: NextRequest) {
     // Default: return flat list of all plans
     const plans = await getAllPlanPricing();
     return NextResponse.json({ plans });
-  } catch (error: any) {
-    console.error('Error in GET /api/admin/plans:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Get plans error',
+      path: '/api/admin/plans',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to get plans' },
+      { error: error instanceof Error ? error.message : 'Failed to get plans' },
       { status: 500 }
     );
   }

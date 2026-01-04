@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { getReceipts, createReceipt } from '@/lib/receipts';
 import { isFeatureEnabled } from '@/lib/features';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -49,10 +50,10 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({ receipts });
-  } catch (error: any) {
-    console.error('Error fetching receipts:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'fetching receipts' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch receipts' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch receipts' },
       { status: 500 }
     );
   }
@@ -96,10 +97,10 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ receipt });
-  } catch (error: any) {
-    console.error('Error creating receipt:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'creating receipt' });
     return NextResponse.json(
-      { error: error.message || 'Failed to create receipt' },
+      { error: error instanceof Error ? error.message : 'Failed to create receipt' },
       { status: 500 }
     );
   }

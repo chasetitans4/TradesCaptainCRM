@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Star, ExternalLink, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -42,11 +42,7 @@ export default function SurveyPage() {
   const [npsScore, setNpsScore] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadSurvey();
-  }, [token]);
-
-  const loadSurvey = async () => {
+  const loadSurvey = useCallback(async () => {
     try {
       const response = await fetch(`/api/surveys/${token}`);
       if (!response.ok) {
@@ -64,12 +60,16 @@ export default function SurveyPage() {
       if (data.status === 'completed') {
         setSubmitted(true);
       }
-    } catch (err) {
+    } catch (_err) {
       setError('Failed to load survey.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    loadSurvey();
+  }, [loadSurvey]);
 
   const handleSubmit = async () => {
     if (ratings.overall === 0) {
@@ -104,7 +104,7 @@ export default function SurveyPage() {
         setShowGoogleReview(true);
         setGoogleReviewUrl(result.googleReviewUrl);
       }
-    } catch (err) {
+    } catch (_err) {
       alert('Failed to submit survey. Please try again.');
     } finally {
       setSubmitting(false);
@@ -119,7 +119,7 @@ export default function SurveyPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'googleReviewClicked' }),
       });
-    } catch (err) {
+    } catch (_err) {
       // Ignore tracking errors
     }
 

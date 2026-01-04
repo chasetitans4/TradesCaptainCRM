@@ -14,6 +14,7 @@ import {
   cancelSubscription,
   getPriceIds,
 } from '@/lib/stripe/subscriptions';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET() {
   try {
@@ -41,10 +42,10 @@ export async function GET() {
       invoices,
       priceIds: getPriceIds(),
     });
-  } catch (error: any) {
-    console.error('Error fetching subscription:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error fetching subscription', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch subscription' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch subscription' },
       { status: 400 }
     );
   }
@@ -79,10 +80,10 @@ export async function PUT(request: NextRequest) {
     await changePlan(profile.business_id, priceId);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error changing plan:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error changing plan', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to change plan' },
+      { error: error instanceof Error ? error.message : 'Failed to change plan' },
       { status: 400 }
     );
   }
@@ -107,10 +108,10 @@ export async function DELETE() {
     await cancelSubscription(profile.business_id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error canceling subscription:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error canceling subscription', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to cancel subscription' },
+      { error: error instanceof Error ? error.message : 'Failed to cancel subscription' },
       { status: 400 }
     );
   }

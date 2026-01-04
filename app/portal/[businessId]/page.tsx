@@ -3,20 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import {
-  Calendar,
-  Receipt,
-  FileText,
-  Wrench,
-  Clock,
-  DollarSign,
-  ArrowRight,
-  Plus,
-  AlertCircle,
-} from 'lucide-react';
+import { Calendar, Receipt, Wrench, DollarSign, ArrowRight, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { logger } from '@/lib/logger';
+const portalDashboardLogger = logger.child({ context: 'portal.dashboard' });
 
 interface DashboardData {
   summary: {
@@ -44,7 +36,11 @@ export default function PortalDashboard() {
         const result = await response.json();
         setData(result);
       } catch (error) {
-        console.error('Error loading dashboard:', error);
+        portalDashboardLogger.error({
+          msg: 'Error loading dashboard',
+          businessId,
+          error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+        });
       } finally {
         setLoading(false);
       }

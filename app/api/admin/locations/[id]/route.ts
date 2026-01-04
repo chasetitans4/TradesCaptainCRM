@@ -8,9 +8,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getLocation, updateLocation, deleteLocation } from '@/lib/admin/locations';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -27,10 +28,13 @@ export async function GET(
     }
 
     return NextResponse.json(location);
-  } catch (error: any) {
-    console.error('Get location error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Get location error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch location' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch location' },
       { status: 500 }
     );
   }
@@ -55,10 +59,13 @@ export async function PATCH(
       success: true,
       location,
     });
-  } catch (error: any) {
-    console.error('Update location error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Update location error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to update location' },
+      { error: error instanceof Error ? error.message : 'Failed to update location' },
       { status: 500 }
     );
   }
@@ -78,10 +85,13 @@ export async function DELETE(
     await deleteLocation(id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Delete location error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Delete location error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to delete location' },
+      { error: error instanceof Error ? error.message : 'Failed to delete location' },
       { status: 500 }
     );
   }

@@ -11,6 +11,7 @@ import {
   getFeatureRequestStats,
 } from '@/lib/feature-requests';
 import type { FeatureRequestStatus, FeatureRequestCategory, FeatureRequestSource } from '@/lib/admin/types';
+import { apiLogger } from '@/lib/logger';
 
 // POST - Create a new feature request
 export async function POST(request: NextRequest) {
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ feature_request: featureRequest }, { status: 201 });
   } catch (error) {
-    console.error('Error creating feature request:', error);
+    apiLogger.error({ message: 'Error creating feature request', error });
     return NextResponse.json(
       { error: 'Failed to create feature request' },
       { status: 500 }
@@ -106,7 +107,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Error fetching feature requests:', error);
+    apiLogger.error({ message: 'Error fetching feature requests', error });
     return NextResponse.json(
       { error: 'Failed to fetch feature requests' },
       { status: 500 }

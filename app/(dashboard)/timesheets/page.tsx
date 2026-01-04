@@ -1,32 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Alert,
-  AlertDescription,
-} from '@/components/ui';
-import {
-  Clock,
-  Play,
-  Square,
-  Loader2,
-  Calendar,
-  User,
-  ChevronLeft,
-  ChevronRight,
-  MapPin,
-  Briefcase,
-} from 'lucide-react';
+import { Button, Card, CardContent, CardHeader, CardTitle, Alert, AlertDescription } from '@/components/ui';
+import { Clock, Play, Square, Loader2, ChevronLeft, ChevronRight, Briefcase } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, differenceInMinutes } from 'date-fns';
 
 interface ClockStatus {
@@ -89,8 +65,7 @@ export default function TimesheetsPage() {
         const entriesData = await entriesRes.json();
         setEntries(entriesData.entries || []);
       }
-    } catch (err) {
-      console.error('Error fetching timesheets:', err);
+    } catch (_err) {
       setError('Failed to load timesheet data');
     } finally {
       setLoading(false);

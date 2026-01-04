@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { getReviewRequests, createReviewRequest, getReviewStats } from '@/lib/reviews';
 import { isFeatureEnabled } from '@/lib/features';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,10 +42,10 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(response);
-  } catch (error: any) {
-    console.error('Error fetching review requests:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'fetching review requests' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch review requests' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch review requests' },
       { status: 500 }
     );
   }
@@ -90,10 +91,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ request: reviewRequest });
-  } catch (error: any) {
-    console.error('Error creating review request:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'creating review request' });
     return NextResponse.json(
-      { error: error.message || 'Failed to create review request' },
+      { error: error instanceof Error ? error.message : 'Failed to create review request' },
       { status: 500 }
     );
   }

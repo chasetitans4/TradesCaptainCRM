@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
 import type { CreateScheduleBlockInput } from '@/types';
+import { apiLogger } from '@/lib/logger';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -67,7 +68,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       .single();
 
     if (error) {
-      console.error('Error updating schedule block:', error);
+      apiLogger.error({ error, context: 'Error updating schedule block' });
       return NextResponse.json(
         { error: 'Failed to update schedule block' },
         { status: 500 }
@@ -76,7 +77,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ block: data });
   } catch (error) {
-    console.error('Error updating schedule block:', error);
+    apiLogger.error({ error, context: 'Error updating schedule block' });
     return NextResponse.json(
       { error: 'Failed to update schedule block' },
       { status: 500 }
@@ -85,7 +86,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 }
 
 // DELETE - Delete a schedule block
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const profile = await getServerUserProfile();
@@ -128,7 +129,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       .eq('id', id);
 
     if (error) {
-      console.error('Error deleting schedule block:', error);
+      apiLogger.error({ error, context: 'Error deleting schedule block' });
       return NextResponse.json(
         { error: 'Failed to delete schedule block' },
         { status: 500 }
@@ -137,7 +138,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting schedule block:', error);
+    apiLogger.error({ error, context: 'Error deleting schedule block' });
     return NextResponse.json(
       { error: 'Failed to delete schedule block' },
       { status: 500 }

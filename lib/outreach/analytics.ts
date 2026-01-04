@@ -7,7 +7,6 @@ import { createClient } from '@/lib/supabase/server';
 import type {
   OutreachDashboardStats,
   AgentPerformanceStats,
-  SpeedMetrics,
 } from '@/types/outreach';
 
 // =====================================================

@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AnalyticsOverviewResponse, RuleAnalyticsResponse } from '@/types/leads-captain';
+import { logger } from '@/lib/logger';
 
 export default function LeadsCaptainAnalyticsPage() {
   const router = useRouter();
@@ -38,6 +39,7 @@ export default function LeadsCaptainAnalyticsPage() {
   const [period, setPeriod] = useState('30');
   const [overview, setOverview] = useState<AnalyticsOverviewResponse | null>(null);
   const [ruleAnalytics, setRuleAnalytics] = useState<RuleAnalyticsResponse | null>(null);
+  const lcAnalyticsLogger = logger.child({ context: 'leads-captain.analytics' });
 
   useEffect(() => {
     fetchAnalytics();
@@ -65,7 +67,11 @@ export default function LeadsCaptainAnalyticsPage() {
         setRuleAnalytics(await rulesRes.json());
       }
     } catch (error) {
-      console.error('Error fetching analytics:', error);
+      lcAnalyticsLogger.error({
+        msg: 'Error fetching analytics',
+        error: error instanceof Error ? error.message : String(error),
+        period,
+      });
       toast.error('Failed to load analytics');
     } finally {
       setLoading(false);

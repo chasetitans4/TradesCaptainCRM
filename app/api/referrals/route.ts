@@ -14,6 +14,7 @@ import {
   redeemCredit,
   getCustomerCreditBalance,
 } from '@/lib/referrals';
+import { apiLogger } from '@/lib/logger';
 
 // GET /api/referrals - Get referral data
 export async function GET(request: NextRequest) {
@@ -78,9 +79,9 @@ export async function GET(request: NextRequest) {
     // Get all referrals
     const referrals = await getBusinessReferrals(userData.business_id, status || undefined);
     return NextResponse.json({ referrals });
-  } catch (error: any) {
-    console.error('Error fetching referral data:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ error, context: 'fetching referral data' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to fetch referral data' }, { status: 500 });
   }
 }
 
@@ -183,8 +184,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(result || { success: true });
-  } catch (error: any) {
-    console.error('Error with referral action:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ error, context: 'referral action' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to perform referral action' }, { status: 500 });
   }
 }

@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Percent, Plus, Loader2, Clock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/components/ui/use-toast';
 
 import type { Promotion, PromotionFormData } from './_components/types';
 import { INITIAL_FORM_DATA } from './_components/types';
@@ -23,25 +24,31 @@ export default function PromotionsSettingsPage() {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('active');
   const [formData, setFormData] = useState<PromotionFormData>(INITIAL_FORM_DATA);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    loadPromotions();
-  }, []);
-
-  async function loadPromotions() {
+  const loadPromotions = useCallback(async () => {
     try {
       const response = await fetch('/api/promotions');
       if (response.ok) {
         const data = await response.json();
         setPromotions(data.promotions || []);
       }
-    } catch (error) {
-      console.error('Error loading promotions:', error);
+    } catch (_error) {
       setError('Failed to load promotions');
+      toast({
+        title: 'Failed to load promotions',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
-  }
+  }, [toast]);
+
+  useEffect(() => {
+    loadPromotions();
+  }, [loadPromotions]);
+
 
   const openNewPromotionDialog = () => {
     setEditingPromotion(null);
@@ -130,8 +137,12 @@ export default function PromotionsSettingsPage() {
     try {
       await fetch(`/api/promotions/${promoId}`, { method: 'DELETE' });
       loadPromotions();
-    } catch (error) {
-      console.error('Error deleting promotion:', error);
+    } catch (_error) {
+      toast({
+        title: 'Failed to delete promotion',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
     }
   };
 

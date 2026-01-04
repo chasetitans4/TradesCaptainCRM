@@ -14,6 +14,7 @@ import {
   formatPayoutDate,
   getPayoutDateISO,
 } from '@/lib/admin/payout-scheduler';
+import { apiLogger } from '@/lib/logger';
 
 /**
  * GET /api/admin/commissions/process-payouts
@@ -89,10 +90,13 @@ export async function GET(request: NextRequest) {
       isToday: getPayoutDateISO(targetDate) === getPayoutDateISO(today),
       summary,
     });
-  } catch (error: any) {
-    console.error('Get payout summary error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Get payout summary error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to get payout summary' },
+      { error: error instanceof Error ? error.message : 'Failed to get payout summary' },
       { status: 500 }
     );
   }
@@ -188,10 +192,13 @@ export async function POST(request: NextRequest) {
         errors: result.errors,
       },
     });
-  } catch (error: any) {
-    console.error('Process payouts error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Process payouts error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to process payouts' },
+      { error: error instanceof Error ? error.message : 'Failed to process payouts' },
       { status: 500 }
     );
   }

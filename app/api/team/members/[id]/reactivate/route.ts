@@ -7,9 +7,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { reactivateMember } from '@/lib/team';
 import { hasPermission } from '@/lib/permissions';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -27,10 +28,10 @@ export async function POST(
     await reactivateMember(id, profile.id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error reactivating member:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error reactivating member' });
     return NextResponse.json(
-      { error: error.message || 'Failed to reactivate member' },
+      { error: error instanceof Error ? error.message : 'Failed to reactivate member' },
       { status: 400 }
     );
   }

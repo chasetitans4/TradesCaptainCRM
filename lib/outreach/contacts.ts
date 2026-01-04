@@ -8,7 +8,6 @@ import type {
   OutreachContact,
   OutreachContactWithRelations,
   OutreachContactStatus,
-  OutreachContactSource,
   InterestLevel,
   CreateOutreachContactInput,
   OutreachContactFilters,
@@ -16,6 +15,8 @@ import type {
 } from '@/types/outreach';
 import { recordConsent, detectTimezoneFromPhone, normalizePhone, isSafeToContact } from './compliance';
 import { updateCampaignStats } from './campaigns';
+import { logger } from '@/lib/logger';
+const outreachLogger = logger.child({ context: 'outreach.contacts' });
 
 // =====================================================
 // GET CONTACTS
@@ -83,7 +84,13 @@ export async function getContacts(
   const { data, count, error } = await query;
 
   if (error) {
-    console.error('Error getting contacts:', error);
+    outreachLogger.error({
+      msg: 'Error getting contacts',
+      filters,
+      page,
+      pageSize,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return {
       data: [],
       total: 0,
@@ -437,7 +444,6 @@ export async function adjustContactScore(
   adjustment: number,
   reason?: string
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createClient();
 
   // Get current score
   const contact = await getContact(id);

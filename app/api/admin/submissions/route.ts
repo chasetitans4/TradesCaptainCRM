@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getAgentSubmissions, SubmissionStatus, SubmissionType } from '@/lib/admin';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -45,10 +46,10 @@ export async function GET(request: NextRequest) {
         totalPages: Math.ceil(total / limit),
       },
     });
-  } catch (error: any) {
-    console.error('Error in GET /api/admin/submissions:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error in GET /api/admin/submissions', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to get submissions' },
+      { error: error instanceof Error ? error.message : 'Failed to get submissions' },
       { status: 500 }
     );
   }

@@ -3,6 +3,8 @@
 import { useEffect } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { logger } from '@/lib/logger';
+const appLogger = logger.child({ context: 'app.error' });
 
 export default function Error({
   error,
@@ -12,7 +14,10 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error(error);
+    appLogger.error({
+      msg: 'Unhandled app error',
+      error: { name: error.name, message: error.message, stack: error.stack, digest: (error as any).digest },
+    });
   }, [error]);
 
   return (

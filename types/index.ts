@@ -9,7 +9,7 @@ export * from './outreach';
 // ENUMS & CONSTANTS
 // =====================================================
 
-export type PlanTier = 'starter' | 'growth' | 'pro';
+export type PlanTier = 'starter' | 'pro' | 'enterprise';
 export type UserRole = 'owner' | 'admin' | 'technician';
 export type UserStatus = 'pending' | 'active' | 'deactivated';
 

@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile, createClient } from '@/lib/supabase/server';
 import { updateRouteStatus, reorderStops } from '@/lib/routes';
 import { isFeatureEnabled } from '@/lib/features';
+import { apiLogger } from '@/lib/logger';
 
 export async function PUT(
   request: NextRequest,
@@ -74,10 +75,10 @@ export async function PUT(
       { error: 'Invalid request. Provide status or newOrder' },
       { status: 400 }
     );
-  } catch (error: any) {
-    console.error('Error updating route:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'updating route' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update route' },
+      { error: error instanceof Error ? error.message : 'Failed to update route' },
       { status: 500 }
     );
   }

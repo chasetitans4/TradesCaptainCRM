@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getSmsUsageAlerts } from '@/lib/admin/sms-usage';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET() {
   try {
@@ -17,10 +18,10 @@ export async function GET() {
     const alerts = await getSmsUsageAlerts(admin.id);
 
     return NextResponse.json({ alerts });
-  } catch (error: any) {
-    console.error('Get SMS alerts error:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Get SMS alerts error', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch SMS alerts' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch SMS alerts' },
       { status: 500 }
     );
   }

@@ -8,9 +8,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getCallLog, updateCallLog, deleteCallLog } from '@/lib/calls';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -34,7 +35,7 @@ export async function GET(
 
     return NextResponse.json(call);
   } catch (error) {
-    console.error('Error in GET /api/calls/[id]:', error);
+    apiLogger.error({ error, context: 'Error in GET /api/calls/[id]' });
     return NextResponse.json(
       { error: 'Failed to fetch call' },
       { status: 500 }
@@ -65,7 +66,7 @@ export async function PATCH(
 
     return NextResponse.json(call);
   } catch (error) {
-    console.error('Error in PATCH /api/calls/[id]:', error);
+    apiLogger.error({ error, context: 'Error in PATCH /api/calls/[id]' });
     return NextResponse.json(
       { error: 'Failed to update call' },
       { status: 500 }
@@ -74,7 +75,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -108,7 +109,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error in DELETE /api/calls/[id]:', error);
+    apiLogger.error({ error, context: 'Error in DELETE /api/calls/[id]' });
     return NextResponse.json(
       { error: 'Failed to delete call' },
       { status: 500 }

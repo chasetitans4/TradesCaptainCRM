@@ -6,6 +6,8 @@
 let serverTimeOffset = 0;
 let lastSyncTime = 0;
 const SYNC_INTERVAL = 5 * 60 * 1000; // Re-sync every 5 minutes
+import { logger } from '@/lib/logger';
+const clockLogger = logger.child({ context: 'utils.clock' });
 
 /**
  * Sync client time with server time
@@ -27,7 +29,10 @@ export async function syncServerTime(): Promise<void> {
     serverTimeOffset = estimatedServerTime - Date.now();
     lastSyncTime = Date.now();
   } catch (error) {
-    console.error('Error syncing server time:', error);
+    clockLogger.warn({
+      msg: 'Error syncing server time',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
   }
 }
 

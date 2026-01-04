@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getLeads, createLead } from '@/lib/admin/pipeline';
 import type { PipelineStage } from '@/lib/admin/types';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,10 +31,10 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({ leads });
-  } catch (error: any) {
-    console.error('Get leads error:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Get leads error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch leads' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch leads' },
       { status: 500 }
     );
   }
@@ -51,10 +52,10 @@ export async function POST(request: NextRequest) {
     const lead = await createLead(admin.id, body);
 
     return NextResponse.json({ lead }, { status: 201 });
-  } catch (error: any) {
-    console.error('Create lead error:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Create lead error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to create lead' },
+      { error: error instanceof Error ? error.message : 'Failed to create lead' },
       { status: 500 }
     );
   }

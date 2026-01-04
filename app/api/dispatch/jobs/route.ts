@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import { getDispatchJobs, getUnassignedJobs } from '@/lib/dispatch/data';
 
 // GET /api/dispatch/jobs - Get jobs for dispatch board
@@ -44,8 +45,8 @@ export async function GET(request: NextRequest) {
     const jobs = await getDispatchJobs(userData.business_id, start, end);
 
     return NextResponse.json({ jobs });
-  } catch (error: any) {
-    console.error('Error fetching dispatch jobs:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ error, route: 'GET /api/dispatch/jobs' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to fetch dispatch jobs' }, { status: 500 });
   }
 }

@@ -4,6 +4,8 @@
 // =====================================================
 
 import { createClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
+const subsLogger = logger.child({ context: 'memberships.subscriptions' });
 
 export interface CustomerMembership {
   id: string;
@@ -117,7 +119,12 @@ export async function subscribeToPlan(
         currentPeriodStart = new Date(subscription.current_period_start * 1000).toISOString();
         currentPeriodEnd = new Date(subscription.current_period_end * 1000).toISOString();
       } catch (stripeError: any) {
-        console.error('Stripe subscription creation failed:', stripeError);
+        subsLogger.error({
+          msg: 'Stripe subscription creation failed',
+          customerId,
+          planId,
+          error: stripeError instanceof Error ? { name: stripeError.name, message: stripeError.message, stack: stripeError.stack } : { message: String(stripeError) },
+        });
         return { success: false, error: stripeError.message };
       }
     } else {
@@ -169,7 +176,12 @@ export async function subscribeToPlan(
       membership: transformMembership(membership),
     };
   } catch (error: any) {
-    console.error('Error subscribing to plan:', error);
+    subsLogger.error({
+      msg: 'Error subscribing to plan',
+      customerId,
+      planId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }
@@ -206,7 +218,12 @@ export async function cancelMembership(
           });
         }
       } catch (stripeError) {
-        console.error('Stripe cancellation failed:', stripeError);
+        subsLogger.error({
+          msg: 'Stripe cancellation failed',
+          membershipId,
+          cancelImmediately,
+          error: stripeError instanceof Error ? { name: stripeError.name, message: stripeError.message, stack: (stripeError as any).stack } : { message: String(stripeError) },
+        });
       }
     }
 
@@ -228,7 +245,12 @@ export async function cancelMembership(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Error cancelling membership:', error);
+    subsLogger.error({
+      msg: 'Error cancelling membership',
+      membershipId,
+      cancelImmediately,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }
@@ -263,7 +285,11 @@ export async function reactivateMembership(
           cancel_at_period_end: false,
         });
       } catch (stripeError) {
-        console.error('Stripe reactivation failed:', stripeError);
+        subsLogger.error({
+          msg: 'Stripe reactivation failed',
+          membershipId,
+          error: stripeError instanceof Error ? { name: stripeError.name, message: stripeError.message, stack: (stripeError as any).stack } : { message: String(stripeError) },
+        });
       }
     }
 
@@ -274,7 +300,11 @@ export async function reactivateMembership(
 
     return { success: true };
   } catch (error: any) {
-    console.error('Error reactivating membership:', error);
+    subsLogger.error({
+      msg: 'Error reactivating membership',
+      membershipId,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return { success: false, error: error.message };
   }
 }

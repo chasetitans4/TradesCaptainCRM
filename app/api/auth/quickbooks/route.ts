@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { getAuthUrl } from '@/lib/quickbooks/client';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET() {
   try {
@@ -26,10 +27,10 @@ export async function GET() {
     const authUrl = getAuthUrl(profile.business_id);
 
     return NextResponse.json({ url: authUrl });
-  } catch (error: any) {
-    console.error('Error generating QuickBooks auth URL:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error generating QuickBooks auth URL', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to generate authorization URL' },
+      { error: error instanceof Error ? error.message : 'Failed to generate authorization URL' },
       { status: 500 }
     );
   }

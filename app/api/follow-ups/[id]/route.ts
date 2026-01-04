@@ -7,9 +7,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -39,7 +40,7 @@ export async function GET(
 
     return NextResponse.json({ follow_up });
   } catch (error) {
-    console.error('Error in GET /api/follow-ups/:id:', error);
+    apiLogger.error({ message: 'Error in GET /api/follow-ups/:id', error });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -79,19 +80,19 @@ export async function PATCH(
       .single();
 
     if (error) {
-      console.error('Error updating follow-up:', error);
+      apiLogger.error({ message: 'Error updating follow-up', error });
       return NextResponse.json({ error: 'Failed to update follow-up' }, { status: 500 });
     }
 
     return NextResponse.json({ follow_up });
   } catch (error) {
-    console.error('Error in PATCH /api/follow-ups/:id:', error);
+    apiLogger.error({ message: 'Error in PATCH /api/follow-ups/:id', error });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -109,13 +110,13 @@ export async function DELETE(
     const { error } = await supabase.from('follow_ups').delete().eq('id', id);
 
     if (error) {
-      console.error('Error deleting follow-up:', error);
+      apiLogger.error({ message: 'Error deleting follow-up', error });
       return NextResponse.json({ error: 'Failed to delete follow-up' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error in DELETE /api/follow-ups/:id:', error);
+    apiLogger.error({ message: 'Error in DELETE /api/follow-ups/:id', error });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

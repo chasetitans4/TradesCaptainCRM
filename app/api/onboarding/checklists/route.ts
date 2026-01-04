@@ -15,6 +15,7 @@ import {
   updateChecklistSubItem,
 } from '@/lib/onboarding/service-checklists';
 import { PlanTrack, PlanTier } from '@/lib/pricing/plans';
+import { apiLogger } from '@/lib/logger';
 
 // GET - Get checklist template or client status
 export async function GET(request: NextRequest) {
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
     const checklist = getChecklistForPlan(track, tier || undefined, hasGbpAddon);
     return NextResponse.json({ checklist });
   } catch (error) {
-    console.error('Error fetching checklist:', error);
+    apiLogger.error({ message: 'Error fetching checklist', error });
     return NextResponse.json(
       { error: 'Failed to fetch checklist' },
       { status: 500 }
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ status: saved }, { status: 201 });
   } catch (error) {
-    console.error('Error creating checklist:', error);
+    apiLogger.error({ message: 'Error creating checklist', error });
     return NextResponse.json(
       { error: 'Failed to create checklist' },
       { status: 500 }
@@ -159,7 +160,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ status });
   } catch (error) {
-    console.error('Error updating checklist:', error);
+    apiLogger.error({ message: 'Error updating checklist', error });
     return NextResponse.json(
       { error: 'Failed to update checklist' },
       { status: 500 }

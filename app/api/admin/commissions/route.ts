@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCommissions, createCommission, getPendingCommissions } from '@/lib/admin/commissions';
 import { verifyAdminAuth } from '@/lib/admin/auth';
 import { CommissionStatus, CommissionType } from '@/lib/admin/types';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,10 +45,13 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('Get commissions error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Get commissions error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to get commissions' },
+      { error: error instanceof Error ? error.message : 'Failed to get commissions' },
       { status: 500 }
     );
   }
@@ -69,10 +73,13 @@ export async function POST(request: NextRequest) {
     const commission = await createCommission(body);
 
     return NextResponse.json({ success: true, commission });
-  } catch (error: any) {
-    console.error('Create commission error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Create commission error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to create commission' },
+      { error: error instanceof Error ? error.message : 'Failed to create commission' },
       { status: 500 }
     );
   }

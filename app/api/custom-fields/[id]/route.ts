@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { updateFieldDefinition, deleteFieldDefinition, reorderFieldDefinitions } from '@/lib/custom-fields';
+import { apiLogger } from '@/lib/logger';
 
 export async function PATCH(
   request: NextRequest,
@@ -54,10 +55,10 @@ export async function PATCH(
     });
 
     return NextResponse.json(definition);
-  } catch (error: any) {
-    console.error('Error updating custom field:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error updating custom field', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update custom field' },
+      { error: error instanceof Error ? error.message : 'Failed to update custom field' },
       { status: 500 }
     );
   }
@@ -84,10 +85,10 @@ export async function DELETE(
     await deleteFieldDefinition(id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error deleting custom field:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error deleting custom field', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to delete custom field' },
+      { error: error instanceof Error ? error.message : 'Failed to delete custom field' },
       { status: 500 }
     );
   }

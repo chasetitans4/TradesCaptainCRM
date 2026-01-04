@@ -6,6 +6,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { haversineDistance } from '@/lib/utils/navigation';
 import { format, startOfDay, endOfDay } from 'date-fns';
+import { logger } from '@/lib/logger';
 
 export interface JobWithLocation {
   id: string;
@@ -94,7 +95,13 @@ export async function getTechnicianJobsForDate(
     .order('scheduled_start', { ascending: true });
 
   if (error) {
-    console.error('Error fetching jobs:', error);
+    logger.error({
+      msg: 'Error fetching jobs for technician',
+      error: error ? { message: error.message, code: error.code, details: error.details } : undefined,
+      technicianId,
+      dayStart,
+      dayEnd,
+    });
     return [];
   }
 

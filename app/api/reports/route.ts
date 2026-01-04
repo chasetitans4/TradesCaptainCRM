@@ -13,6 +13,7 @@ import {
   getYearToDateSummary,
 } from '@/lib/reports';
 import { startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -68,10 +69,10 @@ export async function GET(request: NextRequest) {
         end: endDate.toISOString(),
       },
     });
-  } catch (error: any) {
-    console.error('Error fetching reports:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'fetching reports' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch reports' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch reports' },
       { status: 500 }
     );
   }

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile, createClient } from '@/lib/supabase/server';
 import { isFeatureEnabled } from '@/lib/features';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
       });
 
     if (error) {
-      console.error('Upload error:', error);
+      apiLogger.error({ error, context: 'uploading receipt image' });
       return NextResponse.json(
         { error: 'Failed to upload image' },
         { status: 500 }
@@ -88,10 +89,10 @@ export async function POST(request: NextRequest) {
       url: urlData.publicUrl,
       path: data.path,
     });
-  } catch (error: any) {
-    console.error('Error uploading receipt:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'uploading receipt' });
     return NextResponse.json(
-      { error: error.message || 'Failed to upload receipt' },
+      { error: error instanceof Error ? error.message : 'Failed to upload receipt' },
       { status: 500 }
     );
   }

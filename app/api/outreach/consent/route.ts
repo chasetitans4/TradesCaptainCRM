@@ -5,6 +5,7 @@ import {
   revokeConsent,
   isSafeToContact,
 } from '@/lib/outreach/compliance';
+import { apiLogger } from '@/lib/logger';
 
 /**
  * GET /api/outreach/consent
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ has_consent: hasConsent });
     }
   } catch (error) {
-    console.error('Error checking consent:', error);
+    apiLogger.error({ message: 'Error checking consent', error });
     return NextResponse.json(
       { error: 'Failed to check consent' },
       { status: 500 }
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
       consent,
     });
   } catch (error) {
-    console.error('Error recording consent:', error);
+    apiLogger.error({ message: 'Error recording consent', error });
     return NextResponse.json(
       { error: 'Failed to record consent' },
       { status: 500 }
@@ -117,7 +118,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success });
   } catch (error) {
-    console.error('Error revoking consent:', error);
+    apiLogger.error({ message: 'Error revoking consent', error });
     return NextResponse.json(
       { error: 'Failed to revoke consent' },
       { status: 500 }

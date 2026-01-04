@@ -6,9 +6,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getOfferByCode } from '@/lib/admin/offers';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
@@ -26,10 +27,10 @@ export async function GET(
     }
 
     return NextResponse.json(offer);
-  } catch (error: any) {
-    console.error('Get offer error:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Get offer error', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch offer' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch offer' },
       { status: 500 }
     );
   }

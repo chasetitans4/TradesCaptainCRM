@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createAdminClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
@@ -37,7 +38,7 @@ function verifyToken(token: string): { valid: boolean; payload?: any } {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const cookieStore = await cookies();
     const token = cookieStore.get('admin_token')?.value;
@@ -71,11 +72,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password_hash, two_factor_secret, ...safeUser } = user;
 
     return NextResponse.json({ user: safeUser });
-  } catch (error: any) {
-    console.error('Admin me error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Admin me error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
       { error: 'Failed to get user' },
       { status: 500 }

@@ -6,9 +6,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getJobTimeEntries, getJobTotalTime } from '@/lib/timesheets';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -55,10 +56,13 @@ export async function GET(
       workMinutes: timeStats.workMinutes,
       totalHours: Math.round((timeStats.totalMinutes / 60) * 100) / 100,
     });
-  } catch (error: any) {
-    console.error('Error in GET /api/jobs/[id]/time:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error in GET /api/jobs/[id]/time',
+      error,
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to get job time entries' },
+      { error: error instanceof Error ? error.message : 'Failed to get job time entries' },
       { status: 500 }
     );
   }

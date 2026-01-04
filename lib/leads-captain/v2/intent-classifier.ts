@@ -12,6 +12,7 @@ import {
   LeadsCaptainIntent,
   COMPLIANCE_KEYWORDS,
 } from '@/types/leads-captain';
+import { jobLogger } from '@/lib/logger';
 
 let _openai: OpenAI | null = null;
 function getOpenAIClient(): OpenAI | null {
@@ -102,7 +103,12 @@ export async function classifyIntent(
       is_compliance: false,
     };
   } catch (error) {
-    console.error('[Leads Captain v2] Intent classification error:', error);
+    jobLogger.error({
+      msg: 'Intent classification error',
+      error: error instanceof Error
+        ? { name: error.name, message: error.message, stack: error.stack }
+        : String(error),
+    });
 
     // Fallback to simple keyword matching
     return fallbackClassification(message, intentList);

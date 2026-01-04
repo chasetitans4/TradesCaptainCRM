@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { scheduleCall, getDistributionSettings } from '@/lib/outreach/scheduling';
+import { scheduleCall } from '@/lib/outreach/scheduling';
+import { apiLogger } from '@/lib/logger';
 
 /**
  * GET /api/outreach/calls
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
       has_more: (count || 0) > page * pageSize,
     });
   } catch (error) {
-    console.error('Error getting calls:', error);
+    apiLogger.error({ message: 'Error getting calls', error });
     return NextResponse.json(
       { error: 'Failed to get calls' },
       { status: 500 }
@@ -128,7 +129,7 @@ export async function POST(request: NextRequest) {
       overflow_reason: result.overflow_reason,
     });
   } catch (error) {
-    console.error('Error scheduling call:', error);
+    apiLogger.error({ message: 'Error scheduling call', error });
     return NextResponse.json(
       { error: 'Failed to schedule call' },
       { status: 500 }

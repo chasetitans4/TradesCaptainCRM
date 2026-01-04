@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/components/ui/use-toast';
 import {
   Ticket,
   Search,
@@ -13,8 +14,6 @@ import {
   MessageSquare,
   ChevronRight,
   RefreshCw,
-  Plus,
-  Filter,
   ArrowLeft,
   Send,
   User,
@@ -53,13 +52,10 @@ export default function SupportTicketsPage() {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<TicketStatus | 'all'>('all');
+  const { toast } = useToast();
 
   // Fetch tickets
-  useEffect(() => {
-    fetchTickets();
-  }, [statusFilter]);
-
-  const fetchTickets = async () => {
+  const fetchTickets = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -71,31 +67,35 @@ export default function SupportTicketsPage() {
         const data = await response.json();
         setTickets(data.tickets || []);
       }
-    } catch (error) {
-      console.error('Error fetching tickets:', error);
+    } catch (_error) {
+      toast({ title: 'Failed to load tickets', description: 'Please try again', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter, toast]);
+
+  useEffect(() => {
+    fetchTickets();
+  }, [fetchTickets]);
 
   // Fetch ticket messages when selected
-  useEffect(() => {
-    if (selectedTicket) {
-      fetchMessages(selectedTicket.id);
-    }
-  }, [selectedTicket?.id]);
-
-  const fetchMessages = async (ticketId: string) => {
+  const fetchMessages = useCallback(async (ticketId: string) => {
     try {
       const response = await fetch(`/api/tickets/${ticketId}/messages`);
       if (response.ok) {
         const data = await response.json();
         setMessages(data.messages || []);
       }
-    } catch (error) {
-      console.error('Error fetching messages:', error);
+    } catch (_error) {
+      toast({ title: 'Failed to load messages', description: 'Please try again', variant: 'destructive' });
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    if (selectedTicket) {
+      fetchMessages(selectedTicket.id);
+    }
+  }, [selectedTicket, fetchMessages]);
 
   // Send message
   const handleSendMessage = async () => {
@@ -121,8 +121,8 @@ export default function SupportTicketsPage() {
         // Refresh ticket to get updated status
         fetchTickets();
       }
-    } catch (error) {
-      console.error('Error sending message:', error);
+    } catch (_error) {
+      toast({ title: 'Failed to send message', description: 'Please try again', variant: 'destructive' });
     } finally {
       setSendingMessage(false);
     }
@@ -166,7 +166,6 @@ export default function SupportTicketsPage() {
   // Ticket detail view
   if (selectedTicket) {
     const statusConfig = STATUS_CONFIG[selectedTicket.status];
-    const StatusIcon = statusConfig.icon;
     const priorityConfig = PRIORITY_CONFIG[selectedTicket.priority];
 
     return (

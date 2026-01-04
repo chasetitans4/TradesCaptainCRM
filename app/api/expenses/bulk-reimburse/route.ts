@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 import { bulkMarkReimbursed } from '@/lib/expenses';
 
 export async function POST(request: NextRequest) {
@@ -69,10 +70,10 @@ export async function POST(request: NextRequest) {
       success: true,
       reimbursed: result.count,
     });
-  } catch (error: any) {
-    console.error('Error in POST /api/expenses/bulk-reimburse:', error);
+  } catch (error) {
+    apiLogger.error({ error, route: 'POST /api/expenses/bulk-reimburse' });
     return NextResponse.json(
-      { error: error.message || 'Failed to bulk reimburse expenses' },
+      { error: error instanceof Error ? error.message : 'Failed to bulk reimburse expenses' },
       { status: 400 }
     );
   }

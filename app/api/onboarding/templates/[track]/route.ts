@@ -6,9 +6,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getOnboardingTemplate } from '@/lib/admin/onboarding';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ track: string }> }
 ) {
   try {
@@ -22,10 +23,10 @@ export async function GET(
     const templates = await getOnboardingTemplate(track);
 
     return NextResponse.json({ templates });
-  } catch (error: any) {
-    console.error('Get template error:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Get template error', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch template' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch template' },
       { status: 500 }
     );
   }

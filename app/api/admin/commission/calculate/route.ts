@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { calculateCommission, CommissionInput } from '@/lib/admin/commission-calculator';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,10 +36,14 @@ export async function POST(request: NextRequest) {
       success: true,
       calculation,
     });
-  } catch (error: any) {
-    console.error('Error in POST /api/admin/commission/calculate:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Error calculating commission',
+      path: '/api/admin/commission/calculate',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to calculate commission' },
+      { error: error instanceof Error ? error.message : 'Failed to calculate commission' },
       { status: 500 }
     );
   }

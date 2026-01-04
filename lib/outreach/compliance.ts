@@ -4,6 +4,8 @@
 // =====================================================
 
 import { createClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
+const outreachLogger = logger.child({ context: 'outreach.compliance' });
 import type {
   SMSConsent,
   SMSOptOut,
@@ -54,7 +56,10 @@ export async function recordConsent(input: CreateConsentInput): Promise<SMSConse
     .single();
 
   if (error) {
-    console.error('Error recording consent:', error);
+    outreachLogger.error({
+      msg: 'Error recording consent',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return null;
   }
 
@@ -160,7 +165,10 @@ export async function recordOptOut(
     .single();
 
   if (error) {
-    console.error('Error recording opt-out:', error);
+    outreachLogger.error({
+      msg: 'Error recording opt-out',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return null;
   }
 
@@ -255,7 +263,10 @@ export async function addToSuppressionList(
     .single();
 
   if (error) {
-    console.error('Error adding to suppression list:', error);
+    outreachLogger.error({
+      msg: 'Error adding to suppression list',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return null;
   }
 
@@ -504,7 +515,10 @@ export function isWithinSendWindow(
     return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
   } catch (error) {
     // If timezone is invalid, default to allowing
-    console.error('Error checking send window:', error);
+    outreachLogger.error({
+      msg: 'Error checking send window',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+    });
     return true;
   }
 }

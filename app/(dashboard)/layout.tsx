@@ -11,6 +11,7 @@ import { MobileNav } from '@/components/layout/mobile-nav';
 import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
 import { prefetchRoutes, CRITICAL_ROUTES, SECONDARY_ROUTES } from '@/lib/performance';
 import { InteractiveTour } from '@/components/onboarding';
+import { logger } from '@/lib/logger';
 
 // Dynamic imports for non-critical components (loaded after initial render)
 const CommandPalette = dynamic(
@@ -38,6 +39,7 @@ export default function DashboardLayout({
   const [user, setUser] = useState<UserWithBusiness | null>(null);
   const [loading, setLoading] = useState(true);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const dashboardLayoutLogger = logger.child({ context: 'dashboard.layout' });
 
   // Memoized sign out handler
   const handleSignOut = useCallback(async () => {
@@ -76,7 +78,11 @@ export default function DashboardLayout({
         // Prefetch secondary routes after a delay
         prefetchRoutes(router, SECONDARY_ROUTES, 3000);
       } catch (error) {
-        console.error('Error loading user:', error);
+        dashboardLayoutLogger.error({
+          msg: 'Error loading user',
+          error: error instanceof Error ? error.message : String(error),
+          pathname,
+        });
         router.push('/login');
       } finally {
         setLoading(false);

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { useToast } from '@/components/ui/use-toast';
 import type { UserWithBusiness, Reminder, Customer, Job, Lead, ReminderRetention } from '@/types';
 import {
   ArrowLeft,
@@ -54,6 +55,7 @@ export default function ReminderDetailPage() {
   const [editTime, setEditTime] = useState('');
   const [editRetention, setEditRetention] = useState<ReminderRetention>('30_days');
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   // Load user
   useEffect(() => {
@@ -97,13 +99,17 @@ export default function ReminderDetailPage() {
       setEditDate(remindAt.toISOString().split('T')[0]);
       setEditTime(remindAt.toTimeString().slice(0, 5));
       setEditRetention(data.retention || '30_days');
-    } catch (err) {
-      console.error('Error loading reminder:', err);
+    } catch (_err) {
+      toast({
+        title: 'Failed to load reminder',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
       router.push('/reminders');
     } finally {
       setLoading(false);
     }
-  }, [user, reminderId, router]);
+  }, [user, reminderId, router, toast]);
 
   useEffect(() => {
     if (user && reminderId) {
@@ -135,8 +141,12 @@ export default function ReminderDetailPage() {
         completed: newStatus,
         completed_at: newStatus ? new Date().toISOString() : null,
       });
-    } catch (err) {
-      console.error('Error updating reminder:', err);
+    } catch (_err) {
+      toast({
+        title: 'Failed to update reminder',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
     } finally {
       setUpdating(false);
     }
@@ -183,8 +193,12 @@ export default function ReminderDetailPage() {
         retention: editRetention,
       });
       setIsEditing(false);
-    } catch (err) {
-      console.error('Error updating reminder:', err);
+    } catch (_err) {
+      toast({
+        title: 'Failed to save changes',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
       setError('Failed to save changes');
     } finally {
       setUpdating(false);
@@ -216,8 +230,12 @@ export default function ReminderDetailPage() {
         snoozed_until: snoozedUntil.toISOString(),
       });
       setShowSnoozeSheet(false);
-    } catch (err) {
-      console.error('Error snoozing reminder:', err);
+    } catch (_err) {
+      toast({
+        title: 'Failed to snooze reminder',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
     } finally {
       setUpdating(false);
     }
@@ -239,8 +257,12 @@ export default function ReminderDetailPage() {
       if (error) throw error;
 
       router.push('/reminders');
-    } catch (err) {
-      console.error('Error deleting reminder:', err);
+    } catch (_err) {
+      toast({
+        title: 'Failed to delete reminder',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
       setUpdating(false);
     }
   };

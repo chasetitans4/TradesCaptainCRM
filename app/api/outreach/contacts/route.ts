@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getContacts, createContact } from '@/lib/outreach/contacts';
 import type { OutreachContactFilters } from '@/types/outreach';
+import { apiLogger } from '@/lib/logger';
 
 /**
  * GET /api/outreach/contacts
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error getting contacts:', error);
+    apiLogger.error({ message: 'Error getting contacts', error });
     return NextResponse.json(
       { error: 'Failed to get contacts' },
       { status: 500 }
@@ -129,7 +130,7 @@ export async function POST(request: NextRequest) {
       contact: result.contact,
     });
   } catch (error) {
-    console.error('Error creating contact:', error);
+    apiLogger.error({ message: 'Error creating contact', error });
     return NextResponse.json(
       { error: 'Failed to create contact' },
       { status: 500 }

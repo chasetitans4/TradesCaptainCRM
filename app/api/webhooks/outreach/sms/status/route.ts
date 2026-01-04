@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { smsLogger } from '@/lib/logger';
 
 /**
  * POST /api/webhooks/outreach/sms/status
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error handling SMS status webhook:', error);
+    smsLogger.error({ msg: 'Error handling SMS status webhook', error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) } });
     return NextResponse.json(
       { error: 'Failed to update message status' },
       { status: 500 }

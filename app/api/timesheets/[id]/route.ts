@@ -9,9 +9,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile, createClient } from '@/lib/supabase/server';
 import { updateTimeEntry, deleteTimeEntry } from '@/lib/timesheets';
 import { isFeatureEnabled } from '@/lib/features';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -56,10 +57,10 @@ export async function GET(
     }
 
     return NextResponse.json({ entry });
-  } catch (error: any) {
-    console.error('Error fetching time entry:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error fetching time entry' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch time entry' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch time entry' },
       { status: 500 }
     );
   }
@@ -119,17 +120,17 @@ export async function PUT(
     });
 
     return NextResponse.json({ entry: updatedEntry });
-  } catch (error: any) {
-    console.error('Error updating time entry:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error updating time entry' });
     return NextResponse.json(
-      { error: error.message || 'Failed to update time entry' },
+      { error: error instanceof Error ? error.message : 'Failed to update time entry' },
       { status: 500 }
     );
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -173,10 +174,10 @@ export async function DELETE(
     await deleteTimeEntry(id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error deleting time entry:', error);
+  } catch (error) {
+    apiLogger.error({ error, message: 'Error deleting time entry' });
     return NextResponse.json(
-      { error: error.message || 'Failed to delete time entry' },
+      { error: error instanceof Error ? error.message : 'Failed to delete time entry' },
       { status: 500 }
     );
   }

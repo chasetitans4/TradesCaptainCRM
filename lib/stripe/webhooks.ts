@@ -24,14 +24,17 @@ export async function handleSubscriptionUpdated(
     return;
   }
 
-  // Determine plan tier from price
+  // Determine plan tier from price (v5.9.2 - renamed growth→pro, pro→enterprise)
   const priceId = subscription.items.data[0]?.price.id;
-  let planTier = 'pro';
+  let planTier = 'enterprise';
   let leadsLimit = 300;
 
-  if (priceId === process.env.STRIPE_PRICE_GROWTH_MONTHLY) {
-    planTier = 'growth';
+  if (priceId === process.env.STRIPE_PRICE_PRO_MONTHLY) {
+    planTier = 'pro';
     leadsLimit = 200;
+  } else if (priceId === process.env.STRIPE_PRICE_STARTER_MONTHLY) {
+    planTier = 'starter';
+    leadsLimit = 0;
   }
 
   // Check for multi-location addon
@@ -164,17 +167,161 @@ export async function handleCheckoutCompleted(
 
 /**
  * Handle customer.subscription.trial_will_end
+ * Sends notification to business owner about upcoming trial end
  */
 export async function handleTrialWillEnd(
   subscription: Stripe.Subscription
 ): Promise<void> {
+  const supabase = await createClient();
   const businessId = subscription.metadata.business_id;
 
   if (!businessId) {
+    syncLogger.warn({
+      msg: 'Missing business_id in subscription metadata for trial_will_end',
+      subscriptionId: subscription.id,
+    });
     return;
   }
 
-  // TODO: Send trial ending notification email
+  // Get business and owner info
+  const { data: business } = await supabase
+    .from('businesses')
+    .select('id, name, owner_id')
+    .eq('id', businessId)
+    .single();
+
+  if (!business) {
+    return;
+  }
+
+  // Get owner's email
+  const { data: owner } = await supabase
+    .from('profiles')
+    .select('email, name')
+    .eq('id', business.owner_id)
+    .single();
+
+  if (!owner?.email) {
+    syncLogger.warn({
+      msg: 'No owner email found for trial_will_end notification',
+      businessId,
+    });
+    return;
+  }
+
+  // Calculate trial end date
+  const trialEndDate = subscription.trial_end
+    ? new Date(subscription.trial_end * 1000).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : 'soon';
+
+  // Send notification email
+  try {
+    const { sendEmail } = await import('@/lib/email');
+    await sendEmail({
+      to: owner.email,
+      subject: `Your TradesCaptain trial ends ${trialEndDate}`,
+      html: `
+        <h2>Your trial is ending soon</h2>
+        <p>Hi ${owner.name || 'there'},</p>
+        <p>Your TradesCaptain trial for <strong>${business.name}</strong> will end on <strong>${trialEndDate}</strong>.</p>
+        <p>To continue using all features without interruption, please add a payment method to your account.</p>
+        <p>
+          <a href="${process.env.NEXT_PUBLIC_APP_URL}/settings/billing"
+             style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+            Update Billing
+          </a>
+        </p>
+        <p>If you have any questions, reply to this email and we'll be happy to help!</p>
+        <p>Best,<br>The TradesCaptain Team</p>
+      `,
+    });
+
+    syncLogger.info({
+      msg: 'Trial ending notification sent',
+      businessId,
+      email: owner.email,
+      trialEndDate,
+    });
+  } catch (emailError) {
+    syncLogger.error({
+      msg: 'Failed to send trial ending notification',
+      businessId,
+      error: emailError instanceof Error ? emailError.message : 'Unknown error',
+    });
+  }
+}
+
+/**
+ * Handle invoice.upcoming - notify customer about upcoming charge
+ */
+export async function handleInvoiceUpcoming(
+  invoice: Stripe.Invoice
+): Promise<void> {
+  const supabase = await createClient();
+  const customerId = invoice.customer as string;
+
+  if (!customerId) return;
+
+  // Find business by stripe customer ID
+  const { data: business } = await supabase
+    .from('businesses')
+    .select('id, name, owner_id')
+    .eq('stripe_customer_id', customerId)
+    .single();
+
+  if (!business) return;
+
+  // Get owner's email
+  const { data: owner } = await supabase
+    .from('profiles')
+    .select('email, name')
+    .eq('id', business.owner_id)
+    .single();
+
+  if (!owner?.email) return;
+
+  const amountDue = (invoice.amount_due || 0) / 100;
+  const dueDate = invoice.due_date
+    ? new Date(invoice.due_date * 1000).toLocaleDateString()
+    : 'soon';
+
+  try {
+    const { sendEmail } = await import('@/lib/email');
+    await sendEmail({
+      to: owner.email,
+      subject: `Upcoming charge: $${amountDue.toFixed(2)} for TradesCaptain`,
+      html: `
+        <h2>Upcoming Subscription Charge</h2>
+        <p>Hi ${owner.name || 'there'},</p>
+        <p>Your TradesCaptain subscription for <strong>${business.name}</strong> will be charged <strong>$${amountDue.toFixed(2)}</strong> on <strong>${dueDate}</strong>.</p>
+        <p>No action is needed - this is just a heads up about your upcoming payment.</p>
+        <p>
+          <a href="${process.env.NEXT_PUBLIC_APP_URL}/settings/billing"
+             style="color: #2563eb; text-decoration: underline;">
+            View Billing Details
+          </a>
+        </p>
+        <p>Best,<br>The TradesCaptain Team</p>
+      `,
+    });
+
+    syncLogger.info({
+      msg: 'Upcoming charge notification sent',
+      businessId: business.id,
+      amount: amountDue,
+    });
+  } catch (emailError) {
+    syncLogger.error({
+      msg: 'Failed to send upcoming charge notification',
+      businessId: business.id,
+      error: emailError instanceof Error ? emailError.message : 'Unknown error',
+    });
+  }
 }
 
 /**
@@ -221,6 +368,10 @@ export async function processWebhookEvent(event: Stripe.Event): Promise<void> {
 
     case 'customer.subscription.trial_will_end':
       await handleTrialWillEnd(event.data.object as Stripe.Subscription);
+      break;
+
+    case 'invoice.upcoming':
+      await handleInvoiceUpcoming(event.data.object as Stripe.Invoice);
       break;
 
     default:

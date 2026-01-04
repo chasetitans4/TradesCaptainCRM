@@ -3,6 +3,8 @@
 // Address geocoding utilities for route optimization
 // =====================================================
 
+import { logger } from '@/lib/logger';
+
 export interface GeocodingResult {
   latitude: number;
   longitude: number;
@@ -30,7 +32,7 @@ export async function geocodeAddress(
 ): Promise<GeocodingResult | null> {
   // TODO: Implement with Google Maps Geocoding API or similar
   // For now, return null to indicate geocoding is not configured
-  console.error(`Geocoding not configured. Cannot geocode: ${address}`);
+  logger.error({ msg: 'Geocoding not configured', address });
   return null;
 }
 
@@ -42,7 +44,7 @@ export async function reverseGeocode(
   longitude: number
 ): Promise<string | null> {
   // TODO: Implement with Google Maps Geocoding API or similar
-  console.error(`Reverse geocoding not configured for: ${latitude}, ${longitude}`);
+  logger.error({ msg: 'Reverse geocoding not configured', latitude, longitude });
   return null;
 }
 

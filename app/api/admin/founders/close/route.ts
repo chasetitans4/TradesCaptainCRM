@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSuperAdmin } from '@/lib/admin/auth';
 import { closeFoundersProgram, logAdminActivity } from '@/lib/admin';
+import { apiLogger } from '@/lib/logger';
 
 export async function PUT(request: NextRequest) {
   try {
@@ -25,10 +26,14 @@ export async function PUT(request: NextRequest) {
       success: true,
       message: 'Founders program has been closed',
     });
-  } catch (error: any) {
-    console.error('Error in PUT /api/admin/founders/close:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Close founders program error',
+      path: '/api/admin/founders/close',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to close founders program' },
+      { error: error instanceof Error ? error.message : 'Failed to close founders program' },
       { status: 400 }
     );
   }

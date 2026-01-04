@@ -8,6 +8,7 @@ import {
   getPINSettings,
   updatePINSettings,
 } from '@/lib/auth/pin';
+import { apiLogger } from '@/lib/logger';
 
 // GET - Get PIN settings
 export async function GET() {
@@ -23,9 +24,9 @@ export async function GET() {
 
     const settings = await getPINSettings(user.id);
     return NextResponse.json(settings);
-  } catch (error: any) {
-    console.error('Get PIN settings error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'Get PIN settings error', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }
 
@@ -103,9 +104,9 @@ export async function POST(request: NextRequest) {
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
-  } catch (error: any) {
-    console.error('PIN operation error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'PIN operation error', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }
 
@@ -129,8 +130,8 @@ export async function PATCH(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Update PIN settings error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    apiLogger.error({ msg: 'Update PIN settings error', error: error instanceof Error ? error.message : 'Unknown error' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }

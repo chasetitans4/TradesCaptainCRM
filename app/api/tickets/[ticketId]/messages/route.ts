@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { addTicketMessage, getTicket } from '@/lib/tickets';
+import { apiLogger } from '@/lib/logger';
 
 interface RouteParams {
   params: Promise<{ ticketId: string }>;
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ message: ticketMessage }, { status: 201 });
   } catch (error) {
-    console.error('Error adding message:', error);
+    apiLogger.error({ error, message: 'Error adding message' });
     return NextResponse.json(
       { error: 'Failed to add message' },
       { status: 500 }
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 }
 
 // GET /api/tickets/[ticketId]/messages - Get all messages
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
     const { ticketId } = await params;
 
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ messages: ticket.messages || [] });
   } catch (error) {
-    console.error('Error fetching messages:', error);
+    apiLogger.error({ error, message: 'Error fetching messages' });
     return NextResponse.json(
       { error: 'Failed to fetch messages' },
       { status: 500 }

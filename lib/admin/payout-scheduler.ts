@@ -4,7 +4,10 @@
 // =====================================================
 
 import { createAdminClient } from '@/lib/supabase/server';
+import { logger } from '@/lib/logger';
 import type { Commission } from './types';
+
+const adminLogger = logger.child({ context: 'admin.payouts' });
 
 /**
  * Payout dates are fixed to 1st and 15th of every month.
@@ -142,7 +145,12 @@ export async function getScheduledCommissions(
     .order('created_at', { ascending: true });
 
   if (error) {
-    console.error('Error fetching scheduled commissions:', error);
+    adminLogger.error({
+      msg: 'Error fetching scheduled commissions',
+      error: error instanceof Error
+        ? { name: error.name, message: error.message, stack: error.stack }
+        : { message: String(error) },
+    });
     throw error;
   }
 
@@ -168,7 +176,12 @@ export async function getPayoutSummary(payoutDate: Date): Promise<{
     .in('status', ['eligible', 'approved']);
 
   if (error) {
-    console.error('Error fetching payout summary:', error);
+    adminLogger.error({
+      msg: 'Error fetching payout summary',
+      error: error instanceof Error
+        ? { name: error.name, message: error.message, stack: error.stack }
+        : { message: String(error) },
+    });
     throw error;
   }
 
@@ -224,7 +237,6 @@ export async function processScheduledPayouts(
   processedBy?: string
 ): Promise<PayoutResult> {
   const supabase = createAdminClient();
-  const dateStr = getPayoutDateISO(payoutDate);
 
   const result: PayoutResult = {
     processed: 0,

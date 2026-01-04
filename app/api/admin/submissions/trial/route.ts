@@ -11,6 +11,7 @@ import {
   logAdminActivity,
   PlanType,
 } from '@/lib/admin';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -78,10 +79,10 @@ export async function POST(request: NextRequest) {
     );
 
     return NextResponse.json({ submission }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error in POST /api/admin/submissions/trial:', error);
+  } catch (error) {
+    apiLogger.error({ msg: 'Error in POST /api/admin/submissions/trial', error: error instanceof Error ? error.message : 'Unknown error' });
     return NextResponse.json(
-      { error: error.message || 'Failed to create trial submission' },
+      { error: error instanceof Error ? error.message : 'Failed to create trial submission' },
       { status: 400 }
     );
   }

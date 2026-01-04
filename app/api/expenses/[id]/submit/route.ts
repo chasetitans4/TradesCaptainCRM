@@ -6,9 +6,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getExpense, submitExpense } from '@/lib/expenses';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -57,10 +58,10 @@ export async function POST(
     const updatedExpense = await submitExpense(id);
 
     return NextResponse.json({ expense: updatedExpense });
-  } catch (error: any) {
-    console.error('Error in POST /api/expenses/[id]/submit:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error in POST /api/expenses/[id]/submit', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to submit expense' },
+      { error: error instanceof Error ? error.message : 'Failed to submit expense' },
       { status: 400 }
     );
   }

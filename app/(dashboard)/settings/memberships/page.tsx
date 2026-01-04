@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, useCallback } from 'react';
+import { useToast } from '@/components/ui/use-toast';
 import {
   CreditCard,
   Plus,
@@ -13,7 +13,7 @@ import {
   MoreHorizontal,
   Loader2,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -57,13 +57,13 @@ interface MembershipPlan {
 }
 
 export default function MembershipsSettingsPage() {
-  const router = useRouter();
   const [plans, setPlans] = useState<MembershipPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingPlan, setEditingPlan] = useState<MembershipPlan | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -76,24 +76,28 @@ export default function MembershipsSettingsPage() {
     is_active: true,
   });
 
-  useEffect(() => {
-    loadPlans();
-  }, []);
-
-  async function loadPlans() {
+  const loadPlans = useCallback(async () => {
     try {
       const response = await fetch('/api/memberships/plans');
       if (response.ok) {
         const data = await response.json();
         setPlans(data.plans || []);
       }
-    } catch (error) {
-      console.error('Error loading plans:', error);
+    } catch (_error) {
       setError('Failed to load membership plans');
+      toast({
+        title: 'Failed to load membership plans',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
-  }
+  }, [toast]);
+
+  useEffect(() => {
+    loadPlans();
+  }, [loadPlans]);
 
   const openNewPlanDialog = () => {
     setEditingPlan(null);
@@ -179,8 +183,12 @@ export default function MembershipsSettingsPage() {
     try {
       await fetch(`/api/memberships/plans/${planId}`, { method: 'DELETE' });
       loadPlans();
-    } catch (error) {
-      console.error('Error deleting plan:', error);
+    } catch (_error) {
+      toast({
+        title: 'Failed to delete plan',
+        description: 'Please try again',
+        variant: 'destructive',
+      });
     }
   };
 

@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Input, Label, Progress, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Alert, AlertDescription } from '@/components/ui';
 import { createClient, getCurrentUser } from '@/lib/supabase/client';
-import { Building2, User, Phone, Briefcase, Calendar, Wrench, ArrowRight, Check, Plus, Trash2 } from 'lucide-react';
+import { Building2, Calendar, Wrench, ArrowRight, Check, Plus, Trash2 } from 'lucide-react';
 import type { TradeType } from '@/types';
+import { logger } from '@/lib/logger';
 
 interface BusinessInfo {
   name: string;
@@ -36,6 +37,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const onboardingLogger = logger.child({ context: 'onboarding' });
   
   // Step 1: Business Info
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo>({
@@ -46,8 +48,6 @@ export default function OnboardingPage() {
     trade_type: 'plumbing',
   });
 
-  // Step 2: Calendar connect (skip for now)
-  const [calendarConnected, setCalendarConnected] = useState(false);
 
   // Step 3: Saved Services
   const [services, setServices] = useState<SavedService[]>([
@@ -165,7 +165,17 @@ export default function OnboardingPage() {
       // Success - redirect to dashboard
       router.push('/dashboard?welcome=true');
     } catch (err: any) {
-      console.error('Onboarding error:', err);
+      onboardingLogger.error({
+        msg: 'Onboarding error',
+        error: err instanceof Error ? err.message : String(err),
+        step,
+        businessInfo: {
+          name: businessInfo.name,
+          owner_phone: businessInfo.owner_phone || undefined,
+          trade_type: businessInfo.trade_type,
+        },
+        servicesCount: services.length,
+      });
       setError(err.message || 'Failed to complete setup. Please try again.');
     } finally {
       setLoading(false);
@@ -173,7 +183,6 @@ export default function OnboardingPage() {
   };
 
   const isStep1Valid = businessInfo.name && businessInfo.owner_name && businessInfo.phone;
-  const isStep3Valid = true; // Services are optional
 
   const progress = (step / 3) * 100;
 

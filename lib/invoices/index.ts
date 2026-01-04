@@ -378,7 +378,7 @@ export async function updateOverdueInvoices(businessId: string): Promise<number>
 
   const today = new Date().toISOString().split('T')[0];
 
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('invoices')
     .update({ status: 'overdue' })
     .eq('business_id', businessId)

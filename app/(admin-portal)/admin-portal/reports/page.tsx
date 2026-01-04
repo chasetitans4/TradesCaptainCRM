@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart3, Calendar, Loader2, Download, TrendingUp, TrendingDown, DollarSign, Target, Percent, Users } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { logger } from '@/lib/logger';
+const adminReportsLogger = logger.child({ context: 'admin.reports' });
 
 interface PerformanceReport {
   period: {
@@ -81,7 +83,11 @@ export default function AdminReportsPage() {
         setReport(data);
       }
     } catch (error) {
-      console.error('Failed to fetch report:', error);
+      adminReportsLogger.error({
+        msg: 'Failed to fetch performance report',
+        period,
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
+      });
     } finally {
       setLoading(false);
     }

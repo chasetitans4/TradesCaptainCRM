@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, getServerUserProfile } from '@/lib/supabase/server';
 import type { UpdateWorkingHoursInput } from '@/types';
+import { apiLogger } from '@/lib/logger';
 
 // GET - Fetch working hours
 export async function GET() {
@@ -55,7 +56,7 @@ export async function GET() {
       source: 'default',
     });
   } catch (error) {
-    console.error('Error fetching working hours:', error);
+    apiLogger.error({ error, context: 'Error fetching working hours' });
     return NextResponse.json(
       { error: 'Failed to fetch working hours' },
       { status: 500 }
@@ -125,7 +126,7 @@ export async function PUT(request: NextRequest) {
       .insert(records);
 
     if (insertError) {
-      console.error('Error updating working hours:', insertError);
+      apiLogger.error({ error: insertError, context: 'Error updating working hours' });
       return NextResponse.json(
         { error: 'Failed to update working hours' },
         { status: 500 }
@@ -134,7 +135,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error updating working hours:', error);
+    apiLogger.error({ error, context: 'Error updating working hours' });
     return NextResponse.json(
       { error: 'Failed to update working hours' },
       { status: 500 }

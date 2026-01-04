@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getPerformanceReport } from '@/lib/admin/reports';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,10 +25,13 @@ export async function GET(request: NextRequest) {
     const report = await getPerformanceReport(admin.id, period);
 
     return NextResponse.json(report);
-  } catch (error: any) {
-    console.error('Get performance report error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Get performance report error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch performance report' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch performance report' },
       { status: 500 }
     );
   }

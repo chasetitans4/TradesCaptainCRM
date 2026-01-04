@@ -4,10 +4,11 @@
 // DELETE /api/quickbooks - Disconnect QuickBooks
 // =====================================================
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { getQuickBooksConnectionInfo, disconnectQuickBooks } from '@/lib/quickbooks/client';
 import { getSyncStatus } from '@/lib/quickbooks/sync';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET() {
   try {
@@ -35,10 +36,10 @@ export async function GET() {
       ...connectionInfo,
       syncStatus,
     });
-  } catch (error: any) {
-    console.error('Error fetching QuickBooks info:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error fetching QuickBooks info' });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch QuickBooks info' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch QuickBooks info' },
       { status: 500 }
     );
   }
@@ -66,10 +67,10 @@ export async function DELETE() {
       success: true,
       message: 'QuickBooks disconnected successfully',
     });
-  } catch (error: any) {
-    console.error('Error disconnecting QuickBooks:', error);
+  } catch (error) {
+    apiLogger.error({ error, context: 'Error disconnecting QuickBooks' });
     return NextResponse.json(
-      { error: error.message || 'Failed to disconnect QuickBooks' },
+      { error: error instanceof Error ? error.message : 'Failed to disconnect QuickBooks' },
       { status: 500 }
     );
   }

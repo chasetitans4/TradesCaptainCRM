@@ -6,7 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
-import type { ConversationFilters, ConversationListResponse } from '@/types/leads-captain';
+import { apiLogger } from '@/lib/logger';
+import type { ConversationListResponse } from '@/types/leads-captain';
 
 export async function GET(request: NextRequest) {
   try {
@@ -103,8 +104,11 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json(response);
-  } catch (error: unknown) {
-    console.error('Error fetching conversations:', error);
+  } catch (error) {
+    apiLogger.error({
+      message: 'Error fetching conversations',
+      error,
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to fetch conversations' },
       { status: 500 }

@@ -7,9 +7,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getDocument, deleteDocument } from '@/lib/admin/documents';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -26,17 +27,20 @@ export async function GET(
     }
 
     return NextResponse.json(document);
-  } catch (error: any) {
-    console.error('Get document error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Get document error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch document' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch document' },
       { status: 500 }
     );
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -49,10 +53,13 @@ export async function DELETE(
     await deleteDocument(id);
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Delete document error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Delete document error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to delete document' },
+      { error: error instanceof Error ? error.message : 'Failed to delete document' },
       { status: 500 }
     );
   }

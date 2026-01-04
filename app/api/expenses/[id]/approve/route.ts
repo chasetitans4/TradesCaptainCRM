@@ -6,9 +6,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getExpense, approveExpense } from '@/lib/expenses';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -57,10 +58,10 @@ export async function POST(
     const updatedExpense = await approveExpense(id, profile.id);
 
     return NextResponse.json({ expense: updatedExpense });
-  } catch (error: any) {
-    console.error('Error in POST /api/expenses/[id]/approve:', error);
+  } catch (error) {
+    apiLogger.error({ message: 'Error in POST /api/expenses/[id]/approve', error });
     return NextResponse.json(
-      { error: error.message || 'Failed to approve expense' },
+      { error: error instanceof Error ? error.message : 'Failed to approve expense' },
       { status: 400 }
     );
   }

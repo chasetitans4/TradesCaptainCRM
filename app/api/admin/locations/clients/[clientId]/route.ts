@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { getClientLocations, addLocation, calculateLocationPricing } from '@/lib/admin/locations';
+import { apiLogger } from '@/lib/logger';
 
 export async function GET(
   request: NextRequest,
@@ -26,10 +27,13 @@ export async function GET(
     const pricing = await calculateLocationPricing(clientId, basePlanPriceCents);
 
     return NextResponse.json({ locations, pricing });
-  } catch (error: any) {
-    console.error('Get locations error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Get locations error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch locations' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch locations' },
       { status: 500 }
     );
   }
@@ -48,7 +52,7 @@ export async function POST(
     const { clientId } = await params;
     const body = await request.json();
 
-    const { name, address, city, state, zip, phone, email, is_primary } = body;
+    const { name, address, city, state, zip, phone } = body;
 
     if (!name || !address || !city || !state || !zip) {
       return NextResponse.json(
@@ -74,10 +78,13 @@ export async function POST(
       success: true,
       location,
     });
-  } catch (error: any) {
-    console.error('Add location error:', error);
+  } catch (error) {
+    apiLogger.error({
+      msg: 'Add location error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to add location' },
+      { error: error instanceof Error ? error.message : 'Failed to add location' },
       { status: 500 }
     );
   }

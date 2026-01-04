@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { apiLogger } from '@/lib/logger';
 
 export async function POST(
   request: NextRequest,
@@ -36,13 +37,13 @@ export async function POST(
       .single();
 
     if (error) {
-      console.error('Error completing follow-up:', error);
+      apiLogger.error({ message: 'Error completing follow-up', error });
       return NextResponse.json({ error: 'Failed to complete follow-up' }, { status: 500 });
     }
 
     return NextResponse.json({ follow_up });
   } catch (error) {
-    console.error('Error in POST /api/follow-ups/:id/complete:', error);
+    apiLogger.error({ message: 'Error in POST /api/follow-ups/:id/complete', error });
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
