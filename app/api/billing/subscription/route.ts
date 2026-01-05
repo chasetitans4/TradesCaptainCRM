@@ -13,6 +13,7 @@ import {
   changePlan,
   cancelSubscription,
   getPriceIds,
+  getPriceCatalog,
 } from '@/lib/stripe/subscriptions';
 import { apiLogger } from '@/lib/logger';
 
@@ -41,6 +42,7 @@ export async function GET() {
       subscription,
       invoices,
       priceIds: getPriceIds(),
+      priceCatalog: getPriceCatalog(),
     });
   } catch (error) {
     apiLogger.error({ msg: 'Error fetching subscription', error: error instanceof Error ? error.message : 'Unknown error' });

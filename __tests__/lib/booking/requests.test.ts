@@ -6,13 +6,18 @@ jest.mock('@/lib/twilio/sms', () => ({
 
 jest.mock('@/lib/logger', () => {
   const noop = jest.fn();
+  const mockLogger = {
+    child: jest.fn(() => mockLogger),
+    info: noop,
+    error: noop,
+    warn: noop,
+    debug: noop,
+    fatal: noop,
+  };
   return {
-    apiLogger: {
-      info: noop,
-      error: noop,
-      warn: noop,
-      debug: noop,
-    },
+    logger: mockLogger,
+    apiLogger: mockLogger,
+    syncLogger: mockLogger,
   };
 });
 

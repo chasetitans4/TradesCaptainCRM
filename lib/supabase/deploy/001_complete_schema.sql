@@ -1520,7 +1520,8 @@ CREATE TABLE IF NOT EXISTS kb_articles (
   is_published BOOLEAN DEFAULT TRUE,
   is_featured BOOLEAN DEFAULT FALSE,
   search_keywords TEXT[],
-  show_on_screens TEXT[]
+  show_on_screens TEXT[],
+  search_vector tsvector
 );
 
 -- KB FEEDBACK
@@ -2451,7 +2452,30 @@ CREATE INDEX IF NOT EXISTS idx_admin_sessions_token ON admin_sessions(token_hash
 -- KB articles
 CREATE INDEX IF NOT EXISTS idx_kb_articles_category ON kb_articles(category) WHERE is_published = TRUE;
 CREATE INDEX IF NOT EXISTS idx_kb_articles_slug ON kb_articles(slug);
-CREATE INDEX IF NOT EXISTS idx_kb_articles_search ON kb_articles USING gin(to_tsvector('english', title || ' ' || body || ' ' || array_to_string(search_keywords, ' ')));
+CREATE INDEX IF NOT EXISTS idx_kb_articles_search ON kb_articles USING gin(search_vector);
+
+CREATE OR REPLACE FUNCTION kb_articles_search_vector_update() RETURNS trigger AS $$
+BEGIN
+  NEW.search_vector := to_tsvector(
+    'english',
+    coalesce(NEW.title, '') || ' ' ||
+    coalesce(NEW.body, '') || ' ' ||
+    coalesce(array_to_string(NEW.search_keywords, ' '), '')
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER kb_articles_search_vector_trigger
+BEFORE INSERT OR UPDATE ON kb_articles
+FOR EACH ROW EXECUTE FUNCTION kb_articles_search_vector_update();
+
+UPDATE kb_articles SET search_vector = to_tsvector(
+  'english',
+  coalesce(title, '') || ' ' ||
+  coalesce(body, '') || ' ' ||
+  coalesce(array_to_string(search_keywords, ' '), '')
+);
 
 -- =====================================================
 -- TRIGGERS

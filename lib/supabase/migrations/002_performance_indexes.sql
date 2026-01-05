@@ -9,8 +9,6 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 -- =============================================
 -- CUSTOMERS TABLE
 -- =============================================
-CREATE INDEX IF NOT EXISTS idx_customers_business_active
-  ON customers(business_id) WHERE is_active = true;
 
 CREATE INDEX IF NOT EXISTS idx_customers_phone
   ON customers(business_id, phone);
@@ -79,15 +77,8 @@ CREATE INDEX IF NOT EXISTS idx_invoices_overdue
   ON invoices(business_id, due_date)
   WHERE status = 'overdue';
 
--- =============================================
--- MESSAGES TABLE
--- =============================================
-CREATE INDEX IF NOT EXISTS idx_messages_conversation
-  ON messages(business_id, customer_id, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_messages_unread
-  ON messages(business_id, customer_id)
-  WHERE direction = 'inbound' AND read_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_sms_messages_conversation
+  ON sms_messages(conversation_id, created_at DESC);
 
 -- =============================================
 -- ACTIVITY / AUDIT
@@ -103,7 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_customer_activity_business
 -- =============================================
 CREATE INDEX IF NOT EXISTS idx_notifications_user_unread
   ON notifications(user_id, created_at DESC)
-  WHERE is_read = false;
+  WHERE read_at IS NULL;
 
 -- =============================================
 -- SERVICE AGREEMENTS
@@ -142,27 +133,36 @@ CREATE INDEX IF NOT EXISTS idx_equipment_customer
   ON customer_equipment(customer_id, status);
 
 CREATE INDEX IF NOT EXISTS idx_equipment_warranty_expiring
-  ON customer_equipment(business_id, warranty_expiration)
+  ON customer_equipment(business_id, warranty_expires)
   WHERE status = 'active';
 
 -- =============================================
 -- DOCUMENTS
 -- =============================================
-CREATE INDEX IF NOT EXISTS idx_documents_entity
-  ON documents(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_documents_customer
+  ON documents(customer_id)
+  WHERE customer_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_documents_job
+  ON documents(job_id)
+  WHERE job_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_documents_equipment
+  ON documents(equipment_id)
+  WHERE equipment_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_documents_expiring
-  ON documents(business_id, expiration_date)
-  WHERE expiration_date IS NOT NULL;
+  ON documents(expires_at)
+  WHERE expires_at IS NOT NULL;
 
 -- =============================================
 -- TECHNICIAN METRICS
 -- =============================================
 CREATE INDEX IF NOT EXISTS idx_tech_metrics_date
-  ON technician_daily_metrics(technician_id, date DESC);
+  ON technician_daily_metrics(user_id, metric_date DESC);
 
 CREATE INDEX IF NOT EXISTS idx_tech_metrics_business
-  ON technician_daily_metrics(business_id, date DESC);
+  ON technician_daily_metrics(business_id, metric_date DESC);
 
 -- =============================================
 -- CUSTOM FIELDS
@@ -179,7 +179,7 @@ ANALYZE jobs;
 ANALYZE leads;
 ANALYZE quotes;
 ANALYZE invoices;
-ANALYZE messages;
+ANALYZE sms_messages;
 ANALYZE customer_activity;
 ANALYZE notifications;
 ANALYZE service_agreements;

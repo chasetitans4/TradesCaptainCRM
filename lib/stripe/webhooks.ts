@@ -31,7 +31,7 @@ export async function handleSubscriptionUpdated(
 
   if (priceId === process.env.STRIPE_PRICE_PRO_MONTHLY) {
     planTier = 'pro';
-    leadsLimit = 200;
+    leadsLimit = 300;
   } else if (priceId === process.env.STRIPE_PRICE_STARTER_MONTHLY) {
     planTier = 'starter';
     leadsLimit = 0;

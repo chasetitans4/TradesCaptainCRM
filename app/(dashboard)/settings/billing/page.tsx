@@ -97,6 +97,9 @@ export default function BillingPage() {
   const [subscription, setSubscription] = useState<SubscriptionDetails | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [priceIds, setPriceIds] = useState<{ starter: string; pro: string; enterprise: string } | null>(null);
+  type ServiceKey = 'crm' | 'blue' | 'web' | 'silver' | 'gold' | 'seoaeo';
+  const [priceCatalog, setPriceCatalog] = useState<Record<ServiceKey, { starter: string; pro: string; enterprise: string; multiLocation?: string }> | null>(null);
+  const [selectedService, setSelectedService] = useState<ServiceKey>('crm');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -107,9 +110,12 @@ export default function BillingPage() {
 
   // Check for success/cancel params
   useEffect(() => {
+    const svc = searchParams.get('service');
+    if (svc === 'crm' || svc === 'blue' || svc === 'web' || svc === 'silver' || svc === 'gold' || svc === 'seoaeo') {
+      setSelectedService(svc as ServiceKey);
+    }
     if (searchParams.get('success') === 'true') {
       setSuccessMessage('Your subscription has been updated successfully!');
-      // Clear params
       router.replace('/settings/billing');
     } else if (searchParams.get('canceled') === 'true') {
       setError('Checkout was canceled.');
@@ -133,6 +139,7 @@ export default function BillingPage() {
       setSubscription(data.subscription);
       setInvoices(data.invoices || []);
       setPriceIds(data.priceIds);
+      setPriceCatalog(data.priceCatalog || null);
 
       if (pricingRes.ok) {
         const pricingData = await pricingRes.json();
@@ -159,12 +166,12 @@ export default function BillingPage() {
   }
 
   async function handleChangePlan(newTier: 'starter' | 'pro' | 'enterprise') {
-    if (!priceIds) return;
     setActionLoading('changePlan');
     setError(null);
 
     try {
-      const priceId = priceIds[newTier];
+      const priceId = priceCatalog ? priceCatalog[selectedService]?.[newTier] : priceIds?.[newTier];
+      if (!priceId) throw new Error('Price ID is not configured');
       const res = await fetch('/api/billing/subscription', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

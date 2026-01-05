@@ -184,12 +184,12 @@ describe('lib/stripe/subscriptions', () => {
 
   it('getPriceIds returns env values', async () => {
     await jest.isolateModulesAsync(async () => {
-      process.env.STRIPE_PRICE_GROWTH_MONTHLY = 'pg';
+      process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY = 'pe';
       process.env.STRIPE_PRICE_PRO_MONTHLY = 'pp';
       process.env.STRIPE_PRICE_MULTI_LOCATION_ADDON = 'pl';
       const { getPriceIds } = require('@/lib/stripe/subscriptions');
       const ids = getPriceIds();
-      expect(ids.growth).toBe('pg');
+      expect(ids.enterprise).toBe('pe');
       expect(ids.pro).toBe('pp');
       expect(ids.multiLocation).toBe('pl');
     });

@@ -137,7 +137,7 @@ export async function getSubscriptionDetails(
     leadsThisMonth: business.leads_this_month || business.leads_used || 0,
     leadsLimit:
       business.leads_limit ??
-      (business.plan_tier === 'enterprise' ? 300 : business.plan_tier === 'pro' ? 200 : 0),
+      (business.plan_tier === 'enterprise' ? 300 : business.plan_tier === 'pro' ? 300 : 0),
     upcomingAmount: null,
     paymentMethod: null,
   };
@@ -281,7 +281,7 @@ export async function changePlan(
     leadsLimit = 0;
   } else if (newPriceId === process.env.STRIPE_PRICE_PRO_MONTHLY) {
     planTier = 'pro';
-    leadsLimit = 200;
+    leadsLimit = 300;
   }
   await supabase
     .from('businesses')
@@ -391,9 +391,46 @@ export async function addMultiLocationAddon(businessId: string): Promise<void> {
  */
 export function getPriceIds() {
   return {
+    enterprise: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY,
     starter: process.env.STRIPE_PRICE_STARTER_MONTHLY,
     pro: process.env.STRIPE_PRICE_PRO_MONTHLY,
-    enterprise: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY ?? process.env.STRIPE_PRICE_GROWTH_MONTHLY,
     multiLocation: process.env.STRIPE_PRICE_MULTI_LOCATION_ADDON,
+  };
+}
+
+export function getPriceCatalog() {
+  return {
+    crm: {
+      starter: process.env.STRIPE_PRICE_STARTER_MONTHLY,
+      pro: process.env.STRIPE_PRICE_PRO_MONTHLY,
+      enterprise: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY,
+      multiLocation: process.env.STRIPE_PRICE_MULTI_LOCATION_ADDON,
+    },
+    blue: {
+      starter: process.env.STRIPE_PRICE_BLUE_STARTER_MONTHLY,
+      pro: process.env.STRIPE_PRICE_BLUE_PRO_MONTHLY,
+      enterprise: process.env.STRIPE_PRICE_BLUE_ENTERPRISE_MONTHLY,
+      multiLocation: process.env.STRIPE_PRICE_MULTI_LOCATION_ADDON,
+    },
+    web: {
+      starter: process.env.STRIPE_PRICE_WEB_STARTER_MONTHLY,
+      pro: process.env.STRIPE_PRICE_WEB_PRO_MONTHLY,
+      enterprise: process.env.STRIPE_PRICE_WEB_ENTERPRISE_MONTHLY,
+    },
+    silver: {
+      starter: process.env.STRIPE_PRICE_SILVER_STARTER_MONTHLY,
+      pro: process.env.STRIPE_PRICE_SILVER_PRO_MONTHLY,
+      enterprise: process.env.STRIPE_PRICE_SILVER_ENTERPRISE_MONTHLY,
+    },
+    gold: {
+      starter: process.env.STRIPE_PRICE_GOLD_STARTER_MONTHLY,
+      pro: process.env.STRIPE_PRICE_GOLD_PRO_MONTHLY,
+      enterprise: process.env.STRIPE_PRICE_GOLD_ENTERPRISE_MONTHLY,
+    },
+    seoaeo: {
+      starter: process.env.STRIPE_PRICE_SEOAEO_STARTER_MONTHLY,
+      pro: process.env.STRIPE_PRICE_SEOAEO_PRO_MONTHLY,
+      enterprise: process.env.STRIPE_PRICE_SEOAEO_ENTERPRISE_MONTHLY,
+    },
   };
 }
