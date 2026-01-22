@@ -1017,3 +1017,105 @@ export interface TeamLeaderboard {
     total_commission: number;
   };
 }
+
+// =====================================================
+// BATCH LEAD UPLOAD TYPES
+// =====================================================
+
+export type AssignmentStrategy = 'manual' | 'round_robin' | 'capacity';
+
+export interface RawLeadInput {
+  // Flexible fields that may come from CSV/JSON with various names
+  company_name?: string;
+  company?: string;
+  business_name?: string;
+  contact_name?: string;
+  contact?: string;
+  name?: string;
+  email?: string;
+  email_address?: string;
+  phone?: string;
+  phone_number?: string;
+  telephone?: string;
+  address?: string;
+  street_address?: string;
+  city?: string;
+  state?: string;
+  province?: string;
+  zip?: string;
+  zip_code?: string;
+  postal_code?: string;
+  trade_type?: string;
+  trade?: string;
+  industry?: string;
+  employee_count?: string;
+  employees?: string;
+  current_website?: string;
+  website?: string;
+  current_crm?: string;
+  crm?: string;
+  notes?: string;
+  comments?: string;
+  // Allow any other fields
+  [key: string]: string | undefined;
+}
+
+export interface FormattedLeadData {
+  company_name: string;
+  contact_name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  trade_type?: string;
+  employee_count?: string;
+  current_website?: string;
+  current_crm?: string;
+  notes?: string;
+}
+
+export interface AIFormatChange {
+  field: string;
+  original: string | null;
+  formatted: string | null;
+  reason: string;
+}
+
+export interface AIFormattedLead {
+  formatted_lead: FormattedLeadData;
+  changes: AIFormatChange[];
+  confidence: number;
+  warnings: string[];
+}
+
+export interface BatchUploadValidationError {
+  row: number;
+  field: string;
+  message: string;
+}
+
+export interface BatchUploadResult {
+  batch_id: string;
+  total: number;
+  imported: number;
+  failed: number;
+  errors: BatchUploadValidationError[];
+}
+
+export interface BatchUploadInput {
+  leads: FormattedLeadData[];
+  assignment_strategy: AssignmentStrategy;
+  agent_id?: string; // Required when strategy is 'manual'
+}
+
+export interface AIFormatRequest {
+  raw_leads: RawLeadInput[];
+}
+
+export interface AIFormatResponse {
+  formatted_leads: AIFormattedLead[];
+  total_processed: number;
+  total_warnings: number;
+}

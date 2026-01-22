@@ -4,8 +4,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createClient } from '@/lib/supabase/server';
+import { getPortalSession } from '@/lib/portal/session';
 import { getBusinessForPortal, getCustomerProfile } from '@/lib/portal/data';
 import { apiLogger } from '@/lib/logger';
 
@@ -21,56 +20,27 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check for portal session cookie
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get(`portal_session_${businessId}`);
+    // Verify session using the shared library (checks JWT)
+    const session = await getPortalSession(undefined); // Pass undefined for slug as we check businessId manually
 
-    if (!sessionCookie?.value) {
+    if (!session) {
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
       );
     }
 
-    // Parse session data
-    let sessionData;
-    try {
-      sessionData = JSON.parse(sessionCookie.value);
-    } catch {
-      return NextResponse.json(
-        { error: 'Invalid session' },
+    // Verify session belongs to this business
+    if (session.businessId !== businessId) {
+       return NextResponse.json(
+        { error: 'Invalid session for this business' },
         { status: 401 }
       );
     }
 
-    const { customerId, accessId } = sessionData;
-
-    if (!customerId) {
-      return NextResponse.json(
-        { error: 'Invalid session' },
-        { status: 401 }
-      );
-    }
-
-    // Verify session is still valid
-    const supabase = await createClient();
-    const { data: access } = await supabase
-      .from('customer_portal_access')
-      .select('is_active')
-      .eq('id', accessId)
-      .eq('is_active', true)
-      .single();
-
-    if (!access) {
-      return NextResponse.json(
-        { error: 'Session expired' },
-        { status: 401 }
-      );
-    }
-
-    // Get customer and business info
+    // Get customer and business info using admin client (via data lib)
     const [customer, business] = await Promise.all([
-      getCustomerProfile(customerId),
+      getCustomerProfile(session.customerId),
       getBusinessForPortal(businessId),
     ]);
 

@@ -4,7 +4,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserProfile } from '@/lib/supabase/server';
+import { checkPermission, getServerSession } from '@/lib/permissions/check-permission';
 import { createAdminClient } from '@/lib/supabase/server';
 import { sendSMS } from '@/lib/twilio';
 import { apiLogger } from '@/lib/logger';
@@ -16,8 +16,9 @@ interface RouteParams {
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('manage_leads_captain');
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -39,11 +40,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id, email')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+
     // Get config for authorization
     const { data: config } = await supabase
       .from('leads_captain_config')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', userData.business_id)
       .single();
 
     if (!config) {
@@ -78,7 +89,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Process action
     const updateData: Record<string, unknown> = {
-      approved_by: profile.email || 'user',
+      approved_by: userData.email || 'user',
       approved_at: new Date().toISOString(),
     };
 
@@ -125,7 +136,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       conversation_id: message.conversation_id,
       message_id: id,
       action: auditAction,
-      actor: profile.email || 'user',
+      actor: userData.email || 'user',
       details: {
         action: body.action,
         edited: body.action === 'edit',
@@ -141,7 +152,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         await sendSMS({
           to: message.conversation.customer_phone,
           body: contentToSend,
-          businessId: profile.business_id,
+          businessId: userData.business_id,
           isAIResponse: message.ai_used || false,
         });
 

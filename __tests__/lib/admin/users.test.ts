@@ -34,13 +34,15 @@ jest.mock('@/lib/supabase/server', () => {
       },
     }),
   };
+  const buildClient = () => ({
+    from: (table: string) => {
+      if (table === 'admin_users') return usersTable as any;
+      return {} as any;
+    },
+  });
   return {
-    createClient: jest.fn(async () => ({
-      from: (table: string) => {
-        if (table === 'admin_users') return usersTable as any;
-        return {} as any;
-      },
-    })),
+    createClient: jest.fn(async () => buildClient()),
+    createAdminClient: jest.fn(() => buildClient()),
     __state: state,
   };
 });
@@ -49,7 +51,7 @@ describe('admin users: fetch and create', () => {
   beforeEach(() => {
     const supabase = require('@/lib/supabase/server');
     supabase.__state.rows = [
-      { id: 'a1', email: 'test@example.com', name: 'T', is_active: true },
+      { id: 'a1', email: 'test@example.com', full_name: 'T', status: 'active' },
     ];
     supabase.__state.lastInsert = null;
     supabase.__state.updateCalls = 0;

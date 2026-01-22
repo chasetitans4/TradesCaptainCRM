@@ -92,7 +92,7 @@ export async function getAvailableSlots(
   const { data: jobs } = await supabase
     .from('jobs')
     .select('scheduled_time_start, scheduled_time_end')
-    .eq('assigned_to', user_id)
+    .eq('assigned_user_id', user_id)
     .eq('scheduled_date', dateStr)
     .in('status', ['scheduled', 'in_progress']);
 

@@ -42,8 +42,8 @@ export async function GET(request: NextRequest) {
     // Get jobs from database
     const { data: jobs } = await supabase
       .from('jobs')
-      .select('id, scheduled_date, scheduled_time_start, scheduled_time_end, status, service_type, job_address_line1, job_address_city, job_address_state, job_address_zip, customer:customers(name, phone)')
-      .eq('assigned_to', profile.id)
+      .select('id, customer_id, scheduled_date, scheduled_time_start, scheduled_time_end, status, service_type, job_type, job_address_line1, job_address_city, job_address_state, job_address_zip, customer:customers(id, name, phone)')
+      .eq('assigned_user_id', profile.id)
       .gte('scheduled_date', parsed.data.start.split('T')[0])
       .lte('scheduled_date', parsed.data.end.split('T')[0])
       .in('status', ['scheduled', 'in_progress']);
@@ -82,8 +82,11 @@ export async function GET(request: NextRequest) {
           color: '#3b82f6',
           editable: true,
           job_id: job.id,
+          job_type: job.job_type,
+          customer_id: job.customer_id || undefined,
           customer: jobCustomer
             ? {
+                id: jobCustomer.id,
                 name: jobCustomer.name,
                 phone: jobCustomer.phone || undefined,
               }

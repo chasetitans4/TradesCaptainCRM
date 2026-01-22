@@ -96,22 +96,31 @@ export default function ExpensesPage() {
         fetch(`/api/expenses/report/summary?start_date=${format(monthStart, 'yyyy-MM-dd')}&end_date=${format(monthEnd, 'yyyy-MM-dd')}`),
       ]);
 
-      if (expensesRes.ok) {
+      // Handle expenses response with proper error checking
+      if (!expensesRes.ok) {
+        console.error('Failed to load expenses:', expensesRes.status);
+      } else {
         const data = await expensesRes.json();
         setExpenses(data.expenses || []);
       }
 
-      if (categoriesRes.ok) {
+      // Handle categories response with proper error checking
+      if (!categoriesRes.ok) {
+        console.error('Failed to load categories:', categoriesRes.status);
+      } else {
         const data = await categoriesRes.json();
         setCategories(data.categories || []);
       }
 
-      if (summaryRes.ok) {
+      // Handle summary response with proper error checking
+      if (!summaryRes.ok) {
+        console.error('Failed to load summary:', summaryRes.status);
+      } else {
         const data = await summaryRes.json();
         setSummary(data.summary || {});
       }
     } catch (err) {
-      console.error('Error fetching expenses:', err);
+      console.error('Error fetching expenses:', err instanceof Error ? err.message : 'Unknown error');
       setError('Failed to load expenses');
     } finally {
       setLoading(false);

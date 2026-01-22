@@ -3,33 +3,37 @@ import { createClient } from '@/lib/supabase/server';
 import { getFollowUpRules, createFollowUpRule } from '@/lib/followup/engine';
 import { apiLogger } from '@/lib/logger';
 
+import { getServerSession } from '@/lib/permissions/check-permission';
+
 // GET /api/followup/rules - Get follow-up rules
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: userData } = await supabase
-      .from('users')
-      .select('business_id')
-      .eq('id', user.id)
-      .single();
+    const { searchParams } = new URL(request.url);
+    let businessId = session.user.businessId;
 
-    if (!userData?.business_id) {
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      const queryBusinessId = searchParams.get('businessId');
+      if (queryBusinessId) businessId = queryBusinessId;
+    }
+
+    if (!businessId) {
+      if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+          return NextResponse.json({ rules: [] });
+      }
       return NextResponse.json({ error: 'No business found' }, { status: 404 });
     }
 
-    const { searchParams } = new URL(request.url);
     const triggerType = searchParams.get('triggerType') as any;
     const isActive = searchParams.get('isActive');
 
-    const rules = await getFollowUpRules(userData.business_id, {
+    const rules = await getFollowUpRules(businessId, {
       triggerType: triggerType || undefined,
       isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
     });
@@ -45,25 +49,22 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: userData } = await supabase
-      .from('users')
-      .select('business_id')
-      .eq('id', user.id)
-      .single();
+    const body = await request.json();
 
-    if (!userData?.business_id) {
-      return NextResponse.json({ error: 'No business found' }, { status: 404 });
+    let businessId = session.user.businessId;
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      if (body.businessId) businessId = body.businessId;
     }
 
-    const body = await request.json();
+    if (!businessId) {
+      return NextResponse.json({ error: 'No business found' }, { status: 404 });
+    }
 
     // Validate required fields
     if (!body.name || !body.triggerType || !body.actionType) {
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const rule = await createFollowUpRule(userData.business_id, {
+    const rule = await createFollowUpRule(businessId, {
       name: body.name,
       description: body.description || null,
       triggerType: body.triggerType,

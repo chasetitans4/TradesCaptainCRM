@@ -58,7 +58,7 @@ jest.mock('@/lib/supabase/server', () => {
       };
       return chain;
     };
-    return { from: (table: string) => makeChain(table) };
+    return { from: (table: string) => { state.filters = []; state.orderBy = null; return makeChain(table); } };
   };
   return { createAdminClient: jest.fn(() => build()) };
 });
@@ -222,17 +222,18 @@ describe('admin plans: upgrade options and tracks summary', () => {
   });
 
   it('gets plan tracks summary with price range', async () => {
+    // Note: getPlanTracksSummary only supports tracks: blue, web, seo_aeo
     (globalThis as any).__plansMock = {
       plan_pricing: [
         { id: 'p1', plan_type: 'blue_starter', track: 'blue', monthly_price_cents: 4900, is_active: true, display_order: 1 },
         { id: 'p2', plan_type: 'blue_pro', track: 'blue', monthly_price_cents: 9900, is_active: true, display_order: 2 },
-        { id: 'p3', plan_type: 'leads_basic', track: 'leads_captain', monthly_price_cents: 2900, is_active: true, display_order: 1 },
+        { id: 'p3', plan_type: 'web_basic', track: 'web', monthly_price_cents: 2900, is_active: true, display_order: 1 },
       ],
     };
     const res = await getPlanTracksSummary();
     const blue = res.find(r => r.track === 'blue');
     expect(blue?.price_range).toBe('$49-$99');
-    const lc = res.find(r => r.track === 'leads_captain');
-    expect(lc?.price_range).toBe('$29/mo');
+    const web = res.find(r => r.track === 'web');
+    expect(web?.price_range).toBe('$29/mo');
   });
 });

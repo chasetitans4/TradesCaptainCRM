@@ -71,25 +71,25 @@ export function useAdminKeyboardShortcuts(options: UseAdminKeyboardShortcutsOpti
 
         switch (key) {
           case 'd':
-            targetPath = '/admin-portal';
+            targetPath = '/admin';
             break;
           case 'a':
-            targetPath = '/admin-portal/accounts';
+            targetPath = '/admin/accounts';
             break;
           case 'l':
-            targetPath = '/admin-portal/leads';
+            targetPath = '/admin/leads';
             break;
           case 'c':
-            targetPath = '/admin-portal/commissions';
+            targetPath = '/admin/commissions';
             break;
           case 'g':
-            targetPath = '/admin-portal/agents';
+            targetPath = '/admin/agents';
             break;
           case 'r':
-            targetPath = '/admin-portal/reports';
+            targetPath = '/admin/reports';
             break;
           case 's':
-            targetPath = '/admin-portal/settings';
+            targetPath = '/admin/settings';
             break;
         }
 

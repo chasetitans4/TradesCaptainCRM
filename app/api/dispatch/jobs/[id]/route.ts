@@ -10,6 +10,8 @@ import {
   getJobDispatchHistory,
 } from '@/lib/dispatch/actions';
 import { autoAssignJob } from '@/lib/dispatch/routing';
+import { hasServerPermission, checkPermission, getServerSession } from '@/lib/permissions/check-permission';
+import { Permission } from '@/lib/permissions/roles';
 
 // GET /api/dispatch/jobs/[id] - Get job dispatch history
 export async function GET(
@@ -18,13 +20,14 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!await hasServerPermission('view_all_jobs') && !await hasServerPermission('view_assigned_jobs')) {
+       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const history = await getJobDispatchHistory(id);
@@ -43,27 +46,48 @@ export async function POST(
 ) {
   try {
     const { id: jobId } = await params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const user = session.user;
 
-    const { data: userData } = await supabase
-      .from('users')
-      .select('business_id')
-      .eq('id', user.id)
-      .single();
+    // Determine business ID
+    let businessId = user.businessId;
+    
+    // We don't get query params easily here for POST body usually contains data
+    // But we might need business ID if admin is acting
+    // Ideally the job ID implies the business, but we verify ownership usually.
+    // Since we are operating on a specific job ID, the RLS/logic should handle it, 
+    // but the `userData.business_id` check below needs to be updated.
 
-    if (!userData?.business_id) {
-      return NextResponse.json({ error: 'No business found' }, { status: 404 });
+    // If user is admin, they might not have businessId.
+    // However, dispatch actions (assign, etc) usually require the actor to be part of the business
+    // OR we need to pass `dispatchedBy` as the admin ID.
+    
+    // If Admin, we skip the business_id check on the USER, but we should probably ensure the job belongs to a business they can manage (all businesses for super admin).
+    
+    if (!businessId && user.role !== 'admin' && user.role !== 'super_admin') {
+       return NextResponse.json({ error: 'No business found' }, { status: 404 });
     }
 
     const body = await request.json();
     const { action, ...data } = body;
+
+    // RBAC Check
+    // Skip for admin/super_admin
+    if (user.role !== 'admin' && user.role !== 'super_admin') {
+      let requiredPermission: Permission = 'manage_jobs';
+      if (['start', 'complete'].includes(action)) {
+        requiredPermission = 'update_job_status';
+      } else if (['assign', 'unassign', 'reschedule', 'auto-assign'].includes(action)) {
+        requiredPermission = 'assign_jobs';
+      }
+
+      if (!await hasServerPermission(requiredPermission)) {
+         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
 
     let result;
 
@@ -112,7 +136,23 @@ export async function POST(
         break;
 
       case 'auto-assign':
-        result = await autoAssignJob(jobId, userData.business_id, {
+        // For auto-assign, we need businessId to find technicians
+        // If admin, we need to fetch the job's businessId first?
+        // autoAssignJob likely takes businessId.
+        
+        let targetBusinessId = businessId;
+        if (!targetBusinessId) {
+           // Fetch job's business ID
+           const supabase = await createClient();
+           const { data: job } = await supabase.from('jobs').select('business_id').eq('id', jobId).single();
+           if (job) targetBusinessId = job.business_id;
+        }
+
+        if (!targetBusinessId) {
+           return NextResponse.json({ error: 'Business ID required for auto-assign' }, { status: 400 });
+        }
+
+        result = await autoAssignJob(jobId, targetBusinessId, {
           preferClosest: data.preferClosest,
           preferLeastBusy: data.preferLeastBusy,
           excludeTechnicianIds: data.excludeTechnicianIds,

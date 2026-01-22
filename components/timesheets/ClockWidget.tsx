@@ -316,8 +316,8 @@ export default function ClockWidget({
               ) : (
                 // Clocked in view
                 <>
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Clock className="h-8 w-8 text-green-600" />
+                  <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Clock className="h-8 w-8 text-green-600 dark:text-green-400" />
                   </div>
                   <p className="text-sm text-text-muted mb-1">Clocked In</p>
                   <p className="text-3xl font-bold text-text font-mono mb-1">
@@ -328,15 +328,15 @@ export default function ClockWidget({
                   </p>
 
                   {status.activeJobTimer && (
-                    <div className="mb-4 p-2 bg-blue-50 rounded-lg">
-                      <div className="flex items-center justify-center gap-1 text-blue-700">
+                    <div className="mb-4 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <div className="flex items-center justify-center gap-1 text-blue-700 dark:text-blue-300">
                         <Briefcase className="h-3 w-3" />
                         <span className="text-xs font-medium">
                           Working on: {status.activeJobTimer.job?.service_type}
                         </span>
                       </div>
                       {status.activeJobTimer.job?.customer?.name && (
-                        <p className="text-xs text-blue-600 mt-0.5">
+                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
                           {status.activeJobTimer.job.customer.name}
                         </p>
                       )}

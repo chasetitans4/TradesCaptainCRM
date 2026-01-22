@@ -33,19 +33,32 @@ export async function POST(
 
     const token = await createImpersonationToken(admin.id, id);
 
-    // Return the impersonation URL
+    // SECURITY: Return URL without token in query params
+    // Token is set in HTTP-only cookie instead to prevent exposure in logs/history
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+    const impersonationUrl = `${baseUrl}/auth/impersonate`;
 
-    return NextResponse.json({
+    // Create response with impersonation token in secure HTTP-only cookie
+    const response = NextResponse.json({
       success: true,
-      impersonation_url: `${baseUrl}/auth/impersonate?token=${token}`,
-      token,
+      login_url: impersonationUrl,
       account: {
         id: account.id,
         business_name: account.business_name,
         owner_email: account.owner_email,
       },
     });
+
+    // Set token in HTTP-only cookie (secure, not accessible via JavaScript)
+    response.cookies.set('impersonation_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 60 * 5, // 5 minutes - short-lived for security
+      path: '/auth/impersonate',
+    });
+
+    return response;
   } catch (error) {
     apiLogger.error({
       msg: 'Error creating impersonation session',

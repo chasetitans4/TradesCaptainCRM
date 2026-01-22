@@ -6,7 +6,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getServerSession } from '@/lib/permissions/check-permission';
 import { getCallLog, updateCallLog, deleteCallLog } from '@/lib/calls';
 import { apiLogger } from '@/lib/logger';
 
@@ -16,14 +16,9 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
+    const session = await getServerSession();
 
-    // Get authenticated user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -49,14 +44,9 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
+    const session = await getServerSession();
 
-    // Get authenticated user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -80,25 +70,15 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
+    const session = await getServerSession();
 
-    // Get authenticated user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get user's role to check permissions
-    const { data: profile } = await supabase
-      .from('users')
-      .select('role')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile || (profile.role !== 'owner' && profile.role !== 'admin')) {
+    // session.user.role should be available
+    if (session.user.role !== 'owner' && session.user.role !== 'admin' && session.user.role !== 'super_admin') {
       return NextResponse.json(
         { error: 'Insufficient permissions' },
         { status: 403 }

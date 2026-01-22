@@ -130,13 +130,6 @@ export const OFFER_STACKING_RULES: Record<string, string[]> = {
 export const MAX_OFFERS_PER_SUBSCRIPTION = 2;
 
 // =====================================================
-// IN-MEMORY STORAGE (Replace with Supabase in production)
-// =====================================================
-
-const approvalRequests: Map<string, OfferApprovalRequest> = new Map();
-let requestCounter = 1000;
-
-// =====================================================
 // HELPER FUNCTIONS
 // =====================================================
 
@@ -421,85 +414,4 @@ export function calculateCommission(
     max_total_commission,
     commission_notes: notes,
   };
-}
-
-// =====================================================
-// APPROVAL REQUEST FUNCTIONS
-// =====================================================
-
-export async function createApprovalRequest(request: Omit<OfferApprovalRequest, 'id' | 'status' | 'requested_at'>): Promise<OfferApprovalRequest> {
-  requestCounter++;
-  const id = `apr_${Date.now()}_${requestCounter}`;
-
-  const fullRequest: OfferApprovalRequest = {
-    ...request,
-    id,
-    status: 'pending',
-    requested_at: new Date().toISOString(),
-  };
-
-  approvalRequests.set(id, fullRequest);
-  return fullRequest;
-}
-
-export async function getApprovalRequest(id: string): Promise<OfferApprovalRequest | null> {
-  return approvalRequests.get(id) || null;
-}
-
-export async function getPendingApprovalRequests(): Promise<OfferApprovalRequest[]> {
-  return Array.from(approvalRequests.values()).filter(r => r.status === 'pending');
-}
-
-export async function approveRequest(
-  id: string,
-  reviewedBy: string,
-  notes?: string
-): Promise<OfferApprovalRequest | null> {
-  const request = approvalRequests.get(id);
-  if (!request) return null;
-
-  request.status = 'approved';
-  request.reviewed_at = new Date().toISOString();
-  request.reviewed_by = reviewedBy;
-  request.review_notes = notes;
-
-  approvalRequests.set(id, request);
-  return request;
-}
-
-export async function denyRequest(
-  id: string,
-  reviewedBy: string,
-  notes?: string
-): Promise<OfferApprovalRequest | null> {
-  const request = approvalRequests.get(id);
-  if (!request) return null;
-
-  request.status = 'denied';
-  request.reviewed_at = new Date().toISOString();
-  request.reviewed_by = reviewedBy;
-  request.review_notes = notes;
-
-  approvalRequests.set(id, request);
-  return request;
-}
-
-// =====================================================
-// OFFER USAGE TRACKING
-// =====================================================
-
-export function incrementOfferUsage(offerCode: string): void {
-  const offer = OFFERS.find(o => o.code === offerCode);
-  if (offer) {
-    offer.current_uses++;
-  }
-}
-
-export function getOfferUsageStats(): { code: string; name: string; uses: number; max_uses?: number }[] {
-  return OFFERS.map(o => ({
-    code: o.code,
-    name: o.name,
-    uses: o.current_uses,
-    max_uses: o.max_uses,
-  }));
 }

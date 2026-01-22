@@ -10,31 +10,43 @@ import { recordCall, getCallLogs, getCallStats } from '@/lib/calls';
 import type { CallDirection, CallOutcome } from '@/types';
 import { apiLogger } from '@/lib/logger';
 
+import { getServerSession } from '@/lib/permissions/check-permission';
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
 
     // Get authenticated user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's business
-    const { data: profile } = await supabase
-      .from('users')
-      .select('business_id, role')
-      .eq('auth_user_id', user.id)
-      .single();
+    const { searchParams } = new URL(request.url);
+    let businessId = session.user.businessId;
 
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    // If admin, allow overriding businessId
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      const queryBusinessId = searchParams.get('businessId');
+      if (queryBusinessId) {
+        businessId = queryBusinessId;
+      }
     }
 
-    const { searchParams } = new URL(request.url);
+    if (!businessId && (session.user.role !== 'admin' && session.user.role !== 'super_admin')) {
+      return NextResponse.json({ error: 'User business not found' }, { status: 404 });
+    }
+
+    // If still no businessId (and is admin), we might need to return empty or error depending on logic
+    // But for calls, we likely need a business context. 
+    // If admin and no businessId provided, maybe return all calls? Or error?
+    // Let's assume error for now if businessId is required for the queries.
+    if (!businessId) {
+        // Fallback for admins who didn't provide businessId - maybe return nothing or error
+         return NextResponse.json({ error: 'Business ID required' }, { status: 400 });
+    }
+
     const direction = searchParams.get('direction') as CallDirection | null;
     const outcome = searchParams.get('outcome') as CallOutcome | null;
     const userId = searchParams.get('user_id');
@@ -50,7 +62,7 @@ export async function GET(request: NextRequest) {
     // If stats requested, return call statistics
     if (stats === 'true') {
       const callStats = await getCallStats(
-        profile.business_id,
+        businessId,
         startDate ? new Date(startDate) : undefined,
         endDate ? new Date(endDate) : undefined
       );
@@ -58,7 +70,7 @@ export async function GET(request: NextRequest) {
     }
 
     const result = await getCallLogs({
-      businessId: profile.business_id,
+      businessId: businessId,
       direction: direction || undefined,
       outcome: outcome || undefined,
       userId: userId || undefined,
@@ -86,26 +98,25 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
 
     // Get authenticated user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's business
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id, role')
-      .eq('auth_user_id', user.id)
-      .single();
+    let businessId = session.user.businessId;
+    const body = await request.json();
 
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    // If admin, allow overriding businessId from body
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      if (body.businessId) {
+        businessId = body.businessId;
+      }
     }
 
-    const body = await request.json();
+    if (!businessId) {
+      return NextResponse.json({ error: 'Business ID required' }, { status: 400 });
+    }
 
     const { phone, direction, duration_seconds, outcome, notes, customer_id, lead_id } = body;
 
@@ -116,7 +127,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const call = await recordCall(profile.business_id, {
+    const call = await recordCall(businessId, {
       phone,
       direction,
       duration_seconds,
@@ -124,7 +135,7 @@ export async function POST(request: NextRequest) {
       notes,
       customer_id,
       lead_id,
-      user_id: profile.id, // Set current user as the call handler
+      user_id: session.user.id, // Set current user as the call handler
     });
 
     return NextResponse.json(call, { status: 201 });

@@ -44,27 +44,30 @@ export async function POST(request: NextRequest) {
       maxRemindersPerInvoice = 5,
     } = body;
 
-    // First, update any invoices that should be marked as overdue
+    // OPTIMIZATION: Get all active businesses in a single query
     let businessIds: string[] = [];
     if (businessId) {
       businessIds = [businessId];
-      await updateOverdueInvoices(businessId);
     } else {
-      // Get all active businesses
       const { data: businesses } = await supabase
         .from('businesses')
         .select('id')
         .eq('status', 'active');
-
       businessIds = (businesses || []).map((b) => b.id);
-
-      // Update overdue status for all businesses
-      for (const bizId of businessIds) {
-        await updateOverdueInvoices(bizId);
-      }
     }
 
-    // Find invoices that need reminders
+    // OPTIMIZATION: Batch update overdue invoices for all businesses at once
+    // Instead of calling updateOverdueInvoices in a loop, use a single SQL update
+    const todayDateStr = new Date().toISOString().split('T')[0];
+    await supabase
+      .from('invoices')
+      .update({ status: 'overdue' })
+      .in('business_id', businessIds)
+      .in('status', ['sent', 'viewed', 'partial'])
+      .lt('due_date', todayDateStr)
+      .gt('amount_due', 0);
+
+    // OPTIMIZATION: Fetch ALL invoices for all businesses in a single query
     const today = new Date();
     const results: {
       sent: number;
@@ -73,87 +76,100 @@ export async function POST(request: NextRequest) {
       errors: string[];
     } = { sent: 0, failed: 0, skipped: 0, errors: [] };
 
-    for (const bizId of businessIds) {
-      // Get invoices with outstanding balance
-      let query = supabase
-        .from('invoices')
-        .select(`
-          id,
-          invoice_number,
-          due_date,
-          amount_due,
-          customer:customers (email),
-          reminders:invoice_reminders (sent_at)
-        `)
-        .eq('business_id', bizId)
-        .in('status', ['sent', 'viewed', 'overdue', 'partial'])
-        .gt('amount_due', 0);
+    const { data: allInvoices, error: fetchError } = await supabase
+      .from('invoices')
+      .select(`
+        id,
+        invoice_number,
+        due_date,
+        amount_due,
+        business_id,
+        customer:customers (email),
+        reminders:invoice_reminders (sent_at)
+      `)
+      .in('business_id', businessIds)
+      .in('status', ['sent', 'viewed', 'overdue', 'partial'])
+      .gt('amount_due', 0);
 
-      const { data: invoices, error } = await query;
+    if (fetchError) {
+      results.errors.push(`Failed to fetch invoices: ${fetchError.message}`);
+      return NextResponse.json({ success: false, ...results }, { status: 500 });
+    }
 
-      if (error) {
-        results.errors.push(`Failed to fetch invoices for business ${bizId}: ${error.message}`);
+    // Filter invoices that need reminders (all logic in memory - no additional queries)
+    const invoicesToRemind: string[] = [];
+    const todayStr = today.toISOString().split('T')[0];
+
+    for (const invoice of allInvoices || []) {
+      // Skip if customer has no email
+      const customer = (invoice as any).customer;
+      const customerEmail = Array.isArray(customer)
+        ? customer[0]?.email
+        : customer?.email;
+      if (!customerEmail) {
+        results.skipped++;
         continue;
       }
 
-      for (const invoice of invoices || []) {
-        // Skip if customer has no email
-        const customer = (invoice as any).customer;
-        const customerEmail = Array.isArray(customer)
-          ? customer[0]?.email
-          : customer?.email;
-        if (!customerEmail) {
-          results.skipped++;
-          continue;
-        }
+      // Check reminder count
+      const reminderCount = invoice.reminders?.length || 0;
+      if (reminderCount >= maxRemindersPerInvoice) {
+        results.skipped++;
+        continue;
+      }
 
-        // Check reminder count
-        const reminderCount = invoice.reminders?.length || 0;
-        if (reminderCount >= maxRemindersPerInvoice) {
-          results.skipped++;
-          continue;
-        }
+      // Calculate days until/since due date
+      const dueDate = new Date(invoice.due_date);
+      const daysDiff = Math.floor((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
-        // Calculate days until/since due date
-        const dueDate = new Date(invoice.due_date);
-        const daysDiff = Math.floor((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      // Determine if we should send a reminder
+      let shouldSend = false;
 
-        // Determine if we should send a reminder
-        let shouldSend = false;
+      // Upcoming due date reminder
+      if (daysDiff === daysBeforeDue) {
+        shouldSend = true;
+      }
 
-        // Upcoming due date reminder
-        if (daysDiff === daysBeforeDue) {
+      // Overdue reminders
+      if (daysDiff < 0) {
+        const daysOverdue = Math.abs(daysDiff);
+        if (daysAfterDue.includes(daysOverdue)) {
           shouldSend = true;
         }
+      }
 
-        // Overdue reminders
-        if (daysDiff < 0) {
-          const daysOverdue = Math.abs(daysDiff);
-          if (daysAfterDue.includes(daysOverdue)) {
-            shouldSend = true;
-          }
+      // Check if we already sent a reminder today
+      if (shouldSend && invoice.reminders?.length > 0) {
+        const sentToday = invoice.reminders.some((r: any) =>
+          r.sent_at?.startsWith(todayStr)
+        );
+        if (sentToday) {
+          shouldSend = false;
+          results.skipped++;
+          continue;
         }
+      }
 
-        // Check if we already sent a reminder today
-        if (shouldSend && invoice.reminders?.length > 0) {
-          const todayStr = today.toISOString().split('T')[0];
-          const sentToday = invoice.reminders.some((r: any) =>
-            r.sent_at?.startsWith(todayStr)
-          );
-          if (sentToday) {
-            shouldSend = false;
-            results.skipped++;
-          }
-        }
+      if (shouldSend) {
+        invoicesToRemind.push(invoice.id);
+      }
+    }
 
-        if (shouldSend) {
-          try {
-            await sendPaymentReminder(invoice.id);
-            results.sent++;
-          } catch (error) {
-            results.failed++;
-            results.errors.push(`Invoice ${invoice.invoice_number}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          }
+    // OPTIMIZATION: Send reminders in parallel batches (5 at a time to avoid overwhelming email service)
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < invoicesToRemind.length; i += BATCH_SIZE) {
+      const batch = invoicesToRemind.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        batch.map(invoiceId => sendPaymentReminder(invoiceId))
+      );
+
+      for (let j = 0; j < batchResults.length; j++) {
+        const result = batchResults[j];
+        if (result.status === 'fulfilled') {
+          results.sent++;
+        } else {
+          results.failed++;
+          results.errors.push(`Invoice ${batch[j]}: ${result.reason?.message || 'Unknown error'}`);
         }
       }
     }

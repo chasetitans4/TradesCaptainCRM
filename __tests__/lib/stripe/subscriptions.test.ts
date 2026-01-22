@@ -130,7 +130,7 @@ describe('lib/stripe/subscriptions', () => {
     await jest.isolateModulesAsync(async () => {
       process.env.STRIPE_SECRET_KEY = 'sk';
       process.env.STRIPE_PRICE_GROWTH_MONTHLY = 'price_growth';
-      const retrieve = jest.fn(async () => ({ items: { data: [{ id: 'si_1' }] } }));
+      const retrieve = jest.fn(async () => ({ items: { data: [{ id: 'si_1', price: { id: 'price_old' } }] } }));
       const update = jest.fn(async () => ({}));
       jest.doMock('stripe', () => {
         return class StripeMock {

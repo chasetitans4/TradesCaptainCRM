@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { exchangeCodeForTokens } from '@/lib/quickbooks/client';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { apiLogger } from '@/lib/logger';
+import { getServerSession } from '@/lib/permissions/check-permission';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -32,33 +33,30 @@ export async function GET(request: NextRequest) {
 
   try {
     const supabase = await createServerSupabaseClient();
+    const session = await getServerSession();
 
     // SECURITY: Verify the logged-in user is an owner of the business in the state parameter
     // This prevents attackers from connecting their QuickBooks to another business
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    if (!session?.user) {
       apiLogger.error({ msg: 'QuickBooks callback: No authenticated user', error: 'No authenticated user' });
       return NextResponse.redirect(
         new URL('/settings/integrations?error=unauthorized', request.url)
       );
     }
 
-    // Get the user's profile and verify they're an owner of the business
-    const { data: profile } = await supabase
-      .from('users')
-      .select('business_id, role')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile || profile.business_id !== state) {
+    // Get the user's business and verify they're an owner (or admin)
+    const isAdmin = session.user.role === 'admin' || session.user.role === 'super_admin';
+    
+    // For non-admins, ensure the session business matches the state
+    if (!isAdmin && session.user.businessId !== state) {
       apiLogger.error({ msg: 'QuickBooks callback: Business mismatch - possible CSRF attack', error: 'Business mismatch' });
       return NextResponse.redirect(
         new URL('/settings/integrations?error=state_mismatch', request.url)
       );
     }
 
-    // Only owners can connect QuickBooks (financial integration)
-    if (profile.role !== 'owner') {
+    // Only owners/admins can connect QuickBooks (financial integration)
+    if (!isAdmin && session.user.role !== 'owner') {
       apiLogger.error({ msg: 'QuickBooks callback: Non-owner attempted to connect', error: 'Permission denied' });
       return NextResponse.redirect(
         new URL('/settings/integrations?error=permission_denied', request.url)

@@ -38,6 +38,9 @@ jest.mock('@/lib/supabase/server', () => {
         }),
       }),
     }),
+    delete: () => ({
+      eq: () => Promise.resolve({ error: null }),
+    }),
   };
   const leadReassignments = {
     insert: (data: any) => {
@@ -90,13 +93,13 @@ describe('admin leads: reassign and stats', () => {
     expect(res.success).toBe(2);
   });
 
-  it('soft deletes lead', async () => {
+  it('deletes lead', async () => {
     const supabase = require('@/lib/supabase/server');
     const client = supabase.createAdminClient();
     const table = client.from('tc_leads');
-    const updateSpy = jest.spyOn(table, 'update');
+    const deleteSpy = jest.spyOn(table, 'delete');
     await deleteLead('lead-1');
-    expect(updateSpy).toHaveBeenCalled();
+    expect(deleteSpy).toHaveBeenCalled();
   });
 
   it('logs contact activity', async () => {

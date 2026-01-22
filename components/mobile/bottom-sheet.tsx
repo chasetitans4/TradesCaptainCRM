@@ -50,7 +50,7 @@ export function BottomSheet({
           )}
 
           {/* Content */}
-          <div className="p-4 pb-8 overflow-auto max-h-[85vh]">{children}</div>
+          <div className="p-4 pb-8 overflow-y-auto overscroll-contain max-h-[85vh] touch-pan-y">{children}</div>
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>

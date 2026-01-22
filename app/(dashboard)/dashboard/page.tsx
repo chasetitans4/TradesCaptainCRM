@@ -28,8 +28,11 @@ import {
   User,
   MapPin,
   RefreshCw,
+  Navigation,
 } from 'lucide-react';
 import { GlobalPauseToggle } from '@/components/automation/global-pause-toggle';
+import { RevenueWidget } from '@/components/dashboard/revenue-widget';
+import { AgingReportWidget } from '@/components/dashboard/aging-report';
 
 // Dashboard section types
 interface DashboardStats {
@@ -127,15 +130,15 @@ export default function DashboardPage() {
       let todayJobsQuery = supabase
         .from('jobs')
         .select(`
-          *,
-          customer:customers!jobs_customer_id_fkey (
-            id,
-            name,
-            phone,
-            address_line1,
-            city
-          )
-        `)
+            *,
+            customer:customers!jobs_customer_id_fkey (
+              id,
+              name,
+              phone,
+              address_line1,
+              city
+            )
+          `)
         .gte('scheduled_date', todayStart.toISOString())
         .lt('scheduled_date', todayEnd.toISOString())
         .not('status', 'in', '("completed","cancelled")')
@@ -153,15 +156,15 @@ export default function DashboardPage() {
       let tomorrowJobsQuery = supabase
         .from('jobs')
         .select(`
-          *,
-          customer:customers!jobs_customer_id_fkey (
-            id,
-            name,
-            phone,
-            address_line1,
-            city
-          )
-        `)
+            *,
+            customer:customers!jobs_customer_id_fkey (
+              id,
+              name,
+              phone,
+              address_line1,
+              city
+            )
+          `)
         .gte('scheduled_date', todayEnd.toISOString())
         .lt('scheduled_date', tomorrowEnd.toISOString())
         .not('status', 'in', '("completed","cancelled")')
@@ -206,7 +209,7 @@ export default function DashboardPage() {
           .from('leads')
           .select(`
             *,
-            customer:customers (
+            customer:customers!leads_customer_id_fkey (
               id,
               name,
               phone
@@ -226,25 +229,37 @@ export default function DashboardPage() {
           .from('sms_conversations')
           .select(`
             *,
-            customer:customers (id, name, phone)
+            customer:customers!sms_conversations_customer_id_fkey (id, name, phone)
           `)
           .eq('business_id', user.business_id)
           .not('last_customer_message_at', 'is', null)
           .order('last_customer_message_at', { ascending: false })
           .limit(10);
 
-        // For each, get last message to check if it needs reply
+        // Batch fetch last messages for all conversations in a single query
+        const conversationIds = (convos || []).map(c => c.id);
+
+        const { data: lastMessages } = conversationIds.length > 0
+          ? await supabase
+              .from('sms_messages')
+              .select('id, body, direction, created_at, conversation_id')
+              .in('conversation_id', conversationIds)
+              .order('created_at', { ascending: false })
+          : { data: [] as { id: string; body: string; direction: string; created_at: string; conversation_id: string }[] };
+
+        // Group messages by conversation and take the first (most recent) for each
+        type MessageType = { id: string; body: string; direction: string; created_at: string; conversation_id: string };
+        const messagesByConvo = new Map<string, MessageType>();
+        for (const msg of lastMessages || []) {
+          if (!messagesByConvo.has(msg.conversation_id)) {
+            messagesByConvo.set(msg.conversation_id, msg);
+          }
+        }
+
+        // Filter conversations where last message was inbound (needs reply)
         const unrepliedConvos: UnrepliedConversation[] = [];
         for (const convo of convos || []) {
-          const { data: messages } = await supabase
-            .from('sms_messages')
-            .select('id, body, direction, created_at')
-            .eq('conversation_id', convo.id)
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-          const lastMsg = messages?.[0];
-          // If last message was inbound (from customer), it needs a reply
+          const lastMsg = messagesByConvo.get(convo.id);
           if (lastMsg && lastMsg.direction === 'inbound') {
             unrepliedConvos.push({
               ...convo,
@@ -272,9 +287,17 @@ export default function DashboardPage() {
   }, [user]);
 
   useEffect(() => {
+    let isMounted = true;
+
     if (user) {
-      loadDashboardData();
+      loadDashboardData().catch(() => {
+        // Error already logged in loadDashboardData
+      });
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [user, loadDashboardData]);
 
   // Pull to refresh handler
@@ -343,6 +366,7 @@ export default function DashboardPage() {
               size="icon-sm"
               onClick={handleRefresh}
               disabled={refreshing}
+              aria-label={refreshing ? 'Refreshing dashboard data' : 'Refresh dashboard data'}
             >
               <RefreshCw className={cn('h-5 w-5', refreshing && 'animate-spin')} />
             </Button>
@@ -359,6 +383,29 @@ export default function DashboardPage() {
 
       {/* Main Content */}
       <div className="px-4 py-4 space-y-6">
+        {/* Next Job Card - Shows for technicians and anyone with today's jobs */}
+        {todayJobs.length > 0 && (() => {
+          // Find the next job: first in_progress job, or first scheduled job
+          const inProgressJob = todayJobs.find(j => j.status === 'in_progress');
+          const nextScheduledJob = todayJobs.find(j => j.status === 'scheduled');
+          const nextJob = inProgressJob || nextScheduledJob;
+
+          if (nextJob && nextJob.customer?.id) {
+            return <NextJobCard job={nextJob} />;
+          }
+          return null;
+        })()}
+
+        {/* Revenue Widget - Owners/Admins only */}
+        {shouldShowSection('stats') && (
+          <RevenueWidget />
+        )}
+
+        {/* Invoice Aging Report - Owners/Admins only */}
+        {shouldShowSection('stats') && (
+          <AgingReportWidget compact />
+        )}
+
         {/* Quick Stats - Owners/Admins only */}
         {shouldShowSection('stats') && stats && (
           <div className="grid grid-cols-2 gap-3">
@@ -692,6 +739,60 @@ function JobCard({ job, showDate: _showDate = false }: { job: TodayJob; showDate
   );
 }
 
+function NextJobCard({ job }: { job: TodayJob }) {
+  const statusColors: Record<string, string> = {
+    scheduled: 'bg-info/10 text-info',
+    in_progress: 'bg-warning/10 text-warning',
+    completed: 'bg-success/10 text-success',
+    cancelled: 'bg-danger/10 text-danger',
+    no_show: 'bg-muted/10 text-muted-foreground',
+  };
+
+  return (
+    <div className="card p-4 border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="p-2 rounded-lg bg-primary/20">
+          <Navigation className="h-5 w-5 text-primary" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-text">Next Job</h3>
+          <p className="text-xs text-text-muted">
+            {job.scheduled_time ? `Scheduled for ${job.scheduled_time}` : 'Scheduled for today'}
+          </p>
+        </div>
+        <Badge className={cn('ml-auto shrink-0', statusColors[job.status])}>
+          {job.status.replace('_', ' ')}
+        </Badge>
+      </div>
+
+      <div className="mb-3">
+        <p className="font-medium text-text">{job.title}</p>
+        <p className="text-sm text-text-muted">{job.customer?.name}</p>
+        {job.customer?.address_line1 && (
+          <p className="text-xs text-text-muted mt-1">
+            <MapPin className="h-3 w-3 inline mr-1" />
+            {job.customer.address_line1}{job.customer.city ? `, ${job.customer.city}` : ''}
+          </p>
+        )}
+      </div>
+
+      <Link
+        href={`/customers/${job.customer?.id}`}
+        className="block w-full"
+      >
+        <Button className="w-full" size="lg">
+          <User className="h-4 w-4 mr-2" />
+          View Customer & Route
+        </Button>
+      </Link>
+
+      <p className="text-xs text-text-muted text-center mt-2">
+        View customer details before navigating
+      </p>
+    </div>
+  );
+}
+
 function LeadCard({ lead }: { lead: RecentLead }) {
   const statusColors: Record<string, string> = {
     new: 'bg-primary/10 text-primary',
@@ -833,8 +934,10 @@ function QuickActionsButton({ userRole }: { userRole: UserRole }) {
           'fab z-50',
           open && 'rotate-45'
         )}
+        aria-label={open ? 'Close quick actions menu' : 'Open quick actions menu'}
+        aria-expanded={open}
       >
-        <Plus className="h-6 w-6" />
+        <Plus className="h-6 w-6" aria-hidden="true" />
       </button>
     </>
   );

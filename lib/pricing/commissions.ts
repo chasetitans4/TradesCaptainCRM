@@ -1,6 +1,8 @@
 // =====================================================
-// TRADESCAPTAIN COMMISSION TRACKING - v5.9
+// TRADESCAPTAIN COMMISSION TRACKING - v6.0
 // Complete commission rates for all plans
+// Updated: January 2025
+// Changes: Removed bundles, renamed SEO to SEO/AEO, added extra_user
 // =====================================================
 //
 // Commission Structure:
@@ -20,7 +22,7 @@
 // Same-Day Rule: Commission cannot be paid same day as client payment
 // =====================================================
 
-import type { PlanTrack } from './plans';
+import type { PlanTrack, LegacyPlanTrack } from './plans';
 
 export interface CommissionRate {
   plan_id: string;
@@ -33,7 +35,8 @@ export interface CommissionRate {
 }
 
 // =====================================================
-// LEADS CAPTAIN COMMISSIONS - v5.9
+// LEADS CAPTAIN COMMISSIONS - DISCONTINUED (v6.0)
+// Now included in Blue Pro/Enterprise
 // =====================================================
 
 export const LEADS_CAPTAIN_COMMISSIONS: CommissionRate[] = [
@@ -49,7 +52,8 @@ export const LEADS_CAPTAIN_COMMISSIONS: CommissionRate[] = [
 ];
 
 // =====================================================
-// BLUE CRM COMMISSIONS - v5.9
+// BLUE CRM COMMISSIONS - v6.0
+// Pro/Enterprise include AI SMS (formerly Leads Captain)
 // =====================================================
 
 export const BLUE_COMMISSIONS: CommissionRate[] = [
@@ -83,7 +87,7 @@ export const BLUE_COMMISSIONS: CommissionRate[] = [
 ];
 
 // =====================================================
-// WEB COMMISSIONS - v5.9
+// WEB COMMISSIONS - v6.0
 // =====================================================
 
 export const WEB_COMMISSIONS: CommissionRate[] = [
@@ -117,12 +121,12 @@ export const WEB_COMMISSIONS: CommissionRate[] = [
 ];
 
 // =====================================================
-// LOCAL SEO COMMISSIONS - v5.9
+// SEO/AEO COMMISSIONS - v6.0 (renamed from Local SEO)
 // =====================================================
 
-export const SEO_COMMISSIONS: CommissionRate[] = [
+export const SEO_AEO_COMMISSIONS: CommissionRate[] = [
   {
-    plan_id: 'seo_starter',
+    plan_id: 'seo_aeo_starter',
     monthly_price: 99,
     upfront_commission: 49.50, // 50%
     recurring_10_commission: 9.90, // 10%
@@ -131,7 +135,7 @@ export const SEO_COMMISSIONS: CommissionRate[] = [
     annual_commission: 354, // 35%
   },
   {
-    plan_id: 'seo_pro',
+    plan_id: 'seo_aeo_pro',
     monthly_price: 199,
     upfront_commission: 99.50, // 50%
     recurring_10_commission: 19.90, // 10%
@@ -140,18 +144,21 @@ export const SEO_COMMISSIONS: CommissionRate[] = [
     annual_commission: 711, // 35%
   },
   {
-    plan_id: 'seo_enterprise',
-    monthly_price: 249,
-    upfront_commission: 124.50, // 50%
-    recurring_10_commission: 24.90, // 10%
-    recurring_15_commission: 37.35, // 15%
-    annual_price: 2540,
-    annual_commission: 889, // 35%
+    plan_id: 'seo_aeo_enterprise',
+    monthly_price: 299, // Updated from $249 to $299 per v6.0
+    upfront_commission: 149.50, // 50%
+    recurring_10_commission: 29.90, // 10%
+    recurring_15_commission: 44.85, // 15%
+    annual_price: 3050, // 15% discount
+    annual_commission: 1068, // 35%
   },
 ];
 
+// Legacy SEO_COMMISSIONS alias for backward compatibility
+export const SEO_COMMISSIONS = SEO_AEO_COMMISSIONS;
+
 // =====================================================
-// SILVER BUNDLE COMMISSIONS - v5.9
+// SILVER BUNDLE COMMISSIONS - DISCONTINUED (v6.0)
 // =====================================================
 
 export const SILVER_COMMISSIONS: CommissionRate[] = [
@@ -185,7 +192,7 @@ export const SILVER_COMMISSIONS: CommissionRate[] = [
 ];
 
 // =====================================================
-// GOLD BUNDLE COMMISSIONS - v5.9
+// GOLD BUNDLE COMMISSIONS - DISCONTINUED (v6.0)
 // =====================================================
 
 export const GOLD_COMMISSIONS: CommissionRate[] = [
@@ -219,10 +226,19 @@ export const GOLD_COMMISSIONS: CommissionRate[] = [
 ];
 
 // =====================================================
-// ADD-ON COMMISSIONS - v5.9
+// ADD-ON COMMISSIONS - v6.0
 // =====================================================
 
 export const ADDON_COMMISSIONS = {
+  extra_user: {
+    addon_id: 'extra_user',
+    price: 10,
+    commission: 5, // 50% upfront
+    recurring_10_commission: 1, // 10%
+    recurring_15_commission: 1.50, // 15%
+    billing_type: 'recurring' as const,
+    notes: 'Additional user seat for Blue CRM plans. Same commission structure as plans.',
+  },
   background_video: {
     addon_id: 'background_video',
     price: 99,
@@ -261,7 +277,7 @@ export const REFERRAL_BONUS = {
 };
 
 // =====================================================
-// RETENTION BONUSES - v5.9
+// RETENTION BONUSES - v6.0
 // (For monthly billing only)
 // =====================================================
 
@@ -284,25 +300,44 @@ export const RETENTION_BONUS_TOTAL = 190; // Max possible per customer
 // HELPER FUNCTIONS
 // =====================================================
 
+// Active commissions only (v6.0 products)
 export const ALL_COMMISSIONS: CommissionRate[] = [
-  ...LEADS_CAPTAIN_COMMISSIONS,
   ...BLUE_COMMISSIONS,
   ...WEB_COMMISSIONS,
-  ...SEO_COMMISSIONS,
+  ...SEO_AEO_COMMISSIONS,
+];
+
+// Legacy commissions (discontinued products - for existing subscriptions)
+export const LEGACY_COMMISSIONS: CommissionRate[] = [
+  ...LEADS_CAPTAIN_COMMISSIONS,
   ...SILVER_COMMISSIONS,
   ...GOLD_COMMISSIONS,
 ];
 
+// All commissions including legacy (for lookups)
+export const ALL_COMMISSIONS_WITH_LEGACY: CommissionRate[] = [
+  ...ALL_COMMISSIONS,
+  ...LEGACY_COMMISSIONS,
+];
+
 export function getCommissionRate(planId: string): CommissionRate | undefined {
+  // Search all commissions including legacy for backward compatibility
+  return ALL_COMMISSIONS_WITH_LEGACY.find(c => c.plan_id === planId);
+}
+
+export function getActiveCommissionRate(planId: string): CommissionRate | undefined {
   return ALL_COMMISSIONS.find(c => c.plan_id === planId);
 }
 
-export function getCommissionsByTrack(track: PlanTrack): CommissionRate[] {
+export function getCommissionsByTrack(track: PlanTrack | LegacyPlanTrack): CommissionRate[] {
   switch (track) {
-    case 'leads_captain': return LEADS_CAPTAIN_COMMISSIONS;
+    // Active tracks
     case 'blue': return BLUE_COMMISSIONS;
     case 'web': return WEB_COMMISSIONS;
-    case 'seo': return SEO_COMMISSIONS;
+    case 'seo_aeo': return SEO_AEO_COMMISSIONS;
+    // Legacy tracks
+    case 'leads_captain': return LEADS_CAPTAIN_COMMISSIONS;
+    case 'seo': return SEO_AEO_COMMISSIONS; // Redirects to new SEO/AEO
     case 'silver': return SILVER_COMMISSIONS;
     case 'gold': return GOLD_COMMISSIONS;
     default: return [];
@@ -382,7 +417,7 @@ export function calculateTotalPotentialCommission(
 }
 
 // =====================================================
-// COMMISSION PAYMENT SCHEDULE - v5.9
+// COMMISSION PAYMENT SCHEDULE - v6.0
 // =====================================================
 
 export interface CommissionScheduleEntry {
@@ -460,7 +495,7 @@ export function generateCommissionSchedule(
 }
 
 // =====================================================
-// MULTI-LOCATION PRICING - v5.9
+// MULTI-LOCATION PRICING - v6.0
 // =====================================================
 
 export const MULTI_LOCATION_DISCOUNTS = {

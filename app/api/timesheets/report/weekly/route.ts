@@ -8,32 +8,34 @@ import { createClient } from '@/lib/supabase/server';
 import { startOfWeek, endOfWeek, parseISO, format, eachDayOfInterval } from 'date-fns';
 import { apiLogger } from '@/lib/logger';
 
+import { getServerSession } from '@/lib/permissions/check-permission';
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id, role')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     // Parse query params
     const searchParams = request.nextUrl.searchParams;
     const weekOf = searchParams.get('week_of') || new Date().toISOString();
     const userId = searchParams.get('user_id');
+
+    let businessId = session.user.businessId;
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      const queryBusinessId = searchParams.get('businessId');
+      if (queryBusinessId) businessId = queryBusinessId;
+    }
+
+    if (!businessId) {
+        if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+            return NextResponse.json({ error: 'Business ID required' }, { status: 400 });
+        }
+        return NextResponse.json({ error: 'User business not found' }, { status: 404 });
+    }
 
     const weekDate = parseISO(weekOf);
     const weekStart = startOfWeek(weekDate, { weekStartsOn: 1 });
@@ -44,16 +46,16 @@ export async function GET(request: NextRequest) {
       .from('timesheets')
       .select(`
         *,
-        user:users!timesheets_user_id_fkey(id, first_name, last_name)
+        user:users!timesheets_user_id_fkey(id, name)
       `)
-      .eq('business_id', profile.business_id)
+      .eq('business_id', businessId)
       .gte('clock_in_time', format(weekStart, 'yyyy-MM-dd'))
       .lte('clock_in_time', format(weekEnd, 'yyyy-MM-dd'))
       .order('clock_in_time', { ascending: true });
 
     // Filter by user - technicians only see their own
-    if (profile.role === 'technician') {
-      query = query.eq('user_id', profile.id);
+    if (session.user.role === 'technician') {
+      query = query.eq('user_id', session.user.id);
     } else if (userId) {
       query = query.eq('user_id', userId);
     }

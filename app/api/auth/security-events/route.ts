@@ -7,15 +7,15 @@ import {
 } from '@/lib/auth/audit';
 import { apiLogger } from '@/lib/logger';
 
+import { getServerSession } from '@/lib/permissions/check-permission';
+
 // GET - Get security events
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -26,17 +26,13 @@ export async function GET(request: NextRequest) {
     const riskLevels = searchParams.get('riskLevels')?.split(',');
     const eventTypes = searchParams.get('eventTypes')?.split(',');
 
-    // Get user's business ID for admin queries
-    const { data: profile } = await supabase
-      .from('users')
-      .select('business_id, role')
-      .eq('id', user.id)
-      .single();
+    const businessId = session.user.businessId;
+    const role = session.user.role;
 
     switch (view) {
       case 'summary': {
         // Business security summary (admin only)
-        if (!profile?.business_id || !['owner', 'admin'].includes(profile?.role)) {
+        if (!businessId || !['owner', 'admin', 'super_admin'].includes(role)) {
           return NextResponse.json(
             { error: 'Unauthorized to view business summary' },
             { status: 403 }
@@ -44,27 +40,27 @@ export async function GET(request: NextRequest) {
         }
 
         const days = parseInt(searchParams.get('days') || '30');
-        const summary = await getSecuritySummary(profile.business_id, days);
+        const summary = await getSecuritySummary(businessId, days);
         return NextResponse.json(summary);
       }
 
       case 'business': {
         // High-risk events for business (admin only)
-        if (!profile?.business_id || !['owner', 'admin'].includes(profile?.role)) {
+        if (!businessId || !['owner', 'admin', 'super_admin'].includes(role)) {
           return NextResponse.json(
             { error: 'Unauthorized to view business events' },
             { status: 403 }
           );
         }
 
-        const events = await getHighRiskEvents(profile.business_id, limit);
+        const events = await getHighRiskEvents(businessId, limit);
         return NextResponse.json({ events });
       }
 
       case 'user':
       default: {
         // User's own security events
-        const { events, total } = await getUserSecurityEvents(user.id, {
+        const { events, total } = await getUserSecurityEvents(session.user.id, {
           limit,
           offset,
           riskLevels: riskLevels as any,

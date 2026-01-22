@@ -15,10 +15,10 @@ export async function getTeamMembers(businessId: string) {
 
   const { data, error } = await supabase
     .from('users')
-    .select('id, name, email, role, avatar_url, status, created_at, accepted_at')
+    .select('id, first_name, last_name, email, role, avatar_url, status, created_at, accepted_at')
     .eq('business_id', businessId)
     .order('role') // owner first
-    .order('name');
+    .order('first_name');
 
   if (error) {
     teamLogger.error({
@@ -29,7 +29,11 @@ export async function getTeamMembers(businessId: string) {
     throw error;
   }
 
-  return data || [];
+  return (data || []).map((user: any) => ({
+    ...user,
+    name: `${user.first_name} ${user.last_name}`,
+    full_name: `${user.first_name} ${user.last_name}`,
+  }));
 }
 
 /**
@@ -211,7 +215,7 @@ export async function transferOwnership(
   // Verify current user is owner
   const { data: currentOwner } = await supabase
     .from('users')
-    .select('role, business_id, name')
+    .select('role, business_id, first_name, last_name')
     .eq('id', currentOwnerId)
     .single();
 
@@ -222,7 +226,7 @@ export async function transferOwnership(
   // Verify new owner is in same business and is active
   const { data: newOwner } = await supabase
     .from('users')
-    .select('business_id, status, name, email')
+    .select('business_id, status, first_name, last_name, email')
     .eq('id', newOwnerId)
     .single();
 
@@ -267,9 +271,12 @@ export async function transferOwnership(
 
   // Send email to new owner
   if (newOwner?.email && business?.name) {
+    const newOwnerName = `${newOwner.first_name} ${newOwner.last_name}`;
+    const oldOwnerName = `${currentOwner.first_name} ${currentOwner.last_name}`;
+    
     const html = getOwnershipTransferEmailHtml({
-      newOwnerName: newOwner.name || 'New Owner',
-      oldOwnerName: currentOwner.name || 'Previous Owner',
+      newOwnerName: newOwnerName || 'New Owner',
+      oldOwnerName: oldOwnerName || 'Previous Owner',
       businessName: business.name,
       dashboardUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
     });
@@ -297,7 +304,7 @@ export async function getTeamMember(memberId: string, requesterId: string) {
 
   const { data: member, error } = await supabase
     .from('users')
-    .select('id, name, email, role, avatar_url, phone, status, created_at, accepted_at')
+    .select('id, first_name, last_name, email, role, avatar_url, phone, status, created_at, accepted_at')
     .eq('id', memberId)
     .eq('business_id', requester?.business_id)
     .single();
@@ -306,5 +313,9 @@ export async function getTeamMember(memberId: string, requesterId: string) {
     throw new Error('Member not found');
   }
 
-  return member;
+  return {
+    ...member,
+    name: `${member.first_name} ${member.last_name}`,
+    full_name: `${member.first_name} ${member.last_name}`,
+  };
 }

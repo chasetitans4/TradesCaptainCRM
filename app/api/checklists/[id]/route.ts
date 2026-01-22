@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { updateChecklistItem, deleteChecklistTemplate } from '@/lib/checklists';
+import { checkPermission } from '@/lib/permissions/check-permission';
 import { apiLogger } from '@/lib/logger';
 
 export async function PATCH(
@@ -48,17 +49,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await checkPermission('manage_checklists');
     const profile = await getServerUserProfile();
 
     if (!profile) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only admin/owner can delete templates
-    if (!['owner', 'admin'].includes(profile.role)) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
-
+    // Only admin/owner can delete templates - enforced by checkPermission('manage_checklists') now
+    
     const { id } = await params;
 
     await deleteChecklistTemplate(id);

@@ -27,7 +27,7 @@ export async function GET(
       .from('quotes')
       .select(`
         *,
-        customer:customers (*),
+        customer:customers!customer_id (*),
         items:quote_items (*)
       `)
       .eq('id', id)

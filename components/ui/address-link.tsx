@@ -16,6 +16,7 @@ interface AddressLinkProps {
   className?: string;
   iconClassName?: string;
   onClick?: React.MouseEventHandler<HTMLAnchorElement>;
+  children?: React.ReactNode;
 }
 
 export function AddressLink({
@@ -30,6 +31,7 @@ export function AddressLink({
   className,
   iconClassName,
   onClick,
+  children,
 }: AddressLinkProps) {
   const fullAddress = formatFullAddress({ address, city, state, zip });
 
@@ -52,12 +54,18 @@ export function AddressLink({
       )}
       onClick={onClick}
     >
-      {showIcon && (
-        <MapPin className={cn('h-4 w-4 flex-shrink-0', iconClassName)} />
-      )}
-      <span className="break-words">{fullAddress}</span>
-      {showNavigationIcon && (
-        <Navigation className="h-3 w-3 flex-shrink-0 opacity-50" />
+      {children ? (
+        children
+      ) : (
+        <>
+          {showIcon && (
+            <MapPin className={cn('h-4 w-4 flex-shrink-0', iconClassName)} />
+          )}
+          <span className="break-words">{fullAddress}</span>
+          {showNavigationIcon && (
+            <Navigation className="h-3 w-3 flex-shrink-0 opacity-50" />
+          )}
+        </>
       )}
     </a>
   );

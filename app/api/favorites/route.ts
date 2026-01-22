@@ -15,33 +15,21 @@ import {
 } from '@/lib/favorites';
 import { apiLogger } from '@/lib/logger';
 
+import { getServerSession } from '@/lib/permissions/check-permission';
+
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     const { searchParams } = new URL(request.url);
     const entityType = searchParams.get('type') as EntityType | null;
 
     const favorites = await getFavorites(
-      profile.id,
+      session.user.id,
       entityType || undefined
     );
 
@@ -57,24 +45,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     const body = await request.json();
@@ -87,7 +61,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await toggleFavorite(profile.id, entityType, entityId);
+    const result = await toggleFavorite(session.user.id, entityType, entityId);
 
     return NextResponse.json(result);
   } catch (error) {

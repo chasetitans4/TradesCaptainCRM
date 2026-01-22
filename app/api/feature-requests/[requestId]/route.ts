@@ -9,6 +9,7 @@ import {
   getFeatureRequest,
   updateFeatureRequest,
 } from '@/lib/feature-requests';
+import { checkPermission } from '@/lib/permissions/check-permission';
 import { apiLogger } from '@/lib/logger';
 
 // GET - Get single feature request
@@ -17,6 +18,7 @@ export async function GET(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
+    await checkPermission('view_feature_requests');
     const { requestId } = await params;
     const featureRequest = await getFeatureRequest(requestId);
 
@@ -43,6 +45,7 @@ export async function PATCH(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
+    await checkPermission('manage_feature_requests');
     const { requestId } = await params;
     const body = await request.json();
     const { status, priority, category, admin_notes, estimated_timeline, assigned_to, reviewed_by } = body;

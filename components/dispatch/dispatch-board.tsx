@@ -108,9 +108,10 @@ export interface DispatchTechnician {
 
 interface DispatchBoardProps {
   initialDate?: Date;
+  businessId?: string;
 }
 
-export function DispatchBoard({ initialDate = new Date() }: DispatchBoardProps) {
+export function DispatchBoard({ initialDate = new Date(), businessId }: DispatchBoardProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
   const [jobs, setJobs] = useState<DispatchJob[]>([]);
@@ -143,10 +144,14 @@ export function DispatchBoard({ initialDate = new Date() }: DispatchBoardProps) 
           ? format(addDays(startOfWeek(selectedDate), 6), 'yyyy-MM-dd')
           : dateStr;
 
+      const businessQuery = businessId ? `&businessId=${businessId}` : '';
+      const queryPrefix = businessId ? `?businessId=${businessId}` : '';
+      const unassignedPrefix = businessId ? `&` : `?`;
+
       const [jobsRes, techsRes, unassignedRes] = await Promise.all([
-        fetch(`/api/dispatch/jobs?startDate=${dateStr}&endDate=${endDateStr}`),
-        fetch('/api/dispatch/technicians'),
-        fetch('/api/dispatch/jobs?unassigned=true'),
+        fetch(`/api/dispatch/jobs?startDate=${dateStr}&endDate=${endDateStr}${businessQuery}`),
+        fetch(`/api/dispatch/technicians${queryPrefix}`),
+        fetch(`/api/dispatch/jobs?unassigned=true${businessQuery}`),
       ]);
 
       if (jobsRes.ok) {

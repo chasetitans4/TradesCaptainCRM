@@ -9,20 +9,20 @@ import {
 import { cookies } from 'next/headers';
 import { apiLogger } from '@/lib/logger';
 
+import { getServerSession } from '@/lib/permissions/check-permission';
+
 // GET - Get user's active sessions
 export async function GET() {
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const sessions = await getUserSessions(user.id);
-    const count = await getActiveSessionCount(user.id);
+    const sessions = await getUserSessions(session.user.id);
+    const count = await getActiveSessionCount(session.user.id);
 
     return NextResponse.json({
       sessions,
@@ -37,12 +37,9 @@ export async function GET() {
 // DELETE - Revoke session(s)
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -66,13 +63,13 @@ export async function DELETE(request: NextRequest) {
         );
       }
 
-      const count = await revokeAllOtherSessions(user.id, sessionToken);
+      const count = await revokeAllOtherSessions(session.user.id, sessionToken);
       return NextResponse.json({
         success: true,
         revokedCount: count,
       });
     } else if (sessionId) {
-      await revokeSession(user.id, sessionId);
+      await revokeSession(session.user.id, sessionId);
       return NextResponse.json({ success: true });
     } else {
       return NextResponse.json(

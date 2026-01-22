@@ -1,6 +1,7 @@
 // =====================================================
 // JOB SYNC LOGIC
 // Automatically sync jobs to external calendar
+// Feature flag: Set NYLAS_ENABLED=false to disable for cost savings
 // =====================================================
 
 import {
@@ -10,13 +11,27 @@ import {
 } from './calendar';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
+/**
+ * Check if Nylas calendar sync is enabled
+ * Feature flag to disable Nylas for cost savings when not needed
+ * Set NYLAS_ENABLED=false in environment to disable
+ */
+function isNylasSyncEnabled(): boolean {
+  // Disable if NYLAS_ENABLED is explicitly set to 'false'
+  if (process.env.NYLAS_ENABLED === 'false') {
+    return false;
+  }
+  // Default to enabled if Nylas API key is configured
+  return !!process.env.NYLAS_API_KEY;
+}
+
 interface JobWithCustomer {
   id: string;
   service_type: string;
   description?: string | null;
   scheduled_date: string;
   scheduled_time_start?: string | null;
-  assigned_to?: string | null;
+  assigned_user_id?: string | null;
   external_calendar_event_id?: string | null;
   customer?: {
     name: string;
@@ -39,7 +54,12 @@ export async function syncJobToCalendar(
   job: JobWithCustomer,
   action: 'create' | 'update' | 'delete'
 ): Promise<void> {
-  if (!job.assigned_to) {
+  // Check feature flag - skip if Nylas is disabled
+  if (!isNylasSyncEnabled()) {
+    return;
+  }
+
+  if (!job.assigned_user_id) {
     return; // No user assigned, nothing to sync
   }
 
@@ -49,7 +69,7 @@ export async function syncJobToCalendar(
   const { data: connection } = await supabase
     .from('calendar_connections')
     .select('*')
-    .eq('user_id', job.assigned_to)
+    .eq('user_id', job.assigned_user_id)
     .single();
 
   // If no calendar connected or sync disabled, skip silently
@@ -94,7 +114,7 @@ export async function syncJobToCalendar(
 
   switch (action) {
     case 'create':
-      const eventId = await createCalendarEvent(job.assigned_to, jobForCalendar);
+      const eventId = await createCalendarEvent(job.assigned_user_id, jobForCalendar);
 
       if (eventId) {
         await supabase
@@ -107,13 +127,13 @@ export async function syncJobToCalendar(
     case 'update':
       if (job.external_calendar_event_id) {
         await updateCalendarEvent(
-          job.assigned_to,
+          job.assigned_user_id,
           job.external_calendar_event_id,
           jobForCalendar
         );
       } else {
         // No existing event, create one
-        const newEventId = await createCalendarEvent(job.assigned_to, jobForCalendar);
+        const newEventId = await createCalendarEvent(job.assigned_user_id, jobForCalendar);
         if (newEventId) {
           await supabase
             .from('jobs')
@@ -125,7 +145,7 @@ export async function syncJobToCalendar(
 
     case 'delete':
       if (job.external_calendar_event_id) {
-        await deleteCalendarEvent(job.assigned_to, job.external_calendar_event_id);
+        await deleteCalendarEvent(job.assigned_user_id, job.external_calendar_event_id);
         await supabase
           .from('jobs')
           .update({ external_calendar_event_id: null })

@@ -9,43 +9,47 @@ import { apiLogger } from '@/lib/logger';
 import { getExpenseSummary } from '@/lib/expenses';
 import { parseISO, startOfMonth, endOfMonth } from 'date-fns';
 
+import { getServerSession } from '@/lib/permissions/check-permission';
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id, role')
-      .eq('auth_user_id', user.id)
-      .single();
+    // Parse query params (need to do this first to get businessId potentially)
+    const searchParamsObj = request.nextUrl.searchParams;
+    const startDate = searchParamsObj.get('start_date');
+    const endDate = searchParamsObj.get('end_date');
+    const userId = searchParamsObj.get('user_id');
 
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    let businessId = session.user.businessId;
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      const queryBusinessId = searchParamsObj.get('businessId');
+      if (queryBusinessId) businessId = queryBusinessId;
     }
 
-    // Parse query params
-    const searchParams = request.nextUrl.searchParams;
-    const startDate = searchParams.get('start_date');
-    const endDate = searchParams.get('end_date');
-    const userId = searchParams.get('user_id');
+    if (!businessId) {
+        if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+             // Return empty summary or error? Summary function might need businessId.
+             // Let's return error for now as summary without business context is ambiguous.
+             return NextResponse.json({ error: 'Business ID required' }, { status: 400 });
+        }
+        return NextResponse.json({ error: 'User business not found' }, { status: 404 });
+    }
 
     // Default to current month
     const start = startDate ? parseISO(startDate) : startOfMonth(new Date());
     const end = endDate ? parseISO(endDate) : endOfMonth(new Date());
 
     // Technicians can only see their own summary
-    const targetUserId = profile.role === 'technician' ? profile.id : userId || undefined;
+    const targetUserId = session.user.role === 'technician' ? session.user.id : userId || undefined;
 
     const summary = await getExpenseSummary(
-      profile.business_id,
+      businessId,
       start,
       end,
       targetUserId

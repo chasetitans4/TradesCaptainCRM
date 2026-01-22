@@ -22,6 +22,7 @@ import {
   Settings,
   HelpCircle,
   Clock,
+  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -29,9 +30,9 @@ import { Sidebar } from './sidebar';
 import { BottomSheet } from '@/components/mobile/bottom-sheet';
 
 const mobileNav = [
+  { name: 'My Day', href: '/my-day', icon: Zap },
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Jobs', href: '/jobs', icon: Briefcase },
-  { name: 'Customers', href: '/customers', icon: Users },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
 ];
 
@@ -61,6 +62,7 @@ interface RecentPage {
 function getPageName(pathname: string): string {
   const routes: Record<string, string> = {
     '/dashboard': 'Dashboard',
+    '/my-day': 'My Day',
     '/jobs': 'Jobs',
     '/customers': 'Customers',
     '/calendar': 'Calendar',

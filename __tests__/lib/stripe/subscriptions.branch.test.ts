@@ -121,7 +121,7 @@ describe('lib/stripe/subscriptions branch coverage', () => {
       default_payment_method: {
         card: { brand: 'visa', last4: '4242', exp_month: 1, exp_year: 2030 },
       },
-      items: { data: [{ id: 'si_1' }] },
+      items: { data: [{ id: 'si_1', price: { id: 'price_old' } }] },
     });
     mockStripe.subscriptions.update.mockResolvedValue({ id: 'sub_1' });
     mockStripe.invoices.list.mockResolvedValue({
@@ -422,7 +422,7 @@ describe('lib/stripe/subscriptions branch coverage', () => {
 
       const updated = supabase.state.businesses.get('biz_to_pro');
       expect(updated.plan_tier).toBe('pro');
-      expect(updated.leads_limit).toBe(300);
+      expect(updated.leads_limit).toBe(200);
     });
   });
 

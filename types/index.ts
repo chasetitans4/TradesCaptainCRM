@@ -10,7 +10,15 @@ export * from './outreach';
 // =====================================================
 
 export type PlanTier = 'starter' | 'pro' | 'enterprise';
-export type UserRole = 'owner' | 'admin' | 'technician';
+export type UserRole = 
+  | 'owner' 
+  | 'admin' 
+  | 'technician'
+  // Admin Portal Roles
+  | 'super_admin'
+  | 'finance'
+  | 'manager'
+  | 'agent';
 export type UserStatus = 'pending' | 'active' | 'deactivated';
 
 export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'quoted' | 'scheduled' | 'won' | 'lost';
@@ -144,6 +152,7 @@ export interface Business extends Timestamps {
   // Branding
   logo_url: string | null;
   primary_color: string;
+  secondary_color: string;
   
   // Review Links
   review_link_google: string | null;
@@ -180,8 +189,10 @@ export interface User extends Timestamps {
   auth_user_id: string | null;
 
   // Profile
-  name: string;
-  full_name?: string; // Alias for name
+  first_name: string;
+  last_name: string;
+  name?: string; // Computed/Deprecated
+  full_name?: string; // Computed
   phone: string | null;
   avatar_url: string | null;
 
@@ -236,22 +247,22 @@ export interface EmailRecipient extends Timestamps {
 export interface Customer extends Timestamps {
   id: string;
   business_id: string;
-  
+
   name: string;
   phone: string;
   email: string | null;
-  
+
   address_line1: string | null;
   address_line2: string | null;
   city: string | null;
   state: string | null;
   zip: string | null;
-  
+
   timezone: string | null;
   notes: string | null;
   tags: string[];
   source: LeadSource | null;
-  
+
   total_jobs: number;
   total_revenue: number;
   last_job_date: string | null;
@@ -333,8 +344,8 @@ export interface Job extends Timestamps {
   job_address_zip: string | null;
 
   // Assignment
-  assigned_to: string | null;
-  assigned_user_id?: string | null; // Alias for assigned_to
+  assigned_user_id: string | null;
+  assigned_to?: string | null; // Alias for assigned_user_id
 
   // Completion
   completed_at: string | null;
@@ -831,7 +842,7 @@ export interface LeadFilters {
   dateRange?: {
     start: string;
     end: string;
-  };
+  }
 }
 
 export interface JobFilters {
@@ -841,7 +852,7 @@ export interface JobFilters {
   dateRange?: {
     start: string;
     end: string;
-  };
+  }
 }
 
 export type SortDirection = 'asc' | 'desc';
@@ -881,71 +892,6 @@ export interface WorkingHours {
   created_at: string;
 }
 
-export interface ScheduleBlock {
-  id: string;
-  business_id: string;
-  user_id: string | null;
-  day_of_week: number | null;
-  specific_date: string | null;
-  start_time: string;
-  end_time: string;
-  label: string;
-  is_recurring: boolean;
-  created_at: string;
-}
-
-export interface CalendarEvent {
-  id: string;
-  title: string;
-  description?: string;
-  location?: string;
-  start: Date;
-  end: Date;
-  busy: boolean;
-  source?: 'job' | 'personal' | 'break';
-}
-
-export interface TimeSlot {
-  start: Date;
-  end: Date;
-}
-
-export interface DriveTimeSettings {
-  enabled: boolean;
-  default_minutes: number;
-}
-
-// Calendar event display type for UI
-export interface CalendarDisplayEvent {
-  id: string;
-  type: 'job' | 'personal' | 'break';
-  title: string;
-  start: string;
-  end: string;
-  color: string;
-  editable: boolean;
-  job_id?: string;
-  customer?: {
-    name: string;
-    phone?: string;
-  };
-  source?: 'external';
-  address?: string | null;
-  city?: string | null;
-  state?: string | null;
-  zip?: string | null;
-}
-
-// Input types for calendar operations
-export interface CreateScheduleBlockInput {
-  day_of_week?: number;
-  specific_date?: string;
-  start_time: string;
-  end_time: string;
-  label: string;
-  is_recurring?: boolean;
-}
-
 export interface UpdateWorkingHoursInput {
   day_of_week: number;
   is_working_day: boolean;
@@ -953,112 +899,60 @@ export interface UpdateWorkingHoursInput {
   end_time: string;
 }
 
-export interface AvailabilityCheckResult {
-  available: boolean;
-  suggested?: TimeSlot;
+export interface TimeSlot {
+  start: Date;
+  end: Date;
 }
 
-export interface AvailabilitySlotsResult {
-  slots: TimeSlot[];
-}
-
-// =====================================================
-// TWILIO SMS & PHONE TYPES
-// =====================================================
-
-export type SMSTemplateCategory = 'appointment' | 'follow_up' | 'quote' | 'invoice' | 'general';
-export type ScheduledMessageStatus = 'pending' | 'sent' | 'cancelled' | 'failed';
-export type CallForwardingMode = 'voicemail' | 'forward_owner' | 'forward_custom' | 'forward_sequential' | 'forward_simultaneous';
-export type AISMSTone = 'professional' | 'friendly' | 'casual';
-
-export interface SMSTemplate {
+export interface ScheduleBlock {
   id: string;
   business_id: string;
-  name: string;
-  content: string;
-  category: SMSTemplateCategory | null;
-  is_default: boolean;
-  created_at: string;
-  updated_at: string;
+  user_id?: string | null;
+  label: string;
+  is_recurring: boolean;
+  day_of_week?: number | null;
+  specific_date?: string | null;
+  start_time: string;
+  end_time: string;
 }
 
-export interface ScheduledMessage {
+export interface CreateScheduleBlockInput {
+  label: string;
+  start_time: string;
+  end_time: string;
+  is_recurring?: boolean;
+  day_of_week?: number | null;
+  specific_date?: string | null;
+}
+
+export interface CalendarDisplayEvent {
   id: string;
-  business_id: string;
-  customer_id: string | null;
-  job_id: string | null;
-  phone_number: string;
-  content: string;
-  scheduled_for: string;
-  status: ScheduledMessageStatus;
-  sent_at: string | null;
-  twilio_sid: string | null;
-  error_message: string | null;
-  created_at: string;
-}
-
-export interface CallForwardingSettings {
-  mode: CallForwardingMode;
-  forward_numbers: string[];
-  ring_timeout: number;
-  business_hours_only: boolean;
-  after_hours_mode: CallForwardingMode;
-  voicemail_greeting_url?: string;
-}
-
-export interface AISMSSettings {
-  enabled: boolean;
-  quiet_start: string; // HH:MM
-  quiet_end: string;   // HH:MM
-  knowledge_base: string | null;
-  tone: AISMSTone;
-}
-
-export interface PhoneNumberSettings {
-  phone_number: string | null;
-  phone_sid: string | null;
-  strategy: 'single' | 'per_location';
-}
-
-// Extended SMS Conversation with handoff tracking
-export interface SMSConversationExtended extends SMSConversation {
-  ai_response_count: number;
-  needs_human_attention: boolean;
-  human_attention_reason: string | null;
-  human_attention_at: string | null;
-}
-
-// SMS Message with Twilio fields
-export interface SMSMessageExtended extends SMSMessage {
-  twilio_sid: string | null;
-  is_ai_response: boolean;
-  error_message: string | null;
-}
-
-// Input types for SMS operations
-export interface SendSMSInput {
-  to: string;
-  message: string;
-  customer_id?: string;
+  type: 'job' | 'break' | 'external' | 'personal';
+  title: string;
+  start: string;
+  end: string;
+  color?: string;
+  editable?: boolean;
   job_id?: string;
-}
-
-export interface CreateSMSTemplateInput {
-  name: string;
-  content: string;
-  category?: SMSTemplateCategory;
-  is_default?: boolean;
-}
-
-export interface ScheduleMessageInput {
+  job_type?: string;
+  job_number?: string;
+  status?: string;
+  priority?: string;
+  assigned_to?: string;
+  technician_name?: string;
   customer_id?: string;
-  job_id?: string;
-  phone_number: string;
-  content: string;
-  scheduled_for: string;
+  customer?: {
+    id: string;
+    name: string;
+    phone?: string;
+  };
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  source?: string;
 }
 
-// Phone number search result from Twilio
 export interface AvailablePhoneNumber {
   phone_number: string;
   friendly_name: string;
@@ -1069,4 +963,35 @@ export interface AvailablePhoneNumber {
     mms: boolean;
     voice: boolean;
   };
+}
+
+export type CallForwardingMode = 'voicemail' | 'forward_owner' | 'forward_custom' | 'forward_sequential' | 'forward_simultaneous';
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description?: string;
+  location?: string;
+  start: Date;
+  end: Date;
+  busy: boolean;
+  source: 'personal' | 'job' | 'external';
+}
+
+export interface SMSTemplate {
+  id: string;
+  business_id: string;
+  name: string;
+  content: string;
+  category?: string;
+  is_default?: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface CreateSMSTemplateInput {
+  name: string;
+  content: string;
+  category?: string;
+  is_default?: boolean;
 }

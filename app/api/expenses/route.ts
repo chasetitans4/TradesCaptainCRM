@@ -5,35 +5,33 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getServerSession } from '@/lib/permissions/check-permission';
 import { apiLogger } from '@/lib/logger';
 import { getExpenses, createExpense } from '@/lib/expenses';
 import { parseISO } from 'date-fns';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const session = await getServerSession();
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id, role')
-      .eq('auth_user_id', user.id)
-      .single();
+    const { searchParams } = new URL(request.url);
+    
+    // Determine business ID
+    let businessId = session.user.businessId;
+    const queryBusinessId = searchParams.get('businessId');
+    
+    if ((session.user.role === 'admin' || session.user.role === 'super_admin') && queryBusinessId) {
+      businessId = queryBusinessId;
+    }
 
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!businessId) {
+      return NextResponse.json({ error: 'Business ID not found' }, { status: 404 });
     }
 
     // Parse query params
-    const searchParams = request.nextUrl.searchParams;
     const userId = searchParams.get('user_id');
     const categoryId = searchParams.get('category_id');
     const jobId = searchParams.get('job_id');
@@ -47,8 +45,8 @@ export async function GET(request: NextRequest) {
 
     // Technicians can only see their own expenses
     const filters: Record<string, any> = {};
-    if (profile.role === 'technician') {
-      filters.userId = profile.id;
+    if (session.user.role === 'technician') {
+      filters.userId = session.user.id;
     } else if (userId) {
       filters.userId = userId;
     }
@@ -62,7 +60,7 @@ export async function GET(request: NextRequest) {
     if (isBillable !== null) filters.isBillable = isBillable === 'true';
 
     const { expenses, total } = await getExpenses(
-      profile.business_id,
+      businessId,
       filters,
       page,
       limit
@@ -88,27 +86,23 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const session = await getServerSession();
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const body = await request.json();
+    
+    // Determine business ID
+    let businessId = session.user.businessId;
+    if ((session.user.role === 'admin' || session.user.role === 'super_admin') && body.businessId) {
+      businessId = body.businessId;
     }
 
-    const body = await request.json();
+    if (!businessId) {
+      return NextResponse.json({ error: 'Business ID not found' }, { status: 404 });
+    }
+
     const {
       category_id,
       date,
@@ -149,7 +143,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const expense = await createExpense(profile.business_id, profile.id, {
+    const expense = await createExpense(businessId, session.user.id, {
       categoryId: category_id,
       date: date ? parseISO(date) : new Date(),
       vendor,

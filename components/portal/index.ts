@@ -6,3 +6,5 @@
 export { PortalLogin } from './portal-login';
 export { PortalDashboard } from './portal-dashboard';
 export { ServiceRequestForm } from './service-request-form';
+export { AvailabilityPicker } from './availability-picker';
+export { JobTimeline, CompactJobTimeline } from './job-timeline';

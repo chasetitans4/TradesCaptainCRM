@@ -22,9 +22,10 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get('status');
 
   try {
+    // SECURITY: Select only needed fields - exclude password_hash and two_factor_secret
     let query = supabase
       .from('admin_users')
-      .select('*')
+      .select('id, email, full_name, phone, role, status, hire_date, commission_rate, last_login_at, created_at, updated_at')
       .order('created_at', { ascending: false });
 
     if (role) {
@@ -36,65 +37,109 @@ export async function GET(request: NextRequest) {
 
     const { data: agents, error } = await query;
 
-    if (error) throw error;
+    if (error) {
+      // Table might not exist
+      return NextResponse.json({ agents: [] });
+    }
 
-    // Get stats for each agent
-    const agentsWithStats = await Promise.all(
-      (agents || []).map(async (agent) => {
-        if (agent.role !== 'agent') {
-          return agent;
-        }
+    // Get agent IDs for batch queries (PERF: avoid N+1 queries)
+    const agentIds = (agents || []).filter(a => a.role === 'agent').map(a => a.id);
 
-        // Get lead count
-        const { count: activeLeads } = await supabase
-          .from('sales_leads')
-          .select('*', { count: 'exact', head: true })
-          .eq('agent_id', agent.id)
+    // Initialize stats maps
+    const leadCountsMap = new Map<string, number>();
+    const dealCountsMap = new Map<string, number>();
+    const pendingCommissionsMap = new Map<string, number>();
+    const paidCommissionsMap = new Map<string, number>();
+
+    if (agentIds.length > 0) {
+      // Batch query for leads (handle missing table)
+      try {
+        const { data: leadCounts } = await supabase
+          .from('tc_leads')
+          .select('agent_id')
+          .in('agent_id', agentIds)
           .not('status', 'in', '("won","lost","unqualified")');
 
-        // Get deals count
-        const { count: totalDeals } = await supabase
-          .from('crm_accounts')
-          .select('*', { count: 'exact', head: true })
-          .eq('agent_id', agent.id);
+        // Count leads per agent
+        for (const lead of leadCounts || []) {
+          leadCountsMap.set(lead.agent_id, (leadCountsMap.get(lead.agent_id) || 0) + 1);
+        }
+      } catch {
+        // Table doesn't exist
+      }
 
-        // Get pending commissions
+      // Batch query for deals (handle missing table)
+      try {
+        const { data: dealCounts } = await supabase
+          .from('crm_accounts')
+          .select('agent_id')
+          .in('agent_id', agentIds);
+
+        // Count deals per agent
+        for (const deal of dealCounts || []) {
+          dealCountsMap.set(deal.agent_id, (dealCountsMap.get(deal.agent_id) || 0) + 1);
+        }
+      } catch {
+        // Table doesn't exist
+      }
+
+      // Batch query for pending commissions (handle missing table)
+      try {
         const { data: pendingCommissions } = await supabase
           .from('agent_commissions')
-          .select('commission_amount')
-          .eq('agent_id', agent.id)
+          .select('agent_id, commission_amount')
+          .in('agent_id', agentIds)
           .in('status', ['pending', 'eligible', 'approved']);
 
-        const commissionsPending = pendingCommissions?.reduce(
-          (sum, c) => sum + (c.commission_amount || 0),
-          0
-        ) || 0;
+        // Sum commissions per agent
+        for (const comm of pendingCommissions || []) {
+          pendingCommissionsMap.set(
+            comm.agent_id,
+            (pendingCommissionsMap.get(comm.agent_id) || 0) + (comm.commission_amount || 0)
+          );
+        }
+      } catch {
+        // Table doesn't exist
+      }
 
-        // Get paid commissions YTD
+      // Batch query for paid commissions YTD (handle missing table)
+      try {
         const startOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString();
         const { data: paidCommissions } = await supabase
           .from('agent_commissions')
-          .select('commission_amount')
-          .eq('agent_id', agent.id)
+          .select('agent_id, commission_amount')
+          .in('agent_id', agentIds)
           .eq('status', 'paid')
           .gte('paid_at', startOfYear);
 
-        const commissionsPaidYtd = paidCommissions?.reduce(
-          (sum, c) => sum + (c.commission_amount || 0),
-          0
-        ) || 0;
+        // Sum commissions per agent
+        for (const comm of paidCommissions || []) {
+          paidCommissionsMap.set(
+            comm.agent_id,
+            (paidCommissionsMap.get(comm.agent_id) || 0) + (comm.commission_amount || 0)
+          );
+        }
+      } catch {
+        // Table doesn't exist
+      }
+    }
 
-        return {
-          ...agent,
-          stats: {
-            activeLeads: activeLeads || 0,
-            totalDeals: totalDeals || 0,
-            commissionsPending,
-            commissionsPaidYtd,
-          },
-        };
-      })
-    );
+    // Assemble agents with stats
+    const agentsWithStats = (agents || []).map((agent) => {
+      if (agent.role !== 'agent') {
+        return agent;
+      }
+
+      return {
+        ...agent,
+        stats: {
+          activeLeads: leadCountsMap.get(agent.id) || 0,
+          totalDeals: dealCountsMap.get(agent.id) || 0,
+          commissionsPending: pendingCommissionsMap.get(agent.id) || 0,
+          commissionsPaidYtd: paidCommissionsMap.get(agent.id) || 0,
+        },
+      };
+    });
 
     return NextResponse.json({ agents: agentsWithStats });
   } catch (error) {
@@ -151,6 +196,7 @@ export async function POST(request: NextRequest) {
     const tempPassword = crypto.randomBytes(16).toString('hex');
     const passwordHash = await bcrypt.hash(tempPassword, 12);
 
+    // SECURITY: Select only safe fields - exclude password_hash and two_factor_secret
     const { data: agent, error } = await supabase
       .from('admin_users')
       .insert({
@@ -163,7 +209,7 @@ export async function POST(request: NextRequest) {
         hire_date,
         status: 'active',
       })
-      .select()
+      .select('id, email, full_name, phone, role, status, hire_date, commission_rate, created_at')
       .single();
 
     if (error) throw error;

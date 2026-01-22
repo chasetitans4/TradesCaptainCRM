@@ -417,7 +417,7 @@ describe('booking/requests', () => {
     expect(res.success).toBe(true);
     expect(res.jobId).toBeDefined();
     expect(supabaseState.lastInsert.priority).toBe('high');
-    expect(supabaseState.lastInsert.assigned_to).toBeNull();
+    expect(supabaseState.lastInsert.assigned_user_id).toBeNull();
     expect(supabaseState.lastInsert.scheduled_time_start).toBe('09:00');
     expect(supabaseState.lastInsert.scheduled_time_end).toBe('10:00');
   });
@@ -446,7 +446,7 @@ describe('booking/requests', () => {
     const res = await convertToJob('req-5', 'u5', { assignedTo: 'tech-7', estimatedDuration: 90, notes: 'Bring parts' });
     expect(res.success).toBe(true);
     expect(res.jobId).toBeDefined();
-    expect(supabaseState.lastInsert.assigned_to).toBe('tech-7');
+    expect(supabaseState.lastInsert.assigned_user_id).toBe('tech-7');
     expect(supabaseState.lastInsert.notes).toBe('Bring parts');
     expect(supabaseState.lastInsert.scheduled_time_start).toBe('09:00');
     expect(supabaseState.lastInsert.scheduled_time_end).toBe('10:30');

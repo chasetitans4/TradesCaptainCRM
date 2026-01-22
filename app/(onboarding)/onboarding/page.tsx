@@ -110,41 +110,83 @@ export default function OnboardingPage() {
         return;
       }
 
-      // Create business
-      const { data: business, error: bizError } = await supabase
-        .from('businesses')
-        .insert({
-          name: businessInfo.name,
-          owner_name: businessInfo.owner_name,
-          email: user.email!,
-          phone: businessInfo.phone,
-          owner_phone: businessInfo.owner_phone || null,
-          trade_type: businessInfo.trade_type,
-          plan_tier: 'pro', // Default to pro for CRM access
-          leads_limit: 300,
-          leads_used: 0,
-          onboarding_completed: true,
-          onboarding_completed_at: new Date().toISOString(),
-        })
-        .select()
+      // Check if user already exists
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id, business_id')
+        .eq('auth_user_id', user.id)
         .single();
 
-      if (bizError) throw bizError;
+      let businessId = existingUser?.business_id;
 
-      // Create user record
-      const { error: userError } = await supabase
-        .from('users')
-        .insert({
-          email: user.email!,
-          auth_user_id: user.id,
-          name: businessInfo.owner_name,
-          phone: businessInfo.owner_phone || null,
-          business_id: business.id,
-          role: 'owner',
-          status: 'active',
-        });
+      if (businessId) {
+        // Update existing business
+        const { error: updateError } = await supabase
+          .from('businesses')
+          .update({
+            name: businessInfo.name,
+            owner_name: businessInfo.owner_name,
+            phone: businessInfo.phone,
+            owner_phone: businessInfo.owner_phone || null,
+            trade_type: businessInfo.trade_type,
+            onboarding_completed: true,
+            onboarding_completed_at: new Date().toISOString(),
+          })
+          .eq('id', businessId);
 
-      if (userError) throw userError;
+        if (updateError) throw updateError;
+      } else {
+        // Create new business
+        const { data: business, error: bizError } = await supabase
+          .from('businesses')
+          .insert({
+            name: businessInfo.name,
+            owner_name: businessInfo.owner_name,
+            email: user.email!,
+            phone: businessInfo.phone,
+            owner_phone: businessInfo.owner_phone || null,
+            trade_type: businessInfo.trade_type,
+            plan_tier: 'pro', // Default to pro for CRM access
+            leads_limit: 300,
+            leads_used: 0,
+            onboarding_completed: true,
+            onboarding_completed_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (bizError) throw bizError;
+        businessId = business.id;
+
+        // Create or update user record
+        if (existingUser) {
+           const { error: userUpdateError } = await supabase
+            .from('users')
+            .update({
+              business_id: businessId,
+              name: businessInfo.owner_name,
+              phone: businessInfo.owner_phone || null,
+              status: 'active',
+            })
+            .eq('auth_user_id', user.id);
+            
+            if (userUpdateError) throw userUpdateError;
+        } else {
+          const { error: userError } = await supabase
+            .from('users')
+            .insert({
+              email: user.email!,
+              auth_user_id: user.id,
+              name: businessInfo.owner_name,
+              phone: businessInfo.owner_phone || null,
+              business_id: businessId,
+              role: 'owner',
+              status: 'active',
+            });
+
+          if (userError) throw userError;
+        }
+      }
 
       // Add saved services
       const validServices = services.filter(s => s.name.trim() && s.price.trim());
@@ -153,7 +195,7 @@ export default function OnboardingPage() {
           .from('saved_services')
           .insert(
             validServices.map(s => ({
-              business_id: business.id,
+              business_id: businessId,
               name: s.name.trim(),
               default_price: parseFloat(s.price.replace(/[^0-9.]/g, '')),
             }))

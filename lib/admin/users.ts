@@ -13,7 +13,7 @@ export async function getAdminUser(adminId: string): Promise<AdminUser | null> {
     .from('admin_users')
     .select('*')
     .eq('id', adminId)
-    .eq('is_active', true)
+    .eq('status', 'active')
     .single();
 
   if (error) return null;
@@ -27,7 +27,7 @@ export async function getAdminByEmail(email: string): Promise<AdminUser | null> 
     .from('admin_users')
     .select('*')
     .eq('email', email.toLowerCase())
-    .eq('is_active', true)
+    .eq('status', 'active')
     .single();
 
   if (error) return null;
@@ -40,7 +40,7 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
   const { data, error } = await supabase
     .from('admin_users')
     .select('*')
-    .order('name');
+    .order('full_name');
 
   if (error) throw error;
   return data || [];
@@ -58,10 +58,10 @@ export async function createAdminUser(
     .from('admin_users')
     .insert({
       email: admin.email.toLowerCase(),
-      name: admin.name,
+      full_name: admin.name,
       role: admin.role,
       password_hash: passwordHash,
-      is_active: true,
+      status: 'active',
     })
     .select()
     .single();

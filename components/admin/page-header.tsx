@@ -20,6 +20,8 @@ interface AdminPageHeaderProps {
   breadcrumb?: BreadcrumbItem[];
   /** Show a back button that returns to previous page or specified URL */
   backHref?: string | boolean;
+  /** Optional custom back handler. If provided, overrides backHref behavior */
+  onBack?: () => void;
   /** Icon to display next to the title */
   icon?: LucideIcon;
   /** Action buttons to display on the right */
@@ -33,6 +35,7 @@ export function AdminPageHeader({
   description,
   breadcrumb = [],
   backHref,
+  onBack,
   icon: Icon,
   actions,
   className,
@@ -40,6 +43,10 @@ export function AdminPageHeader({
   const router = useRouter();
 
   const handleBack = () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
     if (typeof backHref === 'string') {
       router.push(backHref);
     } else {
@@ -49,7 +56,7 @@ export function AdminPageHeader({
 
   // Build full breadcrumb trail
   const fullBreadcrumb: BreadcrumbItem[] = [
-    { label: 'Admin Portal', href: '/admin-portal' },
+    { label: 'Admin Portal', href: '/admin' },
     ...breadcrumb,
   ];
 
@@ -134,7 +141,7 @@ export function AdminPageHeader({
 
 /**
  * Generate breadcrumb items from the current path
- * Usage: generateBreadcrumb('/admin-portal/leads/123', { '123': 'John Doe' })
+ * Usage: generateBreadcrumb('/admin/leads/123', { '123': 'John Doe' })
  */
 export function generateBreadcrumb(
   pathname: string,
@@ -143,14 +150,14 @@ export function generateBreadcrumb(
   const segments = pathname.split('/').filter(Boolean);
   const items: BreadcrumbItem[] = [];
 
-  // Skip 'admin-portal' as it's added automatically
+  // Skip 'admin' as it's added automatically via fullBreadcrumb
   let currentPath = '';
   for (let i = 0; i < segments.length; i++) {
     const segment = segments[i];
     currentPath += `/${segment}`;
 
-    // Skip admin-portal segment
-    if (segment === 'admin-portal') continue;
+    // Skip admin segment (it's added automatically)
+    if (segment === 'admin') continue;
 
     // Get label - check custom labels first, then format segment
     const label = customLabels[segment] || formatSegmentLabel(segment);

@@ -204,7 +204,7 @@ export async function getHighRiskEvents(
     .select(
       `
       *,
-      user:users(name, email)
+      user:users!security_events_user_id_fkey(name, email)
     `
     )
     .eq('business_id', businessId)

@@ -69,10 +69,10 @@ export async function getDispatchJobs(
       scheduled_time,
       estimated_duration,
       priority,
-      customer:customers(
+      customer:customers!jobs_customer_id_fkey(
         id, name, phone, address, city, state, zip, latitude, longitude
       ),
-      assigned_user:users!jobs_assigned_user_id_fkey(id, name, color)
+      assigned_user:users!jobs_assigned_user_id_fkey(id, first_name, last_name, color)
     `)
     .eq('business_id', businessId)
     .gte('scheduled_date', startDate)
@@ -126,7 +126,7 @@ export async function getDispatchJobs(
     assignedUser: job.assigned_user
       ? {
           id: (job.assigned_user as any).id,
-          name: (job.assigned_user as any).name,
+          name: `${(job.assigned_user as any).first_name || ''} ${(job.assigned_user as any).last_name || ''}`.trim(),
           color: (job.assigned_user as any).color || '#3B82F6',
         }
       : null,
@@ -144,7 +144,8 @@ export async function getDispatchTechnicians(businessId: string): Promise<Dispat
     .from('users')
     .select(`
       id,
-      name,
+      first_name,
+      last_name,
       email,
       phone,
       color,
@@ -211,7 +212,7 @@ export async function getDispatchTechnicians(businessId: string): Promise<Dispat
 
     return {
       id: user.id,
-      name: user.name,
+      name: `${(user as any).first_name || ''} ${(user as any).last_name || ''}`.trim(),
       email: user.email,
       phone: user.phone || '',
       color: user.color || '#3B82F6',
@@ -252,7 +253,7 @@ export async function getUnassignedJobs(businessId: string): Promise<DispatchJob
       scheduled_time,
       estimated_duration,
       priority,
-      customer:customers(id, name, phone, address, city)
+      customer:customers!jobs_customer_id_fkey(id, name, phone, address, city)
     `)
     .eq('business_id', businessId)
     .is('assigned_user_id', null)
@@ -286,7 +287,8 @@ export async function getUnassignedJobs(businessId: string): Promise<DispatchJob
  */
 export async function getTechnicianSchedule(
   userId: string,
-  date: string
+  date: string,
+  businessId?: string
 ): Promise<{
   available: boolean;
   startTime: string | null;
@@ -295,6 +297,20 @@ export async function getTechnicianSchedule(
   jobs: DispatchJob[];
 }> {
   const supabase = await createClient();
+
+  // Verify user belongs to business if businessId is provided
+  if (businessId) {
+    const { data: user } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .eq('business_id', businessId)
+      .single();
+
+    if (!user) {
+      throw new Error('User not found or does not belong to business');
+    }
+  }
 
   const dateObj = new Date(date);
   const dayOfWeek = dateObj.getDay();
@@ -331,7 +347,7 @@ export async function getTechnicianSchedule(
     .single();
 
   // Get jobs for the day
-  const { data: jobs } = await supabase
+  let jobsQuery = supabase
     .from('jobs')
     .select(`
       id,
@@ -342,11 +358,16 @@ export async function getTechnicianSchedule(
       scheduled_time,
       estimated_duration,
       priority,
-      customer:customers(id, name, phone, address, city)
+      customer:customers!jobs_customer_id_fkey(id, name, phone, address, city)
     `)
     .eq('assigned_user_id', userId)
-    .eq('scheduled_date', date)
-    .order('scheduled_time');
+    .eq('scheduled_date', date);
+
+  if (businessId) {
+    jobsQuery = jobsQuery.eq('business_id', businessId);
+  }
+
+  const { data: jobs } = await jobsQuery.order('scheduled_time');
 
   const mappedJobs: DispatchJob[] = (jobs || []).map((job) => ({
     id: job.id,
@@ -422,7 +443,7 @@ export async function getDispatchStats(
     .from('technician_locations')
     .select(`
       status,
-      user:users(business_id)
+      user:users!technician_locations_user_id_fkey(business_id)
     `);
 
   const businessTechLocations = techLocations?.filter(

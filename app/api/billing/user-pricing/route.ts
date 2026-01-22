@@ -6,10 +6,14 @@
 import { NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { getUserPricingInfo } from '@/lib/billing/per-user';
+import { checkPermission } from '@/lib/permissions/check-permission';
 import { apiLogger } from '@/lib/logger';
 
 export async function GET() {
   try {
+    // Ensure user has billing permissions
+    await checkPermission('manage_billing');
+
     const profile = await getServerUserProfile();
 
     if (!profile) {
@@ -29,7 +33,7 @@ export async function GET() {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     );
   }

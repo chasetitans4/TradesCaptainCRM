@@ -319,7 +319,7 @@ export default function LeadsCaptainLandingPage() {
 
       <footer className="border-t py-8">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>© 2025 TradesCaptain. All rights reserved.</p>
+          <p>© 2026 TradesCaptain. All rights reserved.</p>
           <div className="mt-2 space-x-4">
             <a href="/privacy" className="hover:text-foreground">Privacy Policy</a>
             <a href="/terms" className="hover:text-foreground">Terms of Service</a>

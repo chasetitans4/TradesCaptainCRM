@@ -12,6 +12,10 @@ import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
 import { prefetchRoutes, CRITICAL_ROUTES, SECONDARY_ROUTES } from '@/lib/performance';
 import { InteractiveTour } from '@/components/onboarding';
 import { logger } from '@/lib/logger';
+import { BusinessThemeProvider } from '@/lib/contexts/business-theme-context';
+import { ErrorBoundary } from '@/components/error-boundary';
+import { OfflineProvider } from '@/lib/offline/context';
+import { OfflineIndicator } from '@/components/offline/offline-indicator';
 
 // Dynamic imports for non-critical components (loaded after initial render)
 const CommandPalette = dynamic(
@@ -117,66 +121,78 @@ export default function DashboardLayout({
     : 'U';
 
   return (
-    <div className="min-h-screen bg-muted/30">
-      {/* Desktop Sidebar */}
-      <Sidebar
-        className="hidden lg:flex"
-        businessName={user.business?.name || 'Your Business'}
-        planName={user.business?.subscription_tier || 'Free'}
-      />
-
-      {/* Mobile Navigation */}
-      <MobileNav
-        className="lg:hidden"
-        businessName={user.business?.name}
-        planName={user.business?.subscription_tier}
-      />
-
-      {/* Main Content Area */}
-      <div className="lg:pl-64">
-        <Header
-          userName={user.full_name || 'User'}
-          userEmail={user.email || ''}
-          userRole={user.role || 'owner'}
-          userInitials={userInitials}
-          onSignOut={handleSignOut}
+    <OfflineProvider autoInitialize syncInterval={5 * 60 * 1000}>
+      <BusinessThemeProvider
+        primaryColor={user.business?.primary_color || '#1D4ED8'}
+        secondaryColor={user.business?.secondary_color || '#0369A1'}
+      >
+        <div className="min-h-screen bg-muted/30">
+        {/* Desktop Sidebar */}
+        <Sidebar
+          className="hidden lg:flex"
+          businessName={user.business?.name || 'Your Business'}
+          planName={user.business?.subscription_tier || 'Free'}
         />
-        <main className="p-4 lg:p-6 pb-20 lg:pb-6">
-          <Suspense fallback={
-            <div className="animate-pulse space-y-4">
-              <div className="h-8 w-48 bg-muted rounded" />
-              <div className="h-64 w-full bg-muted rounded-xl" />
-            </div>
-          }>
-            {children}
-          </Suspense>
-        </main>
-      </div>
 
-      {/* Lazy loaded components - not critical for initial render */}
-      <Suspense fallback={null}>
-        <CommandPalette />
-      </Suspense>
-
-      <Suspense fallback={null}>
-        <KeyboardShortcutsDialog
-          open={shortcutsOpen}
-          onOpenChange={setShortcutsOpen}
+        {/* Mobile Navigation */}
+        <MobileNav
+          className="lg:hidden"
+          businessName={user.business?.name}
+          planName={user.business?.subscription_tier}
         />
-      </Suspense>
 
-      {/* AI Assistant Chat Bubble */}
-      <Suspense fallback={null}>
-        <AIAssistantWidget />
-      </Suspense>
+        {/* Main Content Area */}
+        <div className="lg:pl-64">
+          <Header
+            userName={user.full_name || 'User'}
+            userEmail={user.email || ''}
+            userRole={user.role || 'owner'}
+            userInitials={userInitials}
+            onSignOut={handleSignOut}
+          />
+          <main className="p-4 lg:p-6 pb-20 lg:pb-6">
+            <ErrorBoundary>
+              <Suspense fallback={
+                <div className="animate-pulse space-y-4">
+                  <div className="h-8 w-48 bg-muted rounded" />
+                  <div className="h-64 w-full bg-muted rounded-xl" />
+                </div>
+              }>
+                {children}
+              </Suspense>
+            </ErrorBoundary>
+          </main>
+        </div>
 
-      {/* Interactive Onboarding Tour - shows for new users on dashboard */}
-      {pathname === '/dashboard' && (
-        <InteractiveTour
-          tourId="dashboard-intro"
-          autoStart
-        />
-      )}
-    </div>
+        {/* Lazy loaded components - not critical for initial render */}
+        <Suspense fallback={null}>
+          <CommandPalette />
+        </Suspense>
+
+        <Suspense fallback={null}>
+          <KeyboardShortcutsDialog
+            open={shortcutsOpen}
+            onOpenChange={setShortcutsOpen}
+          />
+        </Suspense>
+
+        {/* AI Assistant Chat Bubble */}
+        <Suspense fallback={null}>
+          <AIAssistantWidget />
+        </Suspense>
+
+        {/* Interactive Onboarding Tour - shows for new users on dashboard */}
+        {pathname === '/dashboard' && (
+          <InteractiveTour
+            tourId="dashboard-intro"
+            autoStart
+          />
+        )}
+
+        {/* Offline Status Indicator */}
+        <OfflineIndicator position="bottom" />
+        </div>
+      </BusinessThemeProvider>
+    </OfflineProvider>
   );
 }

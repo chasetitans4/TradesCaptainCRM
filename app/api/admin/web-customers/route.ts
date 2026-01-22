@@ -48,7 +48,15 @@ export async function GET(request: NextRequest) {
 
     const { data: customers, error, count } = await query;
 
-    if (error) throw error;
+    if (error) {
+      // Table might not exist, return empty
+      return NextResponse.json({
+        customers: [],
+        total: 0,
+        page,
+        limit,
+      });
+    }
 
     return NextResponse.json({
       customers,

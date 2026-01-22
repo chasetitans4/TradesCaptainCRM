@@ -10,12 +10,15 @@ import {
   getFeatureRequests,
   getFeatureRequestStats,
 } from '@/lib/feature-requests';
+import { checkPermission } from '@/lib/permissions/check-permission';
 import type { FeatureRequestStatus, FeatureRequestCategory, FeatureRequestSource } from '@/lib/admin/types';
 import { apiLogger } from '@/lib/logger';
 
 // POST - Create a new feature request
 export async function POST(request: NextRequest) {
   try {
+    await checkPermission('view_feature_requests');
+
     const body = await request.json();
     const {
       title,
@@ -71,6 +74,8 @@ export async function POST(request: NextRequest) {
 // GET - List feature requests
 export async function GET(request: NextRequest) {
   try {
+    await checkPermission('view_feature_requests');
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') as FeatureRequestStatus | null;
     const category = searchParams.get('category') as FeatureRequestCategory | null;
@@ -78,6 +83,8 @@ export async function GET(request: NextRequest) {
     const submitter_id = searchParams.get('submitter_id');
     const search = searchParams.get('search');
     const includeStats = searchParams.get('include_stats') === 'true';
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '25');
 
     const filters: {
       status?: FeatureRequestStatus;
@@ -85,7 +92,9 @@ export async function GET(request: NextRequest) {
       source?: FeatureRequestSource;
       submitter_id?: string;
       search?: string;
-    } = {};
+      page?: number;
+      limit?: number;
+    } = { page, limit };
 
     if (status) filters.status = status;
     if (category) filters.category = category;
@@ -93,9 +102,7 @@ export async function GET(request: NextRequest) {
     if (submitter_id) filters.submitter_id = submitter_id;
     if (search) filters.search = search;
 
-    const featureRequests = await getFeatureRequests(
-      Object.keys(filters).length > 0 ? filters : undefined
-    );
+    const featureRequests = await getFeatureRequests(filters);
 
     const response: { feature_requests: typeof featureRequests; stats?: Awaited<ReturnType<typeof getFeatureRequestStats>> } = {
       feature_requests: featureRequests,

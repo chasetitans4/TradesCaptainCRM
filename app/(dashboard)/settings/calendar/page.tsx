@@ -521,8 +521,8 @@ export default function CalendarSettingsPage() {
                     <div>
                       <p className="font-medium text-text">{block.label}</p>
                       <p className="text-sm text-text-muted">
-                        {block.is_recurring && block.day_of_week !== null
-                          ? `${DAY_NAMES[block.day_of_week]}s, `
+                        {block.is_recurring && block.day_of_week != null
+                          ? `${DAY_NAMES[block.day_of_week as number]}s, `
                           : block.specific_date
                           ? `${block.specific_date}, `
                           : ''}

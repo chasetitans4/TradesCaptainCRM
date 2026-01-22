@@ -12,17 +12,27 @@ import { syncLogger } from '@/lib/logger';
  * Get user's Nylas grant ID from the database (decrypted)
  */
 async function getGrantId(userId: string): Promise<string | null> {
-  const supabase = await createServerSupabaseClient();
-  const { data } = await supabase
-    .from('calendar_connections')
-    .select('nylas_grant_id')
-    .eq('user_id', userId)
-    .single();
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { data } = await supabase
+      .from('calendar_connections')
+      .select('nylas_grant_id')
+      .eq('user_id', userId)
+      .single();
 
-  if (!data?.nylas_grant_id) return null;
+    if (!data?.nylas_grant_id) return null;
 
-  // Decrypt the grant ID
-  return decrypt(data.nylas_grant_id);
+    // Decrypt the grant ID (may fail if ENCRYPTION_KEY not set)
+    try {
+      return decrypt(data.nylas_grant_id);
+    } catch (decryptError) {
+      syncLogger.warn({ msg: 'Failed to decrypt grant ID - encryption may not be configured', userId });
+      return null;
+    }
+  } catch (error) {
+    syncLogger.error({ msg: 'Error getting grant ID', error, userId });
+    return null;
+  }
 }
 
 /**

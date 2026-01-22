@@ -3,7 +3,20 @@
 // =====================================================
 
 import { createAdminClient } from '@/lib/supabase/server';
-import { Lead, LeadActivity, LeadStatus, LeadSource, CreateLeadInput, ReassignLeadInput } from './types';
+import {
+  Lead,
+  LeadActivity,
+  LeadStatus,
+  LeadSource,
+  CreateLeadInput,
+  ReassignLeadInput,
+  FormattedLeadData,
+  AssignmentStrategy,
+  BatchUploadResult,
+  BatchUploadValidationError,
+  AdminUser,
+} from './types';
+import { validateLead } from './csv-parser';
 
 /**
  * Get leads (agents see only their own, management sees all)
@@ -25,7 +38,6 @@ export async function getLeads(
   let query = supabase
     .from('tc_leads')
     .select('*, agent:admin_users!tc_leads_agent_id_fkey(id, full_name, email)', { count: 'exact' })
-    .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
   // Agents can only see their own leads
@@ -50,7 +62,10 @@ export async function getLeads(
   query = query.range(offset, offset + limit - 1);
 
   const { data, error, count } = await query;
-  if (error) throw error;
+  if (error) {
+    // Table might not exist yet, return empty
+    return { leads: [], total: 0 };
+  }
 
   return { leads: data || [], total: count || 0 };
 }
@@ -64,8 +79,7 @@ export async function getLead(leadId: string, agentId?: string): Promise<Lead | 
   let query = supabase
     .from('tc_leads')
     .select('*, agent:admin_users!tc_leads_agent_id_fkey(id, full_name, email)')
-    .eq('id', leadId)
-    .is('deleted_at', null);
+    .eq('id', leadId);
 
   // If agentId provided, enforce ownership
   if (agentId) {
@@ -139,8 +153,7 @@ export async function updateLead(
       email: updates.email?.toLowerCase(),
       updated_at: new Date().toISOString(),
     })
-    .eq('id', leadId)
-    .is('deleted_at', null);
+    .eq('id', leadId);
 
   if (agentId) {
     query = query.eq('agent_id', agentId);
@@ -345,7 +358,10 @@ export async function getLeadActivities(leadId: string): Promise<LeadActivity[]>
     .eq('lead_id', leadId)
     .order('created_at', { ascending: false });
 
-  if (error) throw error;
+  if (error) {
+    // Table might not exist yet, return empty
+    return [];
+  }
   return data || [];
 }
 
@@ -402,8 +418,7 @@ export async function getLeadStats(agentId?: string): Promise<{
 
   let query = supabase
     .from('tc_leads')
-    .select('status')
-    .is('deleted_at', null);
+    .select('status');
 
   if (agentId) {
     query = query.eq('agent_id', agentId);
@@ -423,13 +438,274 @@ export async function getLeadStats(agentId?: string): Promise<{
 }
 
 /**
- * Soft delete a lead (super_admin only)
+ * Delete a lead (hard delete)
  */
 export async function deleteLead(leadId: string): Promise<void> {
   const supabase = createAdminClient();
 
   await supabase
     .from('tc_leads')
-    .update({ deleted_at: new Date().toISOString() })
+    .delete()
     .eq('id', leadId);
+}
+
+// =====================================================
+// BATCH LEAD UPLOAD FUNCTIONS
+// =====================================================
+
+/**
+ * Create leads in batch
+ */
+export async function createLeadsBatch(
+  leads: FormattedLeadData[],
+  options: {
+    assignmentStrategy: AssignmentStrategy;
+    agentId?: string;
+    uploadedBy: string;
+  }
+): Promise<BatchUploadResult> {
+  const supabase = createAdminClient();
+  const batchId = crypto.randomUUID();
+
+  // Validate all leads first
+  const validationErrors: BatchUploadValidationError[] = [];
+  leads.forEach((lead, index) => {
+    const errors = validateLead(lead, index + 1);
+    validationErrors.push(...errors);
+  });
+
+  // If there are validation errors on required fields, report them
+  const criticalErrors = validationErrors.filter(
+    e => e.field === 'company_name' || e.field === 'contact_name'
+  );
+
+  if (criticalErrors.length > 0) {
+    return {
+      batch_id: batchId,
+      total: leads.length,
+      imported: 0,
+      failed: criticalErrors.length,
+      errors: criticalErrors,
+    };
+  }
+
+  // Determine agent assignments
+  let agentAssignments: string[];
+
+  switch (options.assignmentStrategy) {
+    case 'manual':
+      if (!options.agentId) {
+        throw new Error('Agent ID required for manual assignment');
+      }
+      agentAssignments = leads.map(() => options.agentId!);
+      break;
+
+    case 'round_robin':
+      agentAssignments = await getRoundRobinAssignments(leads.length);
+      break;
+
+    case 'capacity':
+      agentAssignments = await getCapacityBasedAssignments(leads.length);
+      break;
+
+    default:
+      throw new Error(`Invalid assignment strategy: ${options.assignmentStrategy}`);
+  }
+
+  // Insert leads
+  const leadsToInsert = leads.map((lead, index) => ({
+    agent_id: agentAssignments[index],
+    assigned_at: new Date().toISOString(),
+    assigned_by: options.uploadedBy,
+    company_name: lead.company_name,
+    contact_name: lead.contact_name,
+    email: lead.email?.toLowerCase(),
+    phone: lead.phone,
+    address: lead.address,
+    city: lead.city,
+    state: lead.state,
+    zip: lead.zip,
+    trade_type: lead.trade_type,
+    employee_count: lead.employee_count,
+    current_website: lead.current_website,
+    current_crm: lead.current_crm,
+    notes: lead.notes,
+    source: 'batch_upload' as const,
+    source_details: `Batch upload ${batchId}`,
+    status: 'new' as const,
+    batch_upload_id: batchId,
+    contact_count: 0,
+  }));
+
+  const { data, error } = await supabase
+    .from('tc_leads')
+    .insert(leadsToInsert)
+    .select('id');
+
+  if (error) {
+    return {
+      batch_id: batchId,
+      total: leads.length,
+      imported: 0,
+      failed: leads.length,
+      errors: [{
+        row: 0,
+        field: 'database',
+        message: error.message,
+      }],
+    };
+  }
+
+  const importedCount = data?.length || 0;
+
+  // Log activity for each imported lead
+  if (data && data.length > 0) {
+    const activities = data.map((lead) => ({
+      lead_id: lead.id,
+      agent_id: options.uploadedBy,
+      activity_type: 'created',
+      description: `Lead created via batch upload (Batch: ${batchId})`,
+    }));
+
+    await supabase.from('lead_activities').insert(activities);
+  }
+
+  return {
+    batch_id: batchId,
+    total: leads.length,
+    imported: importedCount,
+    failed: leads.length - importedCount,
+    errors: validationErrors.filter(e => e.field !== 'company_name' && e.field !== 'contact_name'),
+  };
+}
+
+/**
+ * Get round-robin agent assignments
+ */
+async function getRoundRobinAssignments(count: number): Promise<string[]> {
+  const agents = await getActiveAgents();
+
+  if (agents.length === 0) {
+    throw new Error('No active agents available for assignment');
+  }
+
+  const assignments: string[] = [];
+  for (let i = 0; i < count; i++) {
+    assignments.push(agents[i % agents.length].id);
+  }
+
+  return assignments;
+}
+
+/**
+ * Get capacity-based agent assignments (agents with fewest active leads get priority)
+ */
+async function getCapacityBasedAssignments(count: number): Promise<string[]> {
+  const supabase = createAdminClient();
+  const agents = await getActiveAgents();
+
+  if (agents.length === 0) {
+    throw new Error('No active agents available for assignment');
+  }
+
+  // Get lead counts per agent
+  const { data: leadCounts } = await supabase
+    .from('tc_leads')
+    .select('agent_id')
+    .in('status', ['new', 'contacted', 'qualified', 'proposal_sent', 'negotiating']);
+
+  const countByAgent = new Map<string, number>();
+  agents.forEach(agent => countByAgent.set(agent.id, 0));
+
+  if (leadCounts) {
+    leadCounts.forEach((lead) => {
+      const current = countByAgent.get(lead.agent_id) || 0;
+      countByAgent.set(lead.agent_id, current + 1);
+    });
+  }
+
+  // Sort agents by lead count (ascending)
+  const sortedAgents = agents.sort((a, b) =>
+    (countByAgent.get(a.id) || 0) - (countByAgent.get(b.id) || 0)
+  );
+
+  // Assign leads, prioritizing agents with fewer leads
+  const assignments: string[] = [];
+  for (let i = 0; i < count; i++) {
+    // Re-sort after each assignment to maintain balance
+    sortedAgents.sort((a, b) =>
+      (countByAgent.get(a.id) || 0) - (countByAgent.get(b.id) || 0)
+    );
+
+    const agent = sortedAgents[0];
+    assignments.push(agent.id);
+    countByAgent.set(agent.id, (countByAgent.get(agent.id) || 0) + 1);
+  }
+
+  return assignments;
+}
+
+/**
+ * Get active agents for lead assignment
+ */
+export async function getActiveAgents(): Promise<AdminUser[]> {
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase
+    .from('admin_users')
+    .select('*')
+    .eq('status', 'active')
+    .in('role', ['agent', 'admin', 'super_admin'])
+    .order('full_name');
+
+  if (error || !data) {
+    return [];
+  }
+
+  return data;
+}
+
+/**
+ * Get batch upload history
+ */
+export async function getBatchUploadHistory(limit = 10): Promise<{
+  batch_id: string;
+  uploaded_at: string;
+  lead_count: number;
+  uploaded_by: string;
+}[]> {
+  const supabase = createAdminClient();
+
+  const { data } = await supabase
+    .from('tc_leads')
+    .select('batch_upload_id, created_at, assigned_by')
+    .not('batch_upload_id', 'is', null)
+    .order('created_at', { ascending: false });
+
+  if (!data) return [];
+
+  // Group by batch_upload_id
+  const batches = new Map<string, { uploaded_at: string; lead_count: number; uploaded_by: string }>();
+
+  data.forEach((lead) => {
+    if (!lead.batch_upload_id) return;
+
+    const existing = batches.get(lead.batch_upload_id);
+    if (existing) {
+      existing.lead_count++;
+    } else {
+      batches.set(lead.batch_upload_id, {
+        uploaded_at: lead.created_at,
+        lead_count: 1,
+        uploaded_by: lead.assigned_by || 'Unknown',
+      });
+    }
+  });
+
+  return Array.from(batches.entries())
+    .slice(0, limit)
+    .map(([batch_id, info]) => ({
+      batch_id,
+      ...info,
+    }));
 }

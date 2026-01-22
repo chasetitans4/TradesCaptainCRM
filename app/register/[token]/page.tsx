@@ -12,16 +12,14 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle,
-  Crown,
   Clock,
   ArrowRight,
-  Gift,
   Sparkles,
 } from 'lucide-react';
 
 interface InviteData {
   valid: boolean;
-  submission_type: 'trial' | 'founders';
+  submission_type: 'trial';
   company_name: string;
   email: string;
   plan: {
@@ -31,7 +29,6 @@ interface InviteData {
     users: number;
     features: string[];
   };
-  is_founders: boolean;
   is_trial: boolean;
 }
 
@@ -199,17 +196,8 @@ export default function RegistrationPage({ params }: { params: Promise<{ token: 
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full mb-6">
-            {inviteData?.is_founders ? (
-              <>
-                <Crown className="h-5 w-5 text-purple-400" />
-                <span className="text-purple-300 font-medium">Founders Program</span>
-              </>
-            ) : (
-              <>
-                <Clock className="h-5 w-5 text-blue-400" />
-                <span className="text-blue-300 font-medium">30-Day Free Trial</span>
-              </>
-            )}
+            <Clock className="h-5 w-5 text-blue-400" />
+            <span className="text-blue-300 font-medium">30-Day Free Trial</span>
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-3">
             Complete Your Registration
@@ -220,97 +208,48 @@ export default function RegistrationPage({ params }: { params: Promise<{ token: 
           </p>
         </div>
 
-        {/* Founders Banner */}
-        {inviteData?.is_founders && (
-          <div className="bg-gradient-to-r from-purple-600/20 to-purple-800/20 border border-purple-500/30 rounded-xl p-4 mb-6 flex items-center gap-4">
-            <div className="p-3 bg-purple-500/20 rounded-lg">
-              <Gift className="h-6 w-6 text-purple-400" />
-            </div>
-            <div>
-              <div className="font-semibold text-purple-200">You're a Founding Member!</div>
-              <div className="text-purple-300/80 text-sm">
-                Enjoy 3 months free on the Blue Starter plan - a $147 value!
-              </div>
-            </div>
-          </div>
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column - Plan Selection (for trials) or Plan Info (for founders) */}
+          {/* Left Column - Plan Selection */}
           <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
             <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary" />
-              {inviteData?.is_trial ? 'Select Your Plan' : 'Your Plan'}
+              Select Your Plan
             </h2>
 
-            {inviteData?.is_founders ? (
-              <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <div className="text-xl font-bold text-white">Blue Starter</div>
-                    <div className="text-purple-300">Founders Edition</div>
-                  </div>
-                  <Crown className="h-8 w-8 text-purple-400" />
-                </div>
-                <div className="mb-4">
-                  <span className="text-3xl font-bold text-white">$0</span>
-                  <span className="text-gray-400">/mo for 3 months</span>
-                  <div className="text-sm text-gray-400 line-through">$49/mo regular price</div>
-                </div>
-                <ul className="space-y-2">
-                  {plans[0].features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2 text-gray-300">
-                      <CheckCircle className="h-4 w-4 text-purple-400" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {plans.map((plan) => (
-                  <label
-                    key={plan.id}
-                    className={`relative flex flex-col p-4 rounded-xl cursor-pointer transition-all border-2 ${
-                      selectedPlan === plan.id
-                        ? 'border-primary bg-primary/10'
-                        : 'border-white/10 hover:border-white/20 bg-white/5'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="plan"
-                      value={plan.id}
-                      checked={selectedPlan === plan.id}
-                      onChange={(e) => setSelectedPlan(e.target.value)}
-                      className="sr-only"
-                    />
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-semibold text-white">{plan.name}</div>
-                        <div className="text-sm text-gray-400">{plan.description}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xl font-bold text-white">${plan.price}</div>
-                        <div className="text-xs text-gray-400">/month after trial</div>
-                      </div>
+            <div className="space-y-4">
+              {plans.map((plan) => (
+                <label
+                  key={plan.id}
+                  className={`block relative rounded-xl border-2 p-4 cursor-pointer transition-all ${
+                    selectedPlan === plan.id
+                      ? 'border-primary bg-primary/10'
+                      : 'border-white/10 hover:border-white/20 hover:bg-white/5'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="plan"
+                    value={plan.id}
+                    checked={selectedPlan === plan.id}
+                    onChange={(e) => setSelectedPlan(e.target.value)}
+                    className="sr-only"
+                  />
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <div className="font-semibold text-white">{plan.name}</div>
+                      <div className="text-sm text-gray-400">{plan.description}</div>
                     </div>
-                    {selectedPlan === plan.id && (
-                      <div className="mt-3 pt-3 border-t border-white/10">
-                        <ul className="grid grid-cols-2 gap-1 text-sm">
-                          {plan.features.map((feature) => (
-                            <li key={feature} className="flex items-center gap-1 text-gray-300">
-                              <CheckCircle className="h-3 w-3 text-primary shrink-0" />
-                              {feature}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </label>
-                ))}
-              </div>
-            )}
+                    <div className="text-right">
+                      <div className="font-bold text-white">${plan.price}</div>
+                      <div className="text-xs text-gray-400">/month</div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Includes {plan.users} user{plan.users > 1 ? 's' : ''}
+                  </div>
+                </label>
+              ))}
+            </div>
           </div>
 
           {/* Right Column - Registration Form */}

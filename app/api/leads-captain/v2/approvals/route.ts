@@ -4,25 +4,36 @@
 // =====================================================
 
 import { NextResponse } from 'next/server';
-import { getServerUserProfile } from '@/lib/supabase/server';
+import { getServerSession, checkPermission } from '@/lib/permissions/check-permission';
 import { createAdminClient } from '@/lib/supabase/server';
 import { apiLogger } from '@/lib/logger';
 import type { ApprovalQueueItem, ApprovalQueueResponse, LeadsCaptainMessage } from '@/types/leads-captain';
 
 export async function GET() {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('view_leads_captain');
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const supabase = createAdminClient();
 
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+
     // Get config
     const { data: config } = await supabase
       .from('leads_captain_config')
       .select('id, approval_timeout_minutes')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', userData.business_id)
       .single();
 
     if (!config) {

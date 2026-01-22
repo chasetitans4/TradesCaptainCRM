@@ -5,21 +5,34 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserProfile } from '@/lib/supabase/server';
+import { getServerSession } from '@/lib/permissions/check-permission';
 import { getTimeEntries, addTimeEntry } from '@/lib/timesheets';
 import { isFeatureEnabled } from '@/lib/features';
 import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
-    const profile = await getServerUserProfile();
-
-    if (!profile) {
+    const session = await getServerSession();
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    
+    // Determine business ID
+    let businessId = session.user.businessId;
+    const queryBusinessId = searchParams.get('businessId');
+    
+    if ((session.user.role === 'admin' || session.user.role === 'super_admin') && queryBusinessId) {
+      businessId = queryBusinessId;
+    }
+
+    if (!businessId) {
+      return NextResponse.json({ error: 'Business ID not found' }, { status: 404 });
+    }
+
     // Check if timesheets feature is enabled
-    const enabled = await isFeatureEnabled(profile.business_id, 'timesheets_enabled');
+    const enabled = await isFeatureEnabled(businessId, 'timesheets_enabled');
     if (!enabled) {
       return NextResponse.json(
         { error: 'Timesheets feature is not enabled' },
@@ -27,7 +40,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
@@ -35,9 +47,9 @@ export async function GET(request: NextRequest) {
 
     // Technicians can only see their own entries
     const targetUserId =
-      profile.role === 'technician' ? profile.id : userId || undefined;
+      session.user.role === 'technician' ? session.user.id : userId || undefined;
 
-    const entries = await getTimeEntries(profile.business_id, {
+    const entries = await getTimeEntries(businessId, {
       userId: targetUserId,
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
@@ -56,14 +68,25 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const profile = await getServerUserProfile();
-
-    if (!profile) {
+    const session = await getServerSession();
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const body = await request.json();
+
+    // Determine business ID
+    let businessId = session.user.businessId;
+    if ((session.user.role === 'admin' || session.user.role === 'super_admin') && body.businessId) {
+      businessId = body.businessId;
+    }
+
+    if (!businessId) {
+      return NextResponse.json({ error: 'Business ID not found' }, { status: 404 });
+    }
+
     // Check if timesheets feature is enabled
-    const enabled = await isFeatureEnabled(profile.business_id, 'timesheets_enabled');
+    const enabled = await isFeatureEnabled(businessId, 'timesheets_enabled');
     if (!enabled) {
       return NextResponse.json(
         { error: 'Timesheets feature is not enabled' },
@@ -71,12 +94,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
     const { userId, clockIn, clockOut, breakMinutes, jobId, notes } = body;
 
     // Only admins/owners can add entries for other users
     const targetUserId =
-      profile.role === 'technician' ? profile.id : userId || profile.id;
+      session.user.role === 'technician' ? session.user.id : userId || session.user.id;
 
     if (!clockIn || !clockOut) {
       return NextResponse.json(
@@ -85,7 +107,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const entry = await addTimeEntry(targetUserId, profile.business_id, {
+    const entry = await addTimeEntry(targetUserId, businessId, {
       clockIn: new Date(clockIn),
       clockOut: new Date(clockOut),
       breakMinutes: breakMinutes || 0,

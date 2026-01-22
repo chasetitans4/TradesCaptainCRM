@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import {
   clockIn,
   clockOut,
@@ -11,16 +11,14 @@ import {
   getLaborSummary,
 } from '@/lib/costing/labor';
 import { apiLogger } from '@/lib/logger';
+import { getServerSession } from '@/lib/permissions/check-permission';
 
 // GET /api/costing/labor - Get labor entries
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -31,23 +29,31 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate');
     const activeOnly = searchParams.get('active');
 
+    // Determine correct Supabase client
+    let supabase;
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      supabase = createAdminClient();
+    } else {
+      supabase = await createClient();
+    }
+
     // Get active clock-in for user
     if (activeOnly === 'true') {
-      const targetUserId = userId || user.id;
-      const activeClockIn = await getActiveClockIn(targetUserId);
+      const targetUserId = userId || session.user.id;
+      const activeClockIn = await getActiveClockIn(targetUserId, supabase);
       return NextResponse.json({ activeClockIn });
     }
 
     // Get labor for specific job
     if (jobId) {
-      const labor = await getJobLabor(jobId);
+      const labor = await getJobLabor(jobId, supabase);
       return NextResponse.json({ labor });
     }
 
     // Get labor summary for user/date range
     if (startDate && endDate) {
-      const targetUserId = userId || user.id;
-      const summary = await getLaborSummary(targetUserId, startDate, endDate);
+      const targetUserId = userId || session.user.id;
+      const summary = await getLaborSummary(targetUserId, startDate, endDate, supabase);
       return NextResponse.json(summary);
     }
 
@@ -64,31 +70,36 @@ export async function GET(request: NextRequest) {
 // POST /api/costing/labor - Labor actions
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
     const { action, jobId, ...data } = body;
 
-    if (!jobId) {
+    if (!jobId && action !== 'updateEntry' && action !== 'deleteEntry') {
       return NextResponse.json({ error: 'Job ID is required' }, { status: 400 });
+    }
+
+    // Determine correct Supabase client
+    let supabase;
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      supabase = createAdminClient();
+    } else {
+      supabase = await createClient();
     }
 
     let result;
 
     switch (action) {
       case 'clockIn':
-        result = await clockIn(jobId, user.id, data.notes);
+        result = await clockIn(jobId, session.user.id, data.notes, supabase);
         break;
 
       case 'clockOut':
-        result = await clockOut(jobId, user.id, data.breakMinutes || 0, data.notes);
+        result = await clockOut(jobId, session.user.id, data.breakMinutes || 0, data.notes, supabase);
         break;
 
       case 'addEntry':
@@ -98,37 +109,44 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
-        result = await addLaborEntry(jobId, data.userId || user.id, {
-          clockIn: new Date(data.clockIn),
-          clockOut: new Date(data.clockOut),
-          breakMinutes: data.breakMinutes,
-          notes: data.notes,
-          isOvertime: data.isOvertime,
-        });
+        
+        // Admins can add entries for other users
+        const targetUserId = (session.user.role === 'admin' || session.user.role === 'super_admin') && data.userId 
+          ? data.userId 
+          : session.user.id;
+
+        result = await addLaborEntry(
+          jobId,
+          targetUserId,
+          {
+            clockIn: data.clockIn,
+            clockOut: data.clockOut,
+            breakMinutes: data.breakMinutes,
+            notes: data.notes,
+            isOvertime: data.isOvertime
+          }
+        );
         break;
 
       case 'updateEntry':
         if (!data.entryId) {
-          return NextResponse.json(
-            { error: 'Entry ID is required' },
-            { status: 400 }
-          );
+             return NextResponse.json({ error: 'Entry ID required' }, { status: 400 });
         }
-        result = await updateLaborEntry(data.entryId, {
-          clockIn: data.clockIn ? new Date(data.clockIn) : undefined,
-          clockOut: data.clockOut ? new Date(data.clockOut) : undefined,
-          breakMinutes: data.breakMinutes,
-          notes: data.notes,
-          isOvertime: data.isOvertime,
-        });
+        result = await updateLaborEntry(
+            data.entryId,
+            {
+                clockIn: data.clockIn,
+                clockOut: data.clockOut,
+                breakMinutes: data.breakMinutes,
+                notes: data.notes,
+                isOvertime: data.isOvertime
+            }
+        );
         break;
 
       case 'deleteEntry':
         if (!data.entryId) {
-          return NextResponse.json(
-            { error: 'Entry ID is required' },
-            { status: 400 }
-          );
+             return NextResponse.json({ error: 'Entry ID required' }, { status: 400 });
         }
         result = await deleteLaborEntry(data.entryId);
         break;
@@ -138,12 +156,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 400 });
+      return NextResponse.json(
+        { error: result.error || 'Operation failed' },
+        { status: 400 }
+      );
     }
 
     return NextResponse.json(result);
   } catch (error) {
-    apiLogger.error({ msg: 'Error with labor action', error: error instanceof Error ? error.message : 'Unknown error' });
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to process labor action' }, { status: 500 });
+    apiLogger.error({ error, context: 'Error processing labor action' });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }

@@ -45,12 +45,13 @@ export default function FollowUpsPage() {
   async function loadFollowUps() {
     try {
       const response = await fetch('/api/follow-ups');
-      if (response.ok) {
-        const data = await response.json();
-        setFollowUps(data.follow_ups || []);
+      if (!response.ok) {
+        throw new Error(`Failed to load follow-ups: ${response.status}`);
       }
+      const data = await response.json();
+      setFollowUps(data.follow_ups || []);
     } catch (error) {
-      console.error('Error loading follow-ups:', error);
+      console.error('Error loading follow-ups:', error instanceof Error ? error.message : 'Unknown error');
       setError('Failed to load follow-ups');
     } finally {
       setLoading(false);

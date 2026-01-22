@@ -4,7 +4,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    // Use admin client to bypass RLS for public business info
+    const supabase = createAdminClient();
 
     const { data: business, error } = await supabase
       .from('businesses')

@@ -80,7 +80,7 @@ export async function generatePaymentLinkForInvoice(invoiceId: string): Promise<
     .select(
       `
       *,
-      customer:customers (name, email),
+      customer:customers!invoices_customer_id_fkey (name, email),
       business:businesses (name)
     `
     )
@@ -124,7 +124,7 @@ export async function sendInvoiceViaSms(invoiceId: string): Promise<void> {
     .select(
       `
       *,
-      customer:customers (name, phone),
+      customer:customers!invoices_customer_id_fkey (name, phone),
       business:businesses (name, twilio_phone_number)
     `
     )
@@ -183,7 +183,7 @@ export async function sendInvoiceViaEmail(invoiceId: string): Promise<void> {
     .select(
       `
       *,
-      customer:customers (name, email),
+      customer:customers!invoices_customer_id_fkey (name, email),
       business:businesses (name, phone, email),
       line_items:invoice_items (id, description, quantity, unit_price, is_taxable)
     `
@@ -265,7 +265,7 @@ export async function sendPaymentReminder(invoiceId: string): Promise<void> {
     .select(
       `
       *,
-      customer:customers (name, email),
+      customer:customers!invoices_customer_id_fkey (name, email),
       business:businesses (name, phone)
     `
     )

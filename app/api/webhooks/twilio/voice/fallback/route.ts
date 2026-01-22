@@ -11,6 +11,7 @@ import { handleMissedCall, hasLeadsCaptainAccess, TwilioMissedCallPayload } from
 import { processInboundMessage, type ProcessorOptions } from '@/lib/leads-captain/v2';
 import { createAdminClient } from '@/lib/supabase/server';
 import { formatPhoneE164, sendSMS } from '@/lib/twilio';
+import { validateTwilioSignature } from '@/lib/twilio/client';
 import { apiLogger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
@@ -20,6 +21,17 @@ export async function POST(request: NextRequest) {
     formData.forEach((value, key) => {
       params[key] = value.toString();
     });
+
+    // Validate Twilio signature in production
+    if (process.env.NODE_ENV === 'production') {
+      const twilioSignature = request.headers.get('x-twilio-signature');
+      const url = request.url;
+
+      if (!twilioSignature || !validateTwilioSignature(twilioSignature, url, params)) {
+        apiLogger.warn({ msg: 'Invalid Twilio signature on voice fallback webhook', url });
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
 
     const dialCallStatus = params.DialCallStatus;
     const callSid = params.CallSid;

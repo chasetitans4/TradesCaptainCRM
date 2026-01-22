@@ -74,9 +74,20 @@ export const QUESTIONNAIRE_QUESTIONS: QuestionnaireQuestion[] = [
       { value: 'route_optimization', label: 'Route Optimization', description: 'Optimize daily routes' },
       { value: 'online_booking', label: 'Online Booking', description: 'Let customers book online' },
       { value: 'review_requests', label: 'Google Reviews', description: 'Request reviews after jobs' },
-      { value: 'ai_sms', label: 'AI SMS', description: 'Auto-respond to customer texts' },
     ],
     required: false,
+  },
+  {
+    id: 'aiServices',
+    type: 'single',
+    question: 'Interested in AI-powered services?',
+    // v6.3: Leads Captain is now a $49/mo add-on available for any Blue CRM plan
+    description: 'Leads Captain ($49/mo add-on) can auto-respond to customer texts and capture leads. Available for any plan. You can add or remove this anytime in Settings > AI Services.',
+    options: [
+      { value: 'yes', label: 'Yes, I\'m interested', description: 'Learn more about Leads Captain add-on ($49/mo)' },
+      { value: 'no', label: 'No thanks', description: 'Handle all customer messages yourself' },
+    ],
+    required: true,
   },
   {
     id: 'notifications',
@@ -106,6 +117,7 @@ export const QUESTIONNAIRE_QUESTIONS: QuestionnaireQuestion[] = [
 
 /**
  * Process questionnaire responses and set up initial feature settings
+ * v6.3: AI services preference is now just an interest flag - actual activation requires addon purchase
  */
 export async function processQuestionnaireResponses(
   businessId: string,
@@ -117,8 +129,8 @@ export async function processQuestionnaireResponses(
   const features = responses.features || [];
   const featureSettings = {
     business_id: businessId,
-    // Communication
-    ai_sms_enabled: features.includes('ai_sms'),
+    // v6.3: ai_sms_enabled stays false until they purchase the addon
+    ai_sms_enabled: false,
     auto_appointment_reminders: responses.appointmentReminders === 'yes',
     auto_review_requests: features.includes('review_requests'),
     // Scheduling
@@ -150,15 +162,21 @@ export async function processQuestionnaireResponses(
     throw new Error('Failed to save feature preferences');
   }
 
-  // Save questionnaire responses for analytics
+  // Save questionnaire responses to businesses table
+  // v6.3: interested_in_ai_addon flag tracks interest for follow-up
   await supabase
     .from('businesses')
     .update({
       questionnaire_completed: true,
       questionnaire_completed_at: new Date().toISOString(),
       team_size: responses.teamSize,
+      // v6.3: Don't auto-enable AI - requires addon purchase
+      ai_sms_enabled: false,
     })
     .eq('id', businessId);
+
+  // v6.3: If interested in AI, redirect them to AI services page after onboarding
+  // This is handled in the frontend redirect logic
 }
 
 /**

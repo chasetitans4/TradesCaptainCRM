@@ -1,11 +1,13 @@
 // =====================================================
 // UNIFIED NOTIFICATIONS SERVICE
 // Handles email, SMS, and push notifications
+// With SMS batching for cost optimization
 // =====================================================
 
 import { createAdminClient } from '@/lib/supabase/server';
 import { sendEmail, isEmailConfigured } from '@/lib/email';
 import * as emailTemplates from '@/lib/email';
+import { queueBatchedSMS, sendUrgentSMS, SMS_PRIORITY } from './sms-batcher';
 
 export type NotificationType =
   | 'job_confirmed'
@@ -72,16 +74,16 @@ export async function notifyJobConfirmed(
     });
   }
 
-  // Send SMS
+  // Send SMS (urgent - confirmation is time-sensitive)
   if (channels.includes('sms') && job.customer.phone) {
-    const { sendSMS } = await import('@/lib/twilio/sms');
     const date = job.scheduled_date ? new Date(job.scheduled_date).toLocaleDateString() : 'TBD';
     const time = job.scheduled_time || '';
 
-    await sendSMS({
+    await sendUrgentSMS({
       to: job.customer.phone,
-      body: `Hi ${job.customer.name}! Your appointment with ${job.business.name} is confirmed for ${date}${time ? ` at ${time}` : ''}. Reply HELP for assistance.`,
+      message: `Hi ${job.customer.name}! Your appointment with ${job.business.name} is confirmed for ${date}${time ? ` at ${time}` : ''}. Reply HELP for assistance.`,
       businessId: job.business_id,
+      customerId: job.customer.id,
     });
   }
 
@@ -138,9 +140,8 @@ export async function notifyJobCompleted(
     });
   }
 
-  // Send SMS
+  // Send SMS (batched - may combine with review request)
   if (channels.includes('sms') && job.customer.phone) {
-    const { sendSMS } = await import('@/lib/twilio/sms');
     let message = `Hi ${job.customer.name}! Your service with ${job.business.name} is complete.`;
     if (invoiceLink) {
       message += ` View invoice: ${invoiceLink}`;
@@ -149,10 +150,12 @@ export async function notifyJobCompleted(
       message += ` We'd love your review!`;
     }
 
-    await sendSMS({
+    await queueBatchedSMS({
       to: job.customer.phone,
-      body: message,
+      message,
       businessId: job.business_id,
+      customerId: job.customer.id,
+      priority: SMS_PRIORITY.NORMAL,
     });
   }
 
@@ -204,13 +207,13 @@ export async function notifyTechnicianEnRoute(
     });
   }
 
-  // Send SMS
+  // Send SMS (urgent - time-sensitive arrival notification)
   if (channels.includes('sms') && job.customer.phone) {
-    const { sendSMS } = await import('@/lib/twilio/sms');
-    await sendSMS({
+    await sendUrgentSMS({
       to: job.customer.phone,
-      body: `Hi ${job.customer.name}! ${job.assigned_user.name} from ${job.business.name} is on the way. ETA: ${etaStr}. Please ensure access to the service area.`,
+      message: `Hi ${job.customer.name}! ${job.assigned_user.name} from ${job.business.name} is on the way. ETA: ${etaStr}. Please ensure access to the service area.`,
       businessId: job.business_id,
+      customerId: job.customer.id,
     });
   }
 
@@ -273,13 +276,14 @@ export async function sendQuoteNotification(
     });
   }
 
-  // Send SMS
+  // Send SMS (batched - normal priority)
   if (channels.includes('sms') && quote.customer.phone) {
-    const { sendSMS } = await import('@/lib/twilio/sms');
-    await sendSMS({
+    await queueBatchedSMS({
       to: quote.customer.phone,
-      body: `Hi ${quote.customer.name}! ${quote.business.name} has sent you a quote for $${quote.total.toFixed(2)}. View & accept: ${viewLink}`,
+      message: `Hi ${quote.customer.name}! ${quote.business.name} has sent you a quote for $${quote.total.toFixed(2)}. View & accept: ${viewLink}`,
       businessId: quote.business_id,
+      customerId: quote.customer.id,
+      priority: SMS_PRIORITY.NORMAL,
     });
   }
 
@@ -334,13 +338,14 @@ export async function sendReviewRequest(
     });
   }
 
-  // Send SMS
+  // Send SMS (batched - low priority, may combine with job completed)
   if (channels.includes('sms') && customer.phone) {
-    const { sendSMS } = await import('@/lib/twilio/sms');
-    await sendSMS({
+    await queueBatchedSMS({
       to: customer.phone,
-      body: `Hi ${customer.name}! Thank you for choosing ${business.name}. We'd love to hear about your experience! Leave a review: ${reviewLink}`,
+      message: `Hi ${customer.name}! Thank you for choosing ${business.name}. We'd love to hear about your experience! Leave a review: ${reviewLink}`,
       businessId,
+      customerId,
+      priority: SMS_PRIORITY.LOW,
     });
   }
 
@@ -370,3 +375,7 @@ async function logNotification(
 // Re-export push notification functions
 export { sendPushNotification } from './push';
 export * from './push';
+
+// Re-export batching and consolidation functions
+export { queueBatchedSMS, sendUrgentSMS, cancelPendingBatch, SMS_PRIORITY } from './sms-batcher';
+export { queueConsolidatedEmail, sendImmediateEmail, cancelPendingEmails, EMAIL_PRIORITY } from './email-consolidator';

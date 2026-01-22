@@ -4,7 +4,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAgentOrHigher } from '@/lib/admin/auth';
+import { checkPermission } from '@/lib/permissions/check-permission';
 import {
   lookupCustomerByPhone,
   lookupCustomerByEmail,
@@ -14,13 +14,9 @@ import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
-    const admin = await requireAgentOrHigher();
+    await checkPermission('view_admin_support');
 
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const searchParams = request.nextUrl.searchParams;
+    const { searchParams } = new URL(request.url);
     const query = searchParams.get('q');
     const type = searchParams.get('type') || 'auto';
 

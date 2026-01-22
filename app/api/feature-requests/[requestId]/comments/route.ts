@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { addFeatureComment, getFeatureComments } from '@/lib/feature-requests';
+import { checkPermission } from '@/lib/permissions/check-permission';
 import { apiLogger } from '@/lib/logger';
 
 // POST - Add a comment
@@ -14,6 +15,7 @@ export async function POST(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
+    await checkPermission('view_feature_requests');
     const { requestId } = await params;
     const body = await request.json();
     const { commenter_type, commenter_id, commenter_name, comment, is_official_response } = body;
@@ -56,6 +58,7 @@ export async function GET(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
+    await checkPermission('view_feature_requests');
     const { requestId } = await params;
     const comments = await getFeatureComments(requestId);
 

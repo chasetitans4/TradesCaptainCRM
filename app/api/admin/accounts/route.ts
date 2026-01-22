@@ -4,20 +4,22 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAgentOrHigher } from '@/lib/admin/auth';
+import { checkPermission, getServerSession } from '@/lib/permissions/check-permission';
 import { getCRMAccounts, PlanStatus, PlanType } from '@/lib/admin';
 import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
-    const admin = await requireAgentOrHigher();
-
-    if (!admin) {
+    await checkPermission('view_admin_accounts');
+    const session = await getServerSession();
+    
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    
+    const admin = session.user;
 
-    // Parse query params
-    const searchParams = request.nextUrl.searchParams;
+    const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') as PlanStatus | null;
     const planType = searchParams.get('plan_type') as PlanType | null;
     const agentId = searchParams.get('agent_id');

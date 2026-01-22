@@ -5,7 +5,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserProfile } from '@/lib/supabase/server';
+import { getServerSession, checkPermission } from '@/lib/permissions/check-permission';
 import { createAdminClient } from '@/lib/supabase/server';
 import { checkPlanLimit } from '@/lib/leads-captain/v2/features';
 import { apiLogger } from '@/lib/logger';
@@ -13,8 +13,9 @@ import type { CreateRuleRequest } from '@/types/leads-captain';
 
 export async function GET(request: NextRequest) {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('view_leads_captain');
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -22,11 +23,21 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const includeInactive = searchParams.get('include_inactive') === 'true';
 
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+
     // Get config ID
     const { data: config } = await supabase
       .from('leads_captain_config')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', userData.business_id)
       .single();
 
     if (!config) {
@@ -48,7 +59,7 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
 
     // Get limit info
-    const limitInfo = await checkPlanLimit(profile.business_id, 'rules');
+    const limitInfo = await checkPlanLimit(userData.business_id, 'rules');
 
     return NextResponse.json({
       rules: rules || [],
@@ -71,8 +82,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('manage_leads_captain');
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -95,11 +107,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id, email')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+
     // Get config ID
     const { data: config } = await supabase
       .from('leads_captain_config')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', userData.business_id)
       .single();
 
     if (!config) {
@@ -107,7 +129,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check plan limit
-    const limitInfo = await checkPlanLimit(profile.business_id, 'rules');
+    const limitInfo = await checkPlanLimit(userData.business_id, 'rules');
     if (!limitInfo.allowed) {
       return NextResponse.json(
         {
@@ -154,7 +176,7 @@ export async function POST(request: NextRequest) {
     await supabase.from('leads_captain_audit_log').insert({
       config_id: config.id,
       action: 'rule_created',
-      actor: profile.email || 'user',
+      actor: userData.email || 'user',
       details: { rule_id: rule.id, rule_name: rule.name },
     });
 

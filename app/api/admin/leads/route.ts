@@ -5,14 +5,18 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getLeads, createLead } from '@/lib/admin/leads';
-import { verifyAdminAuth } from '@/lib/admin/auth';
+import { checkPermission, hasServerPermission, getServerSession } from '@/lib/permissions/check-permission';
 import { LeadStatus } from '@/lib/admin/types';
 import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth(request);
-    if (!auth.valid || !auth.user) {
+    if (!await hasServerPermission('view_admin_leads')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const session = await getServerSession();
+
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -23,9 +27,11 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '25');
 
     // Non-management roles can only see their own leads
-    const effectiveAgentId = ['super_admin', 'admin', 'finance'].includes(auth.user.role)
+    // Note: session.user.role is typed as string | AdminRole, but checkPermission verifies it.
+    const userRole = session.user.role;
+    const effectiveAgentId = ['super_admin', 'admin', 'finance'].includes(userRole)
       ? agentId
-      : auth.user.id;
+      : session.user.id;
 
     const result = await getLeads({
       agentId: effectiveAgentId,
@@ -49,18 +55,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth(request);
-    if (!auth.valid || !auth.user) {
+    await checkPermission('manage_admin_leads');
+    
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only agents, admins, and super_admins can create leads
-    if (!['agent', 'admin', 'super_admin'].includes(auth.user.role)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    const body = await request.json();
-    const lead = await createLead(auth.user.id, body);
+    const data = await request.json();
+    const lead = await createLead(session.user.id, data);
 
     return NextResponse.json({ success: true, lead });
   } catch (error) {

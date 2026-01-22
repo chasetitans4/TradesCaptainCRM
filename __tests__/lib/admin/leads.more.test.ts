@@ -12,8 +12,8 @@ import {
 jest.mock('@/lib/supabase/server', () => {
   const state: any = {
     leads: [
-      { id: 'l1', agent_id: 'a1', status: 'new', deleted_at: null, email: 'X@E.com' },
-      { id: 'l2', agent_id: 'a2', status: 'new', deleted_at: null },
+      { id: 'l1', agent_id: 'a1', status: 'new', email: 'X@E.com' },
+      { id: 'l2', agent_id: 'a2', status: 'new' },
     ],
     activities: [
       { id: 'act1', lead_id: 'l1', created_at: '2024-01-02T00:00:00.000Z' },
@@ -230,7 +230,9 @@ describe('admin leads: detail and updates', () => {
     supabase.createAdminClient = original;
   });
 
-  it('throws on getLeadActivities query error', async () => {
+  it('returns empty array on getLeadActivities query error', async () => {
+    // Note: getLeadActivities handles errors gracefully and returns empty array
+    // instead of throwing, to support cases where the table might not exist
     const supabase = require('@/lib/supabase/server');
     const original = supabase.createAdminClient;
     supabase.createAdminClient = jest.fn(() => ({
@@ -243,22 +245,25 @@ describe('admin leads: detail and updates', () => {
       }),
     }));
     const mod = require('@/lib/admin/leads');
-    await expect(mod.getLeadActivities('lX')).rejects.toBeTruthy();
+    const result = await mod.getLeadActivities('lX');
+    expect(result).toEqual([]);
     supabase.createAdminClient = original;
   });
 
   it('getLeadStats returns zeros when data null', async () => {
     const supabase = require('@/lib/supabase/server');
     const original = supabase.createAdminClient;
+    const makeChain = () => {
+      const chain: any = {
+        is: () => chain,
+        eq: () => chain,
+        then: (resolve: any) => resolve({ data: null }),
+      };
+      return chain;
+    };
     supabase.createAdminClient = jest.fn(() => ({
       from: (_table: string) => ({
-        select: () => ({
-          is: () => ({
-            eq: () => ({
-              then: (resolve: any) => resolve({ data: null }),
-            }),
-          }),
-        }),
+        select: () => makeChain(),
       }),
     }));
     const mod = require('@/lib/admin/leads');

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { User, Bell, Lock, Save, Loader2, CheckCircle } from 'lucide-react';
+import { User, Bell, Lock, Save, Loader2, CheckCircle, Bot, FlaskConical } from 'lucide-react';
+import { DemoDataSection } from '@/components/portal/demo-data-section';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +28,11 @@ interface NotificationPreferences {
   sms: boolean;
 }
 
+interface AIPreferences {
+  allowAIResponses: boolean;
+  preferHuman: boolean;
+}
+
 export default function SettingsPage() {
   const params = useParams();
   const businessId = params.businessId as string;
@@ -35,6 +41,10 @@ export default function SettingsPage() {
   const [notifications, setNotifications] = useState<NotificationPreferences>({
     email: true,
     sms: true,
+  });
+  const [aiPreferences, setAIPreferences] = useState<AIPreferences>({
+    allowAIResponses: true,
+    preferHuman: false,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -56,6 +66,7 @@ export default function SettingsPage() {
         const data = await response.json();
         setProfile(data.profile);
         setNotifications(data.notifications || { email: true, sms: true });
+        setAIPreferences(data.aiPreferences || { allowAIResponses: true, preferHuman: false });
       } catch (_error) {
         setError('Failed to load settings');
       } finally {
@@ -115,6 +126,34 @@ export default function SettingsPage() {
       }
 
       setSuccess('Notification preferences saved');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveAIPreferences = async () => {
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch('/api/portal/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessId,
+          aiPreferences,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error);
+      }
+
+      setSuccess('AI preferences saved');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -335,6 +374,67 @@ export default function SettingsPage() {
           </Button>
         </CardContent>
       </Card>
+
+      {/* AI Communication Preferences */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bot className="h-5 w-5" />
+            AI Communication Preferences
+          </CardTitle>
+          <CardDescription>
+            Control how our AI assistant interacts with you
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Allow AI Responses</Label>
+              <p className="text-sm text-gray-500">
+                Let our AI assistant respond to your messages for faster service
+              </p>
+            </div>
+            <Switch
+              checked={aiPreferences.allowAIResponses}
+              onCheckedChange={(checked) =>
+                setAIPreferences((prev) => ({ ...prev, allowAIResponses: checked }))
+              }
+            />
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Prefer Human Support</Label>
+              <p className="text-sm text-gray-500">
+                Request to speak with a team member instead of AI when possible
+              </p>
+            </div>
+            <Switch
+              checked={aiPreferences.preferHuman}
+              onCheckedChange={(checked) =>
+                setAIPreferences((prev) => ({ ...prev, preferHuman: checked }))
+              }
+            />
+          </div>
+          <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+            <p>
+              <strong>Note:</strong> Our AI helps provide instant responses 24/7.
+              Complex requests are always routed to our team for personal attention.
+            </p>
+          </div>
+          <Button onClick={handleSaveAIPreferences} disabled={saving}>
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            Save AI Preferences
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Demo Data */}
+      <DemoDataSection />
 
       {/* Password Change */}
       <Card>

@@ -5,6 +5,7 @@
 // overdue invoices, pending estimates to suggest ONE action
 // =====================================================
 
+import 'openai/shims/node';
 import { NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';

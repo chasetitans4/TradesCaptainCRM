@@ -20,13 +20,14 @@ import { createClient, getCurrentUserProfile } from '@/lib/supabase/client';
 import { cn, formatRelativeDate, formatPhoneNumber } from '@/lib/utils';
 import type { UserWithBusiness } from '@/types';
 
-import type { Invoice } from './_components/types';
+import type { Invoice, PaymentPlan } from './_components/types';
 import { InvoiceHeader } from './_components/invoice-header';
 import { InvoiceLineItems } from './_components/invoice-line-items';
 import { PaymentHistory } from './_components/payment-history';
 import { PaymentModal } from './_components/payment-modal';
 import { RefundModal } from './_components/refund-modal';
 import { InvoiceActions } from './_components/invoice-actions';
+import { PaymentPlanModal, PaymentPlanDisplay } from './_components/payment-plan-modal';
 
 export default function InvoiceDetailPage() {
   const router = useRouter();
@@ -40,6 +41,8 @@ export default function InvoiceDetailPage() {
   const [showMenu, setShowMenu] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showRefundModal, setShowRefundModal] = useState(false);
+  const [showPaymentPlanModal, setShowPaymentPlanModal] = useState(false);
+  const [paymentPlan, setPaymentPlan] = useState<PaymentPlan | null>(null);
   const [generatingPaymentLink, setGeneratingPaymentLink] = useState(false);
   const [recordingPayment, setRecordingPayment] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -90,8 +93,37 @@ export default function InvoiceDetailPage() {
     }
 
     setInvoice(data);
-    setPaymentAmount(data.amount_due.toFixed(2));
+    setPaymentAmount((data.amount_due ?? 0).toFixed(2));
     setLoading(false);
+
+    // Load payment plan if exists
+    loadPaymentPlan();
+  };
+
+  const loadPaymentPlan = async () => {
+    try {
+      const response = await fetch(`/api/invoices/${invoiceId}/payment-plan`);
+      if (response.ok) {
+        const data = await response.json();
+        setPaymentPlan(data.plan);
+      }
+    } catch {
+      // Payment plan is optional
+    }
+  };
+
+  const handleCancelPaymentPlan = async () => {
+    try {
+      const response = await fetch(`/api/invoices/${invoiceId}/payment-plan`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        setPaymentPlan(null);
+        loadData();
+      }
+    } catch {
+      alert('Failed to cancel payment plan');
+    }
   };
 
   const handleSendInvoice = async () => {
@@ -292,6 +324,24 @@ export default function InvoiceDetailPage() {
           </div>
         )}
 
+        {/* Payment Plan */}
+        {paymentPlan ? (
+          <PaymentPlanDisplay plan={paymentPlan} onCancel={handleCancelPaymentPlan} />
+        ) : (
+          invoice.amount_due > 0 && invoice.status !== 'void' && (
+            <button
+              onClick={() => setShowPaymentPlanModal(true)}
+              className="w-full bg-card rounded-xl border border-border p-4 flex items-center justify-between hover:bg-muted/50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-muted-foreground" />
+                <span className="font-medium">Set Up Payment Plan</span>
+              </div>
+              <span className="text-sm text-muted-foreground">Split into installments</span>
+            </button>
+          )
+        )}
+
         {/* Customer Info */}
         <div className="bg-card rounded-xl border border-border p-4">
           <h2 className="text-sm font-medium text-muted-foreground mb-3">Customer</h2>
@@ -425,6 +475,17 @@ export default function InvoiceDetailPage() {
         onClose={() => setShowRefundModal(false)}
         invoice={invoice}
         onRefundSuccess={() => loadData()}
+      />
+
+      <PaymentPlanModal
+        isOpen={showPaymentPlanModal}
+        onClose={() => setShowPaymentPlanModal(false)}
+        invoiceId={invoice.id}
+        amountDue={invoice.amount_due}
+        onSuccess={() => {
+          loadData();
+          loadPaymentPlan();
+        }}
       />
     </div>
   );

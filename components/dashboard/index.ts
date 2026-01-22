@@ -4,3 +4,4 @@ export { QuickActions } from './quick-actions';
 export { RecentActivity, type ActivityItem } from './recent-activity';
 export { LeadsFunnel, type FunnelStage } from './leads-funnel';
 export { OutstandingInvoices, type OutstandingInvoice } from './outstanding-invoices';
+export { AgingReportWidget } from './aging-report';

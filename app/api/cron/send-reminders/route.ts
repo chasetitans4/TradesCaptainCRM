@@ -98,7 +98,38 @@ export async function GET(request: NextRequest) {
       errors: [] as string[],
     };
 
-    // Process each message
+    // OPTIMIZATION: Pre-fetch all conversations in a single query
+    const uniquePhoneBusinessPairs = [...new Set(pendingMessages.map(m => `${m.business_id}:${m.phone_number}`))];
+    const businessIds = [...new Set(pendingMessages.map(m => m.business_id))];
+    const phoneNumbers = [...new Set(pendingMessages.map(m => m.phone_number))];
+
+    const { data: existingConversations } = await supabase
+      .from('sms_conversations')
+      .select('id, business_id, phone_number')
+      .in('business_id', businessIds)
+      .in('phone_number', phoneNumbers);
+
+    // Create a lookup map for conversations
+    const conversationMap = new Map<string, string>();
+    for (const conv of existingConversations || []) {
+      conversationMap.set(`${conv.business_id}:${conv.phone_number}`, conv.id);
+    }
+
+    // Prepare batch arrays for database updates
+    const sentMessageIds: string[] = [];
+    const sentMessageUpdates: Array<{ id: string; twilio_sid: string }> = [];
+    const failedMessageIds: string[] = [];
+    const smsMessagesToInsert: Array<{
+      conversation_id: string;
+      content: string;
+      direction: string;
+      status: string;
+      twilio_sid: string;
+      is_ai_response: boolean;
+    }> = [];
+    const conversationIdsToUpdate: string[] = [];
+
+    // Process each message - only Twilio calls are in the loop now
     for (const message of pendingMessages) {
       try {
         // Replace template variables in content
@@ -128,7 +159,7 @@ export async function GET(request: NextRequest) {
           content = content.replace(/\{\{job_time\}\}/g, message.job.scheduled_time);
         }
 
-        // Send via Twilio
+        // Send via Twilio (this is the only external call per message)
         const twilioMessage = await twilioClient.messages.create({
           to: message.phone_number,
           body: content,
@@ -137,40 +168,22 @@ export async function GET(request: NextRequest) {
             : { from: message.business?.twilio_phone_number }),
         });
 
-        // Update message status
-        await supabase
-          .from('scheduled_messages')
-          .update({
-            status: 'sent',
-            sent_at: new Date().toISOString(),
-            twilio_sid: twilioMessage.sid,
-          })
-          .eq('id', message.id);
+        // Queue for batch update
+        sentMessageIds.push(message.id);
+        sentMessageUpdates.push({ id: message.id, twilio_sid: twilioMessage.sid });
 
-        // Also save to sms_messages for conversation history
-        // First find or create conversation
-        const { data: conversation } = await supabase
-          .from('sms_conversations')
-          .select('id')
-          .eq('business_id', message.business_id)
-          .eq('phone_number', message.phone_number)
-          .single();
-
-        if (conversation) {
-          await supabase.from('sms_messages').insert({
-            conversation_id: conversation.id,
+        // Queue SMS message insert if conversation exists
+        const conversationId = conversationMap.get(`${message.business_id}:${message.phone_number}`);
+        if (conversationId) {
+          smsMessagesToInsert.push({
+            conversation_id: conversationId,
             content,
             direction: 'outbound',
             status: 'sent',
             twilio_sid: twilioMessage.sid,
             is_ai_response: false,
           });
-
-          // Update conversation last_message_at
-          await supabase
-            .from('sms_conversations')
-            .update({ last_message_at: new Date().toISOString() })
-            .eq('id', conversation.id);
+          conversationIdsToUpdate.push(conversationId);
         }
 
         results.sent++;
@@ -178,15 +191,45 @@ export async function GET(request: NextRequest) {
         apiLogger.error({ msg: `Error sending message ${message.id}`, error: sendError instanceof Error ? sendError.message : 'Unknown error' });
         results.failed++;
         results.errors.push(`Message ${message.id}: ${sendError instanceof Error ? sendError.message : 'Unknown error'}`);
-
-        // Mark as failed
-        await supabase
-          .from('scheduled_messages')
-          .update({
-            status: 'failed',
-          })
-          .eq('id', message.id);
+        failedMessageIds.push(message.id);
       }
+    }
+
+    // BATCH UPDATE: Update all sent messages at once
+    const sentAt = new Date().toISOString();
+    if (sentMessageUpdates.length > 0) {
+      // Use individual updates for twilio_sid since each is unique
+      // But batch them in parallel for efficiency
+      await Promise.all(
+        sentMessageUpdates.map(({ id, twilio_sid }) =>
+          supabase
+            .from('scheduled_messages')
+            .update({ status: 'sent', sent_at: sentAt, twilio_sid })
+            .eq('id', id)
+        )
+      );
+    }
+
+    // BATCH UPDATE: Mark all failed messages at once
+    if (failedMessageIds.length > 0) {
+      await supabase
+        .from('scheduled_messages')
+        .update({ status: 'failed' })
+        .in('id', failedMessageIds);
+    }
+
+    // BATCH INSERT: Insert all SMS messages at once
+    if (smsMessagesToInsert.length > 0) {
+      await supabase.from('sms_messages').insert(smsMessagesToInsert);
+    }
+
+    // BATCH UPDATE: Update all conversation timestamps at once
+    const uniqueConversationIds = [...new Set(conversationIdsToUpdate)];
+    if (uniqueConversationIds.length > 0) {
+      await supabase
+        .from('sms_conversations')
+        .update({ last_message_at: sentAt })
+        .in('id', uniqueConversationIds);
     }
 
     return NextResponse.json({

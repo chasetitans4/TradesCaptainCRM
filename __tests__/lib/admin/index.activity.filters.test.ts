@@ -25,7 +25,10 @@ jest.mock('@/lib/supabase/server', () => {
       from: (_table: string) => chain,
     };
   };
-  return { createClient: jest.fn(() => build()) };
+  return {
+    createClient: jest.fn(() => build()),
+    createAdminClient: jest.fn(() => build())
+  };
 });
 
 describe('admin index: activity log filters combine', () => {

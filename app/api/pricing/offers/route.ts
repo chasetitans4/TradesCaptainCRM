@@ -12,8 +12,11 @@ import {
   validateOfferCombination,
   calculatePricing,
   calculateCommission,
-  getPendingApprovalRequests,
 } from '@/lib/pricing/offers';
+import {
+  getPendingApprovalRequests,
+  getOfferUsageStats,
+} from '@/lib/pricing/offers-actions';
 import { getPlanById } from '@/lib/pricing/plans';
 import { apiLogger } from '@/lib/logger';
 
@@ -25,6 +28,16 @@ export async function GET(request: NextRequest) {
     const includePending = searchParams.get('include_pending') === 'true';
 
     let offers = getActiveOffers();
+
+    // Merge usage stats
+    const usageStats = await getOfferUsageStats();
+    offers = offers.map(offer => {
+      const stats = usageStats.find(s => s.code === offer.code);
+      return {
+        ...offer,
+        current_uses: stats ? stats.uses : 0
+      };
+    });
 
     // Filter by plan if provided
     if (planId) {

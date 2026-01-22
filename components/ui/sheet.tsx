@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import * as SheetPrimitive from '@radix-ui/react-dialog';
+import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -50,19 +51,29 @@ const sheetVariants = cva(
 
 interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
-    VariantProps<typeof sheetVariants> {}
+    VariantProps<typeof sheetVariants> {
+  /** Accessible title for screen readers when SheetTitle is not used */
+  accessibleTitle?: string;
+}
 
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
->(({ side = 'bottom', className, children, ...props }, ref) => (
+>(({ side = 'bottom', className, children, accessibleTitle, ...props }, ref) => (
   <SheetPortal>
     <SheetOverlay />
     <SheetPrimitive.Content
       ref={ref}
       className={cn(sheetVariants({ side }), className)}
+      aria-describedby={undefined}
       {...props}
     >
+      {/* Always provide a visually hidden title for accessibility */}
+      <VisuallyHidden.Root asChild>
+        <SheetPrimitive.Title>
+          {accessibleTitle || 'Sheet dialog'}
+        </SheetPrimitive.Title>
+      </VisuallyHidden.Root>
       {/* Drag handle for bottom sheet */}
       {side === 'bottom' && (
         <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-muted" />

@@ -2,36 +2,46 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { apiLogger } from '@/lib/logger';
 import { getDispatchJobs, getUnassignedJobs } from '@/lib/dispatch/data';
+import { hasServerPermission } from '@/lib/permissions/check-permission';
+import { getServerSession } from '@/lib/permissions/check-permission';
 
 // GET /api/dispatch/jobs - Get jobs for dispatch board
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: userData } = await supabase
-      .from('users')
-      .select('business_id')
-      .eq('id', user.id)
-      .single();
+    const user = session.user;
+    
+    // Check if user has permission to view jobs
+    // For admin, we skip this check as they have full access, or check specific admin permission
+    if (user.role !== 'admin' && user.role !== 'super_admin' && !await hasServerPermission('view_all_jobs')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
-    if (!userData?.business_id) {
+    let businessId = user.businessId;
+    const { searchParams } = new URL(request.url);
+    const queryBusinessId = searchParams.get('businessId');
+
+    // Allow admins to override business ID
+    if ((user.role === 'admin' || user.role === 'super_admin') && queryBusinessId) {
+      businessId = queryBusinessId;
+    }
+
+    if (!businessId) {
+      // If no business ID found (e.g. admin without override), return empty or error
+      // Returning 404 to match previous behavior for "No business found"
       return NextResponse.json({ error: 'No business found' }, { status: 404 });
     }
 
-    const { searchParams } = new URL(request.url);
-    const start = searchParams.get('start');
-    const end = searchParams.get('end');
+    const start = searchParams.get('start') || searchParams.get('startDate');
+    const end = searchParams.get('end') || searchParams.get('endDate');
     const unassigned = searchParams.get('unassigned');
 
     if (unassigned === 'true') {
-      const jobs = await getUnassignedJobs(userData.business_id);
+      const jobs = await getUnassignedJobs(businessId);
       return NextResponse.json({ jobs });
     }
 
@@ -42,7 +52,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const jobs = await getDispatchJobs(userData.business_id, start, end);
+    const jobs = await getDispatchJobs(businessId, start, end);
 
     return NextResponse.json({ jobs });
   } catch (error) {

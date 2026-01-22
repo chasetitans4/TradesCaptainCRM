@@ -8,34 +8,14 @@ import { cookies } from 'next/headers';
 import { createAdminClient } from '@/lib/supabase/server';
 import { apiLogger } from '@/lib/logger';
 
-function getJwtSecret(): string {
-  const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+import { jwtVerify } from 'jose';
+
+function getJwtSecret(): Uint8Array {
+  const secret = process.env.JWT_SECRET;
   if (!secret) {
     throw new Error('JWT_SECRET environment variable must be configured');
   }
-  return secret;
-}
-
-function verifyToken(token: string): { valid: boolean; payload?: any } {
-  const crypto = require('crypto');
-  const [payloadStr, signature] = token.split('.');
-  if (!payloadStr || !signature) return { valid: false };
-
-  const jwtSecret = getJwtSecret();
-  const expectedSig = crypto
-    .createHmac('sha256', jwtSecret)
-    .update(payloadStr)
-    .digest('base64url');
-
-  if (signature !== expectedSig) return { valid: false };
-
-  try {
-    const payload = JSON.parse(Buffer.from(payloadStr, 'base64url').toString());
-    if (payload.exp && payload.exp < Date.now()) return { valid: false };
-    return { valid: true, payload };
-  } catch {
-    return { valid: false };
-  }
+  return new TextEncoder().encode(secret);
 }
 
 export async function GET(_request: NextRequest) {
@@ -50,8 +30,11 @@ export async function GET(_request: NextRequest) {
       );
     }
 
-    const { valid, payload } = verifyToken(token);
-    if (!valid || !payload) {
+    let payload;
+    try {
+      const { payload: verifiedPayload } = await jwtVerify(token, getJwtSecret());
+      payload = verifiedPayload;
+    } catch (e) {
       return NextResponse.json(
         { error: 'Invalid or expired token' },
         { status: 401 }
@@ -75,7 +58,7 @@ export async function GET(_request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password_hash, two_factor_secret, ...safeUser } = user;
 
-    return NextResponse.json({ user: safeUser });
+    return NextResponse.json({ user: { ...safeUser, name: (safeUser as any).full_name } });
   } catch (error) {
     apiLogger.error({
       msg: 'Admin me error',

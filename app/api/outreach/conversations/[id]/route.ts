@@ -4,6 +4,7 @@ import {
   takeOverConversation,
   closeConversation,
 } from '@/lib/outreach/sms';
+import { getServerUserProfile } from '@/lib/supabase/server';
 import { apiLogger } from '@/lib/logger';
 
 interface RouteParams {
@@ -16,6 +17,11 @@ interface RouteParams {
  */
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
+    const profile = await getServerUserProfile();
+    if (!profile) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
     const data = await getConversationWithMessages(id);
 
@@ -42,6 +48,11 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
  */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
+    const profile = await getServerUserProfile();
+    if (!profile) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const { action, ...data } = body;

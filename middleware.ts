@@ -1,5 +1,5 @@
 // =====================================================
-// ROOT MIDDLEWARE
+// ROOT PROXY (Next.js 16)
 // Handles authentication, CSRF protection, rate limiting, and security
 // =====================================================
 
@@ -24,14 +24,30 @@ const publicRoutes = [
   '/api/webhooks',
   '/api/cron',
   '/api/public',
+  '/api/portal',
+  // Auth API endpoints need to be accessible without Supabase auth
+  '/api/auth/password/reset',
+  '/api/auth/callback',
+  // Admin API login needs to be accessible without Supabase auth
+  '/api/admin/login',
+  '/api/admin/auth/login',
+  '/api/admin/me',
+  '/api/admin/auth/me',
+  // Admin portal needs to be accessible without Supabase auth;
+  // it has its own session/cookies
+  '/admin',
+  '/admin/login',
+  // Customer portal handles its own sessions
+  '/portal',
 ];
 
 // Routes that are for admin portal only
-const adminRoutes = ['/admin-portal'];
+const adminRoutes: string[] = []; // Empty because /admin is now handled by custom auth, not Supabase auth
 
 // Static asset patterns
 const staticPatterns = [
   '/_next',
+  '/@vite',  // IDE webview requests
   '/favicon',
   '/images',
   '/icons',
@@ -110,8 +126,12 @@ function getCSP(nonce: string): string {
     'base-uri': ["'self'"],
     'form-action': ["'self'"],
     'frame-ancestors': ["'self'"],
-    'upgrade-insecure-requests': [],
   };
+
+  // Only enable HTTPS upgrades in production to avoid breaking localhost HTTP
+  if (!isDev) {
+    directives['upgrade-insecure-requests'] = [];
+  }
 
   return Object.entries(directives)
     .map(([key, values]) =>
@@ -182,12 +202,20 @@ async function updateSession(request: NextRequest) {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const hostHeader = request.headers.get('host') || '';
+  console.log('[Middleware] Processing:', { pathname, host: hostHeader });
+
+  const host = hostHeader.split(':')[0];
+  const port = hostHeader.split(':')[1] || '';
+  const isAdminHost = host === 'admin.tradescaptain.com';
+  const isPortalHost = port === '3001';
+  const isCrmHost = host === 'crm.tradescaptain.com';
 
   // Generate or extract correlation ID for request tracing
   // This enables end-to-end tracing across services and logs
   const correlationId = request.headers.get('x-correlation-id') || crypto.randomUUID();
 
-  // Skip middleware for static assets
+  // Skip proxy for static assets
   if (matchesPattern(pathname, staticPatterns)) {
     return NextResponse.next();
   }
@@ -197,6 +225,52 @@ export async function middleware(request: NextRequest) {
     const response = NextResponse.next();
     response.headers.set('x-correlation-id', correlationId);
     return response;
+  }
+
+  // Host-based routing:
+  // - localhost:3001 serves the Customer Portal
+  // - admin.tradescaptain.com serves the Admin Portal under /admin
+  //   and defaults to /admin/login at root
+  // - crm.tradescaptain.com serves the CRM app and defaults to /login at root
+
+  if (isPortalHost) {
+     // Allow access to portal routes and public assets
+     // Redirect root to a portal-specific landing or 404 if no business ID is known,
+     // but usually portal is accessed via /portal/[id].
+
+     if (pathname.startsWith('/portal') || pathname.startsWith('/api/portal')) {
+        // Allow request to proceed
+     } else {
+        // Redirect all other traffic (including root, /dashboard, /login) to the test business portal login
+        // This prevents CRM routes from being accessed on the portal port
+        return NextResponse.redirect(new URL('/portal/11111111-1111-1111-1111-111111111111/login', request.url));
+     }
+  } else if (isAdminHost) {
+    // Redirect root or generic CRM login to admin portal login
+    if (pathname === '/' || pathname === '/login') {
+      const url = new URL('/admin/login', request.url);
+      const res = NextResponse.redirect(url);
+      res.headers.set('x-correlation-id', correlationId);
+      return res;
+    }
+    // Allow admin routes to proceed directly
+    if (pathname.startsWith('/admin') || pathname.startsWith('/api/')) {
+      // Continue to normal processing
+    } else {
+      // Rewrite non-API, non-admin paths into /admin namespace
+      const url = new URL(`/admin${pathname}`, request.url);
+      const res = NextResponse.rewrite(url);
+      res.headers.set('x-correlation-id', correlationId);
+      return res;
+    }
+  } else if (isCrmHost) {
+    // Default root to CRM login
+    if (pathname === '/') {
+      const url = new URL('/login', request.url);
+      const res = NextResponse.redirect(url);
+      res.headers.set('x-correlation-id', correlationId);
+      return res;
+    }
   }
 
   // Apply rate limiting for API routes (Edge-compatible in-memory)
@@ -226,7 +300,10 @@ export async function middleware(request: NextRequest) {
   const isAdminRoute = matchesPattern(pathname, adminRoutes);
 
   // Redirect unauthenticated users from protected routes
-  if (!user && !isPublicRoute) {
+  // Skip this for admin subdomain; admin portal has its own auth
+  // Skip for portal host as well; portal handles its own auth in the page/layout
+  // Skip for admin routes; they are handled by the admin layout
+  if (!user && !isPublicRoute && !isAdminHost && !isPortalHost && !isAdminRoute && !pathname.startsWith('/api/')) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
@@ -238,7 +315,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // Check admin access
-  if (isAdminRoute && user && supabase) {
+  // Skip Supabase-based admin check on admin subdomain
+  if (isAdminRoute && user && supabase && !isAdminHost) {
     try {
       // Fetch user role from database
       const { data: profile } = await supabase
@@ -311,8 +389,8 @@ export async function middleware(request: NextRequest) {
         // Allow only for specific non-browser clients (e.g., cURL, Postman with valid auth)
         // For cookie-based auth, we require Origin/Referer
         const hasCookieAuth = request.cookies.has('sb-access-token') ||
-                              request.cookies.has('admin-session') ||
-                              request.cookies.has('portal-session');
+                              request.cookies.has('admin_session') ||
+                              request.cookies.has('portal_session');
 
         if (hasCookieAuth) {
           return NextResponse.json(

@@ -28,7 +28,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Verify user has access to this conversation
     const { data: conversation, error: convError } = await supabase
       .from('sms_conversations')
-      .select('*, customer:customers(id, name, phone)')
+      .select('*, customer:customers!sms_conversations_customer_id_fkey(id, name, phone)')
       .eq('id', id)
       .eq('business_id', profile.business_id)
       .single();
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     let query = supabase
       .from('sms_messages')
-      .select('*, sender_user:users(id, name)')
+      .select('*, sender_user:users!sms_messages_user_id_fkey(id, first_name, last_name)')
       .eq('conversation_id', id)
       .order('created_at', { ascending: false })
       .limit(limit);

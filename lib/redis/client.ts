@@ -24,6 +24,8 @@ const getRedisConfig = () => {
 
 // Singleton pattern for Redis connection
 let redis: Redis | null = null;
+let lastErrorLogTime = 0;
+const ERROR_LOG_INTERVAL_MS = 60000; // Only log Redis errors once per minute
 
 export function getRedis(): Redis {
   if (!redis) {
@@ -32,7 +34,8 @@ export function getRedis(): Redis {
     redis = new Redis(config as any, {
       maxRetriesPerRequest: 3,
       retryStrategy(times) {
-        const delay = Math.min(times * 50, 2000);
+        // Exponential backoff with max 30 seconds between retries
+        const delay = Math.min(times * 1000, 30000);
         return delay;
       },
       enableReadyCheck: true,
@@ -40,7 +43,12 @@ export function getRedis(): Redis {
     });
 
     redis.on('error', (err) => {
-      cacheLogger.error({ msg: 'Redis connection error', error: { message: err.message } });
+      // Only log errors once per minute to avoid spam
+      const now = Date.now();
+      if (now - lastErrorLogTime >= ERROR_LOG_INTERVAL_MS) {
+        lastErrorLogTime = now;
+        cacheLogger.error({ msg: 'Redis connection error', error: { message: err.message || 'Connection failed' } });
+      }
     });
 
   }

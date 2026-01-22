@@ -6,7 +6,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserProfile } from '@/lib/supabase/server';
+import { getServerSession, checkPermission } from '@/lib/permissions/check-permission';
 import { createAdminClient } from '@/lib/supabase/server';
 import { apiLogger } from '@/lib/logger';
 import type { UpdateRuleRequest } from '@/types/leads-captain';
@@ -17,19 +17,30 @@ interface RouteParams {
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('view_leads_captain');
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
     const supabase = createAdminClient();
 
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+
     // Get config ID for authorization
     const { data: config } = await supabase
       .from('leads_captain_config')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', userData.business_id)
       .single();
 
     if (!config) {
@@ -74,8 +85,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('manage_leads_captain');
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -83,11 +95,21 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const supabase = createAdminClient();
     const body: UpdateRuleRequest = await request.json();
 
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id, email')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+
     // Get config ID for authorization
     const { data: config } = await supabase
       .from('leads_captain_config')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', userData.business_id)
       .single();
 
     if (!config) {
@@ -153,7 +175,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     await supabase.from('leads_captain_audit_log').insert({
       config_id: config.id,
       action: 'rule_updated',
-      actor: profile.email || 'user',
+      actor: userData.email || 'user',
       details: { rule_id: id, fields_updated: Object.keys(updateData) },
     });
 
@@ -172,19 +194,30 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('manage_leads_captain');
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
     const supabase = createAdminClient();
 
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id, email')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+
     // Get config ID for authorization
     const { data: config } = await supabase
       .from('leads_captain_config')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', userData.business_id)
       .single();
 
     if (!config) {
@@ -222,7 +255,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     await supabase.from('leads_captain_audit_log').insert({
       config_id: config.id,
       action: 'rule_deleted',
-      actor: profile.email || 'user',
+      actor: userData.email || 'user',
       details: { rule_id: id, rule_name: existing.name },
     });
 

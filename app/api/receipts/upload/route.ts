@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile, createClient } from '@/lib/supabase/server';
 import { isFeatureEnabled } from '@/lib/features';
 import { apiLogger } from '@/lib/logger';
+import { processImage } from '@/lib/images/processor';
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,19 +56,78 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
 
-    // Generate unique filename
-    const fileExt = file.name.split('.').pop() || 'jpg';
-    const fileName = `${profile.business_id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
     // Convert File to ArrayBuffer then to Buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to Supabase Storage
+    // Generate unique base path
+    const timestamp = Date.now();
+    const randomId = Math.random().toString(36).substring(7);
+    const basePath = `${profile.business_id}/${timestamp}-${randomId}`;
+
+    // For images (not PDFs), apply compression while keeping original for OCR
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf';
+
+    let uploadBuffer = buffer;
+    let uploadContentType = file.type;
+    let fileName = `${basePath}.${file.name.split('.').pop() || 'jpg'}`;
+    let thumbnailUrl: string | undefined;
+    let compressionRatio: number | undefined;
+
+    if (isImage && !file.type.includes('heic')) {
+      try {
+        // Process image: compress and generate thumbnail
+        const processed = await processImage(buffer, {
+          outputFormat: 'webp',
+          quality: 85,
+          generatePreview: false,
+        });
+
+        // Use compressed version for storage (reduces costs)
+        uploadBuffer = Buffer.from(processed.compressed.buffer);
+        uploadContentType = 'image/webp';
+        fileName = `${basePath}.webp`;
+
+        compressionRatio = processed.metadata.compressionRatio;
+
+        // Also upload thumbnail for quick preview
+        const thumbFileName = `${basePath}_thumb.webp`;
+        const { error: thumbError } = await supabase.storage
+          .from('receipts')
+          .upload(thumbFileName, Buffer.from(processed.thumbnail.buffer), {
+            contentType: 'image/webp',
+            cacheControl: '31536000',
+            upsert: false,
+          });
+
+        if (!thumbError) {
+          const { data: thumbUrl } = supabase.storage
+            .from('receipts')
+            .getPublicUrl(thumbFileName);
+          thumbnailUrl = thumbUrl.publicUrl;
+        }
+
+        apiLogger.info({
+          msg: 'Receipt image compressed',
+          originalSize: processed.metadata.originalSize,
+          compressedSize: processed.metadata.compressedSize,
+          ratio: compressionRatio?.toFixed(2),
+        });
+      } catch (compressionError) {
+        // Fall back to original if compression fails (e.g., HEIC not supported)
+        apiLogger.warn({
+          msg: 'Receipt compression failed, using original',
+          error: compressionError instanceof Error ? compressionError.message : 'Unknown error',
+        });
+      }
+    }
+
+    // Upload main file
     const { data, error } = await supabase.storage
       .from('receipts')
-      .upload(fileName, buffer, {
-        contentType: file.type,
+      .upload(fileName, uploadBuffer, {
+        contentType: uploadContentType,
         cacheControl: '3600',
         upsert: false,
       });
@@ -88,6 +148,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       url: urlData.publicUrl,
       path: data.path,
+      thumbnailUrl,
+      compressionRatio,
+      compressed: isImage && !isPdf,
     });
   } catch (error) {
     apiLogger.error({ error, context: 'uploading receipt' });

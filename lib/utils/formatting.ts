@@ -72,6 +72,37 @@ export function formatDate(date: string | Date, formatStr: string = 'MMM d, yyyy
 }
 
 /**
+ * Safely format a date, returning fallback for invalid/null dates
+ */
+export function safeFormatDate(
+  date: string | Date | null | undefined,
+  formatStr: string = 'MMM d, yyyy',
+  fallback: string = '-'
+): string {
+  if (!date) return fallback;
+  try {
+    const d = typeof date === 'string' ? parseISO(date) : date;
+    if (isNaN(d.getTime())) return fallback;
+    return format(d, formatStr);
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Check if a date string/Date is valid
+ */
+export function isValidDate(date: string | Date | null | undefined): boolean {
+  if (!date) return false;
+  try {
+    const d = typeof date === 'string' ? parseISO(date) : date;
+    return !isNaN(d.getTime());
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Format time
  */
 export function formatTime(time: string): string {

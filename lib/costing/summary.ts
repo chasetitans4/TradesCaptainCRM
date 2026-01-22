@@ -315,8 +315,8 @@ export async function getTechnicianProfitability(
       labor_cost,
       total_minutes,
       job_id,
-      user:users(name, business_id),
-      job:jobs(total, status, completed_at)
+      user:users!job_labor_user_id_fkey(name, business_id),
+      job:jobs!job_labor_job_id_fkey(total, status, completed_at)
     `)
     .gte('clock_in', startDate)
     .lte('clock_in', endDate + 'T23:59:59')

@@ -64,7 +64,10 @@ export async function getCoupons(
   query = query.range(offset, offset + limit - 1);
 
   const { data, error, count } = await query;
-  if (error) throw error;
+  if (error) {
+    // Table might not exist yet, return empty
+    return { coupons: [], total: 0 };
+  }
 
   return { coupons: data || [], total: count || 0 };
 }
@@ -293,6 +296,9 @@ export async function getExpiringCoupons(daysAhead: number = 7): Promise<CrmCoup
     .lte('expires_at', futureDate.toISOString())
     .order('expires_at', { ascending: true });
 
-  if (error) throw error;
+  if (error) {
+    // Table might not exist yet, return empty
+    return [];
+  }
   return data || [];
 }

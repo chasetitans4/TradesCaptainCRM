@@ -5,7 +5,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserProfile } from '@/lib/supabase/server';
+import { checkPermission, getServerSession } from '@/lib/permissions/check-permission';
 import { createAdminClient } from '@/lib/supabase/server';
 import { apiLogger } from '@/lib/logger';
 import type { UpdatePriceItemRequest } from '@/types/leads-captain';
@@ -16,8 +16,9 @@ interface RouteParams {
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('manage_leads_captain');
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -25,11 +26,21 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const supabase = createAdminClient();
     const body: UpdatePriceItemRequest = await request.json();
 
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+
     // Get config ID for authorization
     const { data: config } = await supabase
       .from('leads_captain_config')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', userData.business_id)
       .single();
 
     if (!config) {
@@ -86,19 +97,30 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('manage_leads_captain');
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
     const supabase = createAdminClient();
 
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+
     // Get config ID for authorization
     const { data: config } = await supabase
       .from('leads_captain_config')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', userData.business_id)
       .single();
 
     if (!config) {

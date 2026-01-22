@@ -196,18 +196,20 @@ describe('lib/leads-captain v2 guardrails and classifier', () => {
     });
   });
 
-  it('generateAIResponse uses mocked Anthropic and applies guardrails', async () => {
+  it('generateAIResponse uses mocked OpenAI and applies guardrails', async () => {
     await jest.isolateModulesAsync(async () => {
-      process.env.ANTHROPIC_API_KEY = 'test-key';
-      jest.doMock('@anthropic-ai/sdk', () => {
+      process.env.OPENAI_API_KEY = 'test-key';
+      jest.doMock('openai', () => {
         return {
           __esModule: true,
-          default: class Anthropic {
-            messages = {
-              create: async () => ({
-                content: [{ type: 'text', text: 'We will be there at 3pm. 😊' }],
-                usage: { input_tokens: 100, output_tokens: 50 },
-              }),
+          default: class OpenAI {
+            chat = {
+              completions: {
+                create: async () => ({
+                  choices: [{ message: { content: 'We will be there at 3pm. 😊' } }],
+                  usage: { total_tokens: 150 },
+                }),
+              },
             };
           },
         };
@@ -235,11 +237,66 @@ describe('lib/leads-captain v2 guardrails and classifier', () => {
         price_list: [],
       };
       const res = await generateAIResponse('Can we schedule?', classification, config, null, history, options);
-      expect(res.model).toContain('claude');
+      expect(res.model).toContain('gpt');
       expect(res.guardrails_applied).toContain('time_promise_removed');
       expect(res.guardrails_applied).toContain('booking_link_added');
       expect(typeof res.confidence).toBe('number');
       expect(res.tokens_used).toBeGreaterThan(0);
+    });
+  });
+
+  it('generateAIResponse falls back to Anthropic when OpenAI errors', async () => {
+    await jest.isolateModulesAsync(async () => {
+      process.env.OPENAI_API_KEY = 'test-key';
+      process.env.ANTHROPIC_API_KEY = 'anth-key';
+      jest.doMock('openai', () => {
+        return {
+          __esModule: true,
+          default: class OpenAI {
+            chat = {
+              completions: {
+                create: async () => {
+                  throw new Error('OpenAI failure');
+                },
+              },
+            };
+          },
+        };
+      });
+      jest.doMock('@anthropic-ai/sdk', () => {
+        return {
+          __esModule: true,
+          default: class Anthropic {
+            messages = {
+              create: async () => ({
+                content: [{ type: 'text', text: 'We will be there at 3pm.' }],
+                usage: { input_tokens: 80, output_tokens: 40 },
+              }),
+            };
+          },
+        };
+      });
+      const { generateAIResponse } = require('@/lib/leads-captain/v2/guardrails');
+      const config = {
+        business_name: 'Biz',
+        tone: 'friendly_professional',
+        ai_confidence_threshold: 70,
+        require_approval: 'never',
+        booking_link: 'https://book.example',
+      };
+      const classification = { intent: 'schedule', sentiment: 'neutral', confidence: 75, language: 'en', entities: {}, is_compliance: false };
+      const options = {
+        creativity_level: 'low',
+        max_length: 200,
+        tone: 'friendly_professional',
+        use_emojis: false,
+        pricing_mode: 'never',
+        templates_for_reference: [],
+        price_list: [],
+      };
+      const res = await generateAIResponse('Please schedule me', classification, config, null, [], options);
+      expect(res.model).toContain('claude');
+      expect(res.guardrails_applied).toContain('booking_link_added');
     });
   });
 

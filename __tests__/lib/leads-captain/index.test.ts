@@ -381,7 +381,7 @@ describe('lib/leads-captain inbound SMS branches', () => {
             if (table === 'businesses') {
               return {
                 select: () => ({
-                  eq: () => ({ single: async () => ({ data: { plan_type: 'silver', ai_sms_enabled: true } }) }),
+                  eq: () => ({ single: async () => ({ data: { plan_type: 'silver', ai_sms_enabled: true, has_leads_captain_addon: true } }) }),
                 }),
               };
             }

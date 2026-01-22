@@ -6,8 +6,11 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
+import { checkPermission } from '@/lib/permissions/check-permission';
 import {
   getChecklistForPlan,
+} from '@/lib/onboarding/checklist-definitions';
+import {
   getClientChecklistStatus,
   initializeClientChecklist,
   saveClientChecklistStatus,
@@ -113,6 +116,8 @@ export async function POST(request: NextRequest) {
 // PATCH - Update checklist item
 export async function PATCH(request: NextRequest) {
   try {
+    await checkPermission('manage_onboarding');
+
     const body = await request.json();
     const {
       client_id,

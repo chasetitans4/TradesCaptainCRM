@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getServerSession } from '@/lib/permissions/check-permission';
 import { checkSearchRateLimit } from '@/lib/rate-limit';
 import { apiLogger } from '@/lib/logger';
 
@@ -18,46 +19,45 @@ interface SearchResult {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Get authenticated user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const session = await getServerSession();
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's business
-    const { data: profile } = await supabase
-      .from('users')
-      .select('business_id, id')
-      .eq('auth_user_id', user.id)
-      .single();
+    const { searchParams } = new URL(request.url);
+    
+    // Determine business ID
+    let businessId = session.user.businessId;
+    const queryBusinessId = searchParams.get('businessId');
+    
+    if ((session.user.role === 'admin' || session.user.role === 'super_admin') && queryBusinessId) {
+      businessId = queryBusinessId;
+    }
 
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!businessId) {
+      return NextResponse.json({ error: 'Business ID not found' }, { status: 404 });
     }
 
     // Check rate limit (30 searches per minute per user)
-    const rateLimit = await checkSearchRateLimit(profile.id);
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: 'Search rate limit exceeded. Please wait a moment.' },
-        {
-          status: 429,
-          headers: {
-            'X-RateLimit-Limit': '30',
-            'X-RateLimit-Remaining': rateLimit.remaining.toString(),
-            'X-RateLimit-Reset': rateLimit.resetAt.toISOString(),
-            'Retry-After': (rateLimit.retryAfter || 60).toString(),
-          },
-        }
-      );
+    // Only check rate limit if not an admin/super_admin override
+    if (session.user.role !== 'admin' && session.user.role !== 'super_admin') {
+      const rateLimit = await checkSearchRateLimit(session.user.id);
+      if (!rateLimit.allowed) {
+        return NextResponse.json(
+          { error: 'Search rate limit exceeded. Please wait a moment.' },
+          {
+            status: 429,
+            headers: {
+              'X-RateLimit-Limit': '30',
+              'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+              'X-RateLimit-Reset': rateLimit.resetAt.toISOString(),
+              'Retry-After': (rateLimit.retryAfter || 60).toString(),
+            },
+          }
+        );
+      }
     }
 
-    const { searchParams } = new URL(request.url);
     const query = searchParams.get('q')?.trim();
     const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 20);
 
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ results: [] });
     }
 
-    const businessId = profile.business_id;
+    const supabase = await createClient();
     const searchPattern = `%${query}%`;
 
     // Search in parallel

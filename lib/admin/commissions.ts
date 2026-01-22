@@ -49,54 +49,73 @@ export async function getCommissions(
   const supabase = createAdminClient();
   const { agentId, status, type, page = 1, limit = 25 } = options;
 
-  let query = supabase
-    .from('commissions')
-    .select(`
-      *,
-      agent:admin_users!commissions_agent_id_fkey(id, full_name, email),
-      crm_account:crm_accounts(id, business_name, email),
-      web_customer:web_customers(id, business_name, email)
-    `, { count: 'exact' })
-    .order('created_at', { ascending: false });
+  try {
+    let query = supabase
+      .from('commissions')
+      .select(`
+        *,
+        agent:admin_users!commissions_agent_id_fkey(id, full_name, email),
+        crm_account:crm_accounts(id, business_name, email),
+        web_customer:web_customers(id, business_name, email)
+      `, { count: 'exact' })
+      .order('created_at', { ascending: false });
 
-  if (agentId) {
-    query = query.eq('agent_id', agentId);
+    if (agentId) {
+      query = query.eq('agent_id', agentId);
+    }
+    if (status) {
+      query = query.eq('status', status);
+    }
+    if (type) {
+      query = query.eq('commission_type', type);
+    }
+
+    const offset = (page - 1) * limit;
+    query = query.range(offset, offset + limit - 1);
+
+    const { data, error, count } = await query;
+    if (error) {
+      // Table might not exist
+      return { commissions: [], total: 0 };
+    }
+
+    return { commissions: data || [], total: count || 0 };
+  } catch {
+    // Table doesn't exist
+    return { commissions: [], total: 0 };
   }
-  if (status) {
-    query = query.eq('status', status);
-  }
-  if (type) {
-    query = query.eq('commission_type', type);
-  }
-
-  const offset = (page - 1) * limit;
-  query = query.range(offset, offset + limit - 1);
-
-  const { data, error, count } = await query;
-  if (error) throw error;
-
-  return { commissions: data || [], total: count || 0 };
 }
 
 /**
  * Get pending commissions ready for approval
  */
-export async function getPendingCommissions(): Promise<Commission[]> {
+export async function getPendingCommissions(agentId?: string): Promise<Commission[]> {
   const supabase = createAdminClient();
 
-  const { data, error } = await supabase
-    .from('commissions')
-    .select(`
-      *,
-      agent:admin_users!commissions_agent_id_fkey(id, full_name, email),
-      crm_account:crm_accounts(id, business_name),
-      web_customer:web_customers(id, business_name)
-    `)
-    .eq('status', 'eligible')
-    .order('eligible_at', { ascending: true });
+  try {
+    let query = supabase
+      .from('commissions')
+      .select(`
+        *,
+        agent:admin_users!commissions_agent_id_fkey(id, full_name, email),
+        crm_account:crm_accounts(id, business_name, email),
+        web_customer:web_customers(id, business_name, email)
+      `)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
 
-  if (error) throw error;
-  return data || [];
+    if (agentId) {
+      query = query.eq('agent_id', agentId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      return [];
+    }
+    return data || [];
+  } catch {
+    return [];
+  }
 }
 
 /**

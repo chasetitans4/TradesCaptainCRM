@@ -3,20 +3,18 @@ import { createClient } from '@/lib/supabase/server';
 import { verify2FA, send2FACode, getTwoFactorStatus } from '@/lib/auth/two-factor';
 import { check2FAVerifyRateLimit, check2FASendRateLimit } from '@/lib/rate-limit';
 import { apiLogger } from '@/lib/logger';
+import { getServerSession } from '@/lib/permissions/check-permission';
 
 // GET - Get 2FA status
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const status = await getTwoFactorStatus(user.id);
+    const status = await getTwoFactorStatus(session.user.id);
     return NextResponse.json(status);
   } catch (error) {
     apiLogger.error({ msg: 'Get 2FA status error', error: error instanceof Error ? error.message : 'Unknown error' });
@@ -89,54 +87,47 @@ export async function POST(request: NextRequest) {
 // PUT - Send new 2FA code (for SMS/email)
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     // Also allow unauthenticated users during login flow (with userId in body)
     const body = await request.json();
-    const userId = user?.id || body.userId;
-    const method = body.method;
+    let userId = body.userId;
 
     if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+        // If no userId in body, check session
+        const session = await getServerSession();
+        if (session?.user) {
+            userId = session.user.id;
+        }
     }
 
-    if (!['sms', 'email'].includes(method)) {
+    if (!userId) {
+        return NextResponse.json({ error: 'Unauthorized or User ID required' }, { status: 401 });
+    }
+
+    const method = body.method;
+
+    if (!method || !['sms', 'email'].includes(method)) {
       return NextResponse.json(
-        { error: 'Method must be "sms" or "email"' },
+        { error: 'Valid method (sms or email) is required' },
         { status: 400 }
       );
     }
 
-    // Get client IP for rate limiting
-    const ip = request.headers.get('cf-connecting-ip') ||
-               request.headers.get('x-real-ip') ||
-               request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-               'unknown';
-
-    // Check Redis-backed rate limit (5 sends per 10 minutes per user+IP)
+    // Rate limit sending codes (1 per minute)
+    const ip = request.headers.get('cf-connecting-ip') || 'unknown';
     const rateLimit = await check2FASendRateLimit(userId, ip);
+    
     if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: 'Too many code requests. Please wait before requesting another code.' },
-        {
-          status: 429,
-          headers: {
-            'X-RateLimit-Limit': '5',
-            'X-RateLimit-Remaining': rateLimit.remaining.toString(),
-            'X-RateLimit-Reset': rateLimit.resetAt.toISOString(),
-            'Retry-After': (rateLimit.retryAfter || 600).toString(),
-          },
-        }
+       return NextResponse.json(
+        { error: 'Too many requests. Please wait before requesting another code.' },
+        { status: 429 }
       );
     }
 
     await send2FACode(userId, method);
+
     return NextResponse.json({
       success: true,
-      message: `Code sent via ${method}`,
+      message: `Verification code sent to your ${method === 'sms' ? 'phone' : 'email'}`,
     });
   } catch (error) {
     apiLogger.error({ msg: 'Send 2FA code error', error: error instanceof Error ? error.message : 'Unknown error' });

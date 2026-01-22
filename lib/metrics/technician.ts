@@ -78,7 +78,7 @@ export async function recordDailyMetrics(
     .from('jobs')
     .select('id, status, total, labor_hours, is_callback')
     .eq('business_id', businessId)
-    .eq('assigned_to', technicianId)
+    .eq('assigned_user_id', technicianId)
     .gte('scheduled_date', dayStart)
     .lte('scheduled_date', dayEnd);
 

@@ -52,7 +52,6 @@ export async function getCrmAccounts(
   let query = supabase
     .from('crm_accounts')
     .select('*, agent:admin_users!crm_accounts_agent_id_fkey(id, full_name, email)', { count: 'exact' })
-    .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
   if (agentId) {
@@ -72,7 +71,10 @@ export async function getCrmAccounts(
   query = query.range(offset, offset + limit - 1);
 
   const { data, error, count } = await query;
-  if (error) throw error;
+  if (error) {
+    // Table might not exist yet, return empty
+    return { accounts: [], total: 0 };
+  }
 
   return { accounts: data || [], total: count || 0 };
 }
@@ -254,7 +256,6 @@ export async function getWebCustomers(
   let query = supabase
     .from('web_customers')
     .select('*, agent:admin_users!web_customers_agent_id_fkey(id, full_name, email)', { count: 'exact' })
-    .is('deleted_at', null)
     .order('created_at', { ascending: false });
 
   if (agentId) {
@@ -274,7 +275,10 @@ export async function getWebCustomers(
   query = query.range(offset, offset + limit - 1);
 
   const { data, error, count } = await query;
-  if (error) throw error;
+  if (error) {
+    // Table might not exist yet, return empty
+    return { customers: [], total: 0 };
+  }
 
   return { customers: data || [], total: count || 0 };
 }
@@ -437,33 +441,47 @@ export async function getAdminDashboardStats(): Promise<{
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-  // Get CRM accounts
-  const { data: crmAccounts } = await supabase
-    .from('crm_accounts')
-    .select('status, monthly_amount, created_at, is_trial, cancelled_at')
-    .is('deleted_at', null);
+  // Get CRM accounts - handle missing table gracefully
+  let crmAccounts: { status: string; monthly_amount: number; created_at: string; is_trial: boolean; cancelled_at: string | null }[] = [];
+  try {
+    const { data } = await supabase
+      .from('crm_accounts')
+      .select('status, monthly_amount, created_at, is_trial, cancelled_at');
+    crmAccounts = data || [];
+  } catch { /* Table might not exist */ }
 
-  // Get web customers
-  const { data: webCustomers } = await supabase
-    .from('web_customers')
-    .select('status, monthly_amount, created_at, cancelled_at')
-    .is('deleted_at', null);
+  // Get web customers - handle missing table gracefully
+  let webCustomers: { status: string; monthly_amount: number; created_at: string; cancelled_at: string | null }[] = [];
+  try {
+    const { data } = await supabase
+      .from('web_customers')
+      .select('status, monthly_amount, created_at, cancelled_at');
+    webCustomers = data || [];
+  } catch { /* Table might not exist */ }
 
-  // Get pending commissions
-  const { data: commissions } = await supabase
-    .from('commissions')
-    .select('commission_amount')
-    .eq('status', 'eligible');
+  // Get pending commissions - handle missing table gracefully
+  let commissions: { commission_amount: number }[] = [];
+  try {
+    const { data } = await supabase
+      .from('commissions')
+      .select('commission_amount')
+      .eq('status', 'eligible');
+    commissions = data || [];
+  } catch { /* Table might not exist */ }
 
-  // Get agent count
-  const { count: agentCount } = await supabase
-    .from('admin_users')
-    .select('*', { count: 'exact', head: true })
-    .eq('role', 'agent')
-    .eq('status', 'active');
+  // Get agent count - handle missing table gracefully
+  let agentCount = 0;
+  try {
+    const { count } = await supabase
+      .from('admin_users')
+      .select('*', { count: 'exact', head: true })
+      .eq('role', 'agent')
+      .eq('status', 'active');
+    agentCount = count || 0;
+  } catch { /* Table might not exist */ }
 
-  const crm = crmAccounts || [];
-  const web = webCustomers || [];
+  const crm = crmAccounts;
+  const web = webCustomers;
 
   // Calculate MRR
   const crmMrr = crm.filter(a => a.status === 'active').reduce((sum, a) => sum + Number(a.monthly_amount || 0), 0);
@@ -528,42 +546,62 @@ export async function getAgentDashboardStats(agentId: string): Promise<{
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const startOfYear = new Date(now.getFullYear(), 0, 1);
 
-  // Get accounts created by agent this month
-  const { data: monthlyAccounts } = await supabase
-    .from('crm_accounts')
-    .select('monthly_amount')
-    .eq('agent_id', agentId)
-    .gte('created_at', startOfMonth.toISOString());
+  // Get accounts created by agent this month - handle missing tables gracefully
+  let monthlyAccounts: { monthly_amount: number }[] = [];
+  try {
+    const { data } = await supabase
+      .from('crm_accounts')
+      .select('monthly_amount')
+      .eq('agent_id', agentId)
+      .gte('created_at', startOfMonth.toISOString());
+    monthlyAccounts = data || [];
+  } catch { /* Table might not exist */ }
 
-  const { data: monthlyWeb } = await supabase
-    .from('web_customers')
-    .select('monthly_amount')
-    .eq('agent_id', agentId)
-    .gte('created_at', startOfMonth.toISOString());
+  let monthlyWeb: { monthly_amount: number }[] = [];
+  try {
+    const { data } = await supabase
+      .from('web_customers')
+      .select('monthly_amount')
+      .eq('agent_id', agentId)
+      .gte('created_at', startOfMonth.toISOString());
+    monthlyWeb = data || [];
+  } catch { /* Table might not exist */ }
 
-  // Get commissions
-  const { data: commissions } = await supabase
-    .from('commissions')
-    .select('commission_amount, status, paid_at')
-    .eq('agent_id', agentId);
+  // Get commissions - handle missing table gracefully
+  let commissions: { commission_amount: number; status: string; paid_at: string | null }[] = [];
+  try {
+    const { data } = await supabase
+      .from('commissions')
+      .select('commission_amount, status, paid_at')
+      .eq('agent_id', agentId);
+    commissions = data || [];
+  } catch { /* Table might not exist */ }
 
-  // Get active leads
-  const { count: activeLeads } = await supabase
-    .from('tc_leads')
-    .select('*', { count: 'exact', head: true })
-    .eq('agent_id', agentId)
-    .not('status', 'in', '("won","lost","unqualified")');
+  // Get active leads - handle missing table gracefully
+  let activeLeadsCount = 0;
+  try {
+    const { count } = await supabase
+      .from('tc_leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('agent_id', agentId)
+      .not('status', 'in', '("won","lost","unqualified")');
+    activeLeadsCount = count || 0;
+  } catch { /* Table might not exist */ }
 
-  // Get retention rate
-  const { data: agentAccounts } = await supabase
-    .from('crm_accounts')
-    .select('status')
-    .eq('agent_id', agentId);
+  // Get retention rate - handle missing table gracefully
+  let agentAccounts: { status: string }[] = [];
+  try {
+    const { data } = await supabase
+      .from('crm_accounts')
+      .select('status')
+      .eq('agent_id', agentId);
+    agentAccounts = data || [];
+  } catch { /* Table might not exist */ }
 
-  const all = commissions || [];
-  const accounts = monthlyAccounts || [];
-  const webAccounts = monthlyWeb || [];
-  const agentAllAccounts = agentAccounts || [];
+  const all = commissions;
+  const accounts = monthlyAccounts;
+  const webAccounts = monthlyWeb;
+  const agentAllAccounts = agentAccounts;
 
   const dealsThisMonth = accounts.length + webAccounts.length;
   const revenueThisMonth = accounts.reduce((sum, a) => sum + Number(a.monthly_amount || 0), 0) +
@@ -586,7 +624,7 @@ export async function getAgentDashboardStats(agentId: string): Promise<{
     revenueThisMonth,
     commissionsEligible,
     commissionsPaidYtd,
-    activeLeads: activeLeads || 0,
+    activeLeads: activeLeadsCount,
     retentionRate,
     dealProgress: { current: dealsThisMonth, goal: 10 },
   };

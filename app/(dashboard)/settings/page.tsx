@@ -33,6 +33,7 @@ import {
   Loader2,
   CalendarDays,
   MessageSquare,
+  History,
 } from 'lucide-react';
 
 interface SettingSection {
@@ -423,6 +424,21 @@ export default function SettingsPage() {
               </div>
               <ChevronRight className="h-5 w-5 text-text-muted" />
             </Link>
+            {hasPermission(user.role, 'manage_settings') && (
+              <Link
+                href="/settings/audit-log"
+                className="flex items-center gap-4 p-4 hover:bg-muted/50 active:bg-muted transition-colors"
+              >
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <History className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-text">Audit Log</p>
+                  <p className="text-sm text-text-muted">Track user activity and changes</p>
+                </div>
+                <ChevronRight className="h-5 w-5 text-text-muted" />
+              </Link>
+            )}
           </div>
         </section>
 
@@ -442,7 +458,7 @@ export default function SettingsPage() {
         <p className="text-center text-xs text-text-muted py-4">
           Trades Captain CRM v1.0.0
           <br />
-          © 2024 Trades Captain. All rights reserved.
+          © 2026 Trades Captain. All rights reserved.
         </p>
       </div>
     </div>

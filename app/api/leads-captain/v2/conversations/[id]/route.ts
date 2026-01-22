@@ -6,7 +6,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserProfile } from '@/lib/supabase/server';
+import { checkPermission, getServerSession } from '@/lib/permissions/check-permission';
 import { createAdminClient } from '@/lib/supabase/server';
 import { sendSMS } from '@/lib/twilio';
 import { apiLogger } from '@/lib/logger';
@@ -16,21 +16,32 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(_request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('view_leads_captain');
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
     const supabase = createAdminClient();
 
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+
     // Get config for authorization and info
     const { data: config } = await supabase
       .from('leads_captain_config')
       .select('id, business_name, owner_name, timezone')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', userData.business_id)
       .single();
 
     if (!config) {
@@ -81,8 +92,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('manage_leads_captain');
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -90,11 +102,21 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const supabase = createAdminClient();
     const body = await request.json();
 
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id, email')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+
     // Get config for authorization
     const { data: config } = await supabase
       .from('leads_captain_config')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', userData.business_id)
       .single();
 
     if (!config) {
@@ -210,7 +232,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       config_id: config.id,
       conversation_id: id,
       action: auditAction,
-      actor: profile.email || 'user',
+      actor: userData.email || 'user',
       details: { action, previous_status: existing.status },
     });
 
@@ -229,8 +251,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('manage_leads_captain');
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -242,11 +265,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Message content is required' }, { status: 400 });
     }
 
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id, email')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+
     // Get config for authorization
     const { data: config } = await supabase
       .from('leads_captain_config')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', userData.business_id)
       .single();
 
     if (!config) {
@@ -303,7 +336,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       await sendSMS({
         to: conversation.customer_phone,
         body: body.content,
-        businessId: profile.business_id,
+        businessId: userData.business_id,
         isAIResponse: false,
       });
 
@@ -321,7 +354,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         conversation_id: id,
         message_id: message.id,
         action: 'message_sent',
-        actor: profile.email || 'user',
+        actor: userData.email || 'user',
         details: { manual: true },
       });
 

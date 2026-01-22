@@ -72,6 +72,22 @@ export default function NewJobPage() {
     assigned_user_id: '',
   });
 
+  // Prefill title/description from query params
+  useEffect(() => {
+    const updates: Partial<FormData> = {};
+    const title = searchParams.get('title');
+    const description = searchParams.get('description');
+    if (title && title.trim().length > 0) {
+      updates.title = title;
+    }
+    if (description && description.trim().length > 0) {
+      updates.description = description;
+    }
+    if (Object.keys(updates).length > 0) {
+      setFormData((prev) => ({ ...prev, ...updates }));
+    }
+  }, [searchParams]);
+
   // Load user and team members
   useEffect(() => {
     async function loadData() {

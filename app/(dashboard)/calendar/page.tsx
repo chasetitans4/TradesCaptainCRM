@@ -4,11 +4,12 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getCurrentUserProfile } from '@/lib/supabase/client';
-import { cn, formatTime } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { UserWithBusiness, CalendarDisplayEvent } from '@/types';
 import { AddressLink } from '@/components/ui/address-link';
+import { ScheduleCalendar, CalendarJob, CrewMember } from '@/components/calendar/schedule-calendar';
 import {
   Plus,
   ChevronLeft,
@@ -19,8 +20,11 @@ import {
   Phone,
   RefreshCw,
   Settings,
-  User as UserIcon,
+  LayoutGrid,
+  List,
+  Users,
 } from 'lucide-react';
+import { showError, showSuccess } from '@/lib/toast';
 
 type ViewMode = 'day' | 'week' | 'month';
 
@@ -31,19 +35,14 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-const EVENT_COLORS: Record<string, string> = {
-  job: 'bg-primary border-primary/50 text-white',
-  personal: 'bg-gray-500 border-gray-400 text-white',
-  break: 'bg-warning border-warning/50 text-white',
-};
-
 export default function CalendarPage() {
   const router = useRouter();
   const [user, setUser] = useState<UserWithBusiness | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [events, setEvents] = useState<CalendarDisplayEvent[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const [technicians, setTechnicians] = useState<CrewMember[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -61,34 +60,58 @@ export default function CalendarPage() {
     loadUser();
   }, [router]);
 
+  // Load technicians
+  const loadTechnicians = useCallback(async () => {
+    try {
+      const response = await fetch('/api/dispatch/technicians');
+      if (response.ok) {
+        const data = await response.json();
+        setTechnicians(data.technicians || []);
+      }
+    } catch (error) {
+      console.error('Error loading technicians:', error);
+    }
+  }, []);
+
   // Load events for current date range
   const loadEvents = useCallback(async () => {
     if (!user) return;
 
     setRefreshing(true);
 
-    // Calculate date range based on view mode
+    // Calculate date range - always load at least a week for the schedule view
     let start: Date;
     let end: Date;
 
-    if (viewMode === 'day') {
-      start = new Date(selectedDate);
-      start.setHours(0, 0, 0, 0);
-      end = new Date(selectedDate);
-      end.setHours(23, 59, 59, 999);
-    } else if (viewMode === 'week') {
-      start = getStartOfWeek(currentDate);
-      end = new Date(start);
-      end.setDate(end.getDate() + 7);
-    } else {
+    if (viewMode === 'month') {
       start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
       end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    } else if (viewMode === 'week') {
+      // For week view, load the entire week (Monday to Sunday)
+      const dayOfWeek = currentDate.getDay();
+      start = new Date(currentDate);
+      start.setDate(start.getDate() - ((dayOfWeek + 6) % 7)); // Start from Monday
+      start.setHours(0, 0, 0, 0);
+      end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+    } else {
+      // For day view, load current day plus a buffer
+      start = new Date(currentDate);
+      start.setDate(start.getDate() - 7);
+      start.setHours(0, 0, 0, 0);
+      end = new Date(currentDate);
+      end.setDate(end.getDate() + 14);
+      end.setHours(23, 59, 59, 999);
     }
 
     try {
       const response = await fetch(
         `/api/calendar/events?start=${start.toISOString()}&end=${end.toISOString()}`
       );
+      if (!response.ok) {
+        throw new Error('Failed to load calendar events');
+      }
       const data = await response.json();
       setEvents(data || []);
     } catch (error) {
@@ -96,60 +119,40 @@ export default function CalendarPage() {
     } finally {
       setRefreshing(false);
     }
-  }, [user, viewMode, currentDate, selectedDate]);
+  }, [user, viewMode, currentDate]);
 
   useEffect(() => {
     if (user) {
       loadEvents();
+      loadTechnicians();
     }
-  }, [user, loadEvents]);
+  }, [user, loadEvents, loadTechnicians]);
 
-  // Navigation handlers
-  function navigatePrev() {
-    const newDate = new Date(currentDate);
-    if (viewMode === 'day') {
-      newDate.setDate(newDate.getDate() - 1);
-      setSelectedDate(newDate);
-    } else if (viewMode === 'week') {
-      newDate.setDate(newDate.getDate() - 7);
-    } else {
-      newDate.setMonth(newDate.getMonth() - 1);
-    }
-    setCurrentDate(newDate);
-  }
+  // Convert CalendarDisplayEvent to CalendarJob for the new component
+  const calendarJobs = useMemo((): CalendarJob[] => {
+    return events
+      .filter((event) => event.type === 'job')
+      .map((event) => ({
+        id: event.id,
+        title: event.title,
+        customerId: event.customer_id || event.customer?.id,
+        customerName: event.customer?.name,
+        customerPhone: event.customer?.phone,
+        startTime: new Date(event.start),
+        endTime: new Date(event.end),
+        jobType: event.job_type || 'service',
+        status: event.status || 'scheduled',
+        priority: event.priority,
+        address: event.address || undefined,
+        city: event.city || undefined,
+        technicianId: event.assigned_to || undefined,
+        technicianName: event.technician_name || undefined,
+        jobNumber: event.job_number || undefined,
+        job_id: event.job_id,
+      }));
+  }, [events]);
 
-  function navigateNext() {
-    const newDate = new Date(currentDate);
-    if (viewMode === 'day') {
-      newDate.setDate(newDate.getDate() + 1);
-      setSelectedDate(newDate);
-    } else if (viewMode === 'week') {
-      newDate.setDate(newDate.getDate() + 7);
-    } else {
-      newDate.setMonth(newDate.getMonth() + 1);
-    }
-    setCurrentDate(newDate);
-  }
-
-  function goToToday() {
-    const today = new Date();
-    setCurrentDate(today);
-    setSelectedDate(today);
-  }
-
-  // Get week dates
-  const weekDates = useMemo(() => {
-    const start = getStartOfWeek(currentDate);
-    const dates: Date[] = [];
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(start);
-      date.setDate(date.getDate() + i);
-      dates.push(date);
-    }
-    return dates;
-  }, [currentDate]);
-
-  // Group events by date
+  // Group events by date for month view
   const eventsByDate = useMemo(() => {
     const grouped: Record<string, CalendarDisplayEvent[]> = {};
     events.forEach((event) => {
@@ -159,7 +162,6 @@ export default function CalendarPage() {
       }
       grouped[dateKey].push(event);
     });
-    // Sort events within each day by start time
     Object.keys(grouped).forEach((key) => {
       grouped[key].sort(
         (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
@@ -168,49 +170,110 @@ export default function CalendarPage() {
     return grouped;
   }, [events]);
 
-  // Events for selected date (day view)
-  const selectedDateEvents = useMemo(() => {
-    const dateKey = selectedDate.toISOString().split('T')[0];
-    return eventsByDate[dateKey] || [];
-  }, [eventsByDate, selectedDate]);
+  // Navigation for month view
+  function navigateMonth(direction: 'prev' | 'next') {
+    const newDate = new Date(currentDate);
+    newDate.setMonth(newDate.getMonth() + (direction === 'next' ? 1 : -1));
+    setCurrentDate(newDate);
+  }
 
-  // Format header based on view mode
-  const headerTitle = useMemo(() => {
-    if (viewMode === 'day') {
-      return formatDateLong(selectedDate);
-    } else if (viewMode === 'week') {
-      const start = weekDates[0];
-      const end = weekDates[6];
-      if (start.getMonth() === end.getMonth()) {
-        return `${MONTH_NAMES[start.getMonth()]} ${start.getDate()} - ${end.getDate()}, ${start.getFullYear()}`;
-      } else {
-        return `${MONTH_NAMES[start.getMonth()]} ${start.getDate()} - ${MONTH_NAMES[end.getMonth()]} ${end.getDate()}`;
+  function goToToday() {
+    const today = new Date();
+    setCurrentDate(today);
+    setSelectedDate(today);
+  }
+
+  // Handle job actions
+  const handleMarkComplete = useCallback(async (jobId: string) => {
+    try {
+      const response = await fetch(`/api/jobs/${jobId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed' }),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to mark job as complete');
       }
-    } else {
-      return `${MONTH_NAMES[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+      showSuccess('Job marked as complete');
+      loadEvents();
+    } catch (error) {
+      console.error('Error marking job complete:', error);
+      showError('Failed to mark job as complete');
     }
-  }, [viewMode, currentDate, selectedDate, weekDates]);
+  }, [loadEvents]);
+
+  const handleStartJob = useCallback(async (jobId: string) => {
+    try {
+      const response = await fetch(`/api/jobs/${jobId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'in_progress' }),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to start job');
+      }
+      showSuccess('Job started');
+      loadEvents();
+    } catch (error) {
+      console.error('Error starting job:', error);
+      showError('Failed to start job');
+    }
+  }, [loadEvents]);
+
+  const handleReschedule = useCallback((job: CalendarJob) => {
+    router.push(`/jobs/${job.job_id || job.id}/reschedule`);
+  }, [router]);
 
   if (loading || !user) {
     return <CalendarSkeleton />;
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen flex flex-col bg-background">
       {/* Header */}
-      <header className="sticky-header bg-background border-b border-border">
+      <header className="shrink-0 bg-background border-b border-border">
         <div className="px-4 py-3">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-xl font-bold text-text">Calendar</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-bold text-text">Schedule</h1>
             <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={loadEvents}
-                disabled={refreshing}
-              >
-                <RefreshCw className={cn('h-5 w-5', refreshing && 'animate-spin')} />
-              </Button>
+              {/* View Toggle */}
+              <div className="flex bg-muted rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('day')}
+                  className={cn(
+                    'px-2 py-1.5 text-xs font-medium rounded transition-colors',
+                    viewMode === 'day' ? 'bg-background shadow-sm' : 'text-muted-foreground'
+                  )}
+                  title="Day View"
+                >
+                  Day
+                </button>
+                <button
+                  onClick={() => setViewMode('week')}
+                  className={cn(
+                    'px-2 py-1.5 text-xs font-medium rounded transition-colors',
+                    viewMode === 'week' ? 'bg-background shadow-sm' : 'text-muted-foreground'
+                  )}
+                  title="Week View"
+                >
+                  Week
+                </button>
+                <button
+                  onClick={() => setViewMode('month')}
+                  className={cn(
+                    'px-2 py-1.5 text-xs font-medium rounded transition-colors',
+                    viewMode === 'month' ? 'bg-background shadow-sm' : 'text-muted-foreground'
+                  )}
+                  title="Month View"
+                >
+                  Month
+                </button>
+              </div>
+              <Link href="/calendar/team">
+                <Button variant="ghost" size="icon-sm" title="Team Calendar">
+                  <Users className="h-5 w-5" />
+                </Button>
+              </Link>
               <Link href="/settings/calendar">
                 <Button variant="ghost" size="icon-sm">
                   <Settings className="h-5 w-5" />
@@ -218,106 +281,92 @@ export default function CalendarPage() {
               </Link>
             </div>
           </div>
-
-          {/* View mode toggle */}
-          <div className="flex items-center justify-between">
-            <div className="flex bg-muted rounded-lg p-1">
-              {(['day', 'week', 'month'] as ViewMode[]).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setViewMode(mode)}
-                  className={cn(
-                    'px-3 py-1.5 text-sm rounded transition-colors capitalize',
-                    viewMode === mode ? 'bg-background shadow-sm font-medium' : 'text-text-muted'
-                  )}
-                >
-                  {mode}
-                </button>
-              ))}
-            </div>
-            <Button variant="outline" size="sm" onClick={goToToday}>
-              Today
-            </Button>
-          </div>
-
-          {/* Navigation */}
-          <div className="flex items-center justify-between mt-3">
-            <button onClick={navigatePrev} className="p-2">
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            <span className="font-medium text-text">{headerTitle}</span>
-            <button onClick={navigateNext} className="p-2">
-              <ChevronRight className="h-5 w-5" />
-            </button>
-          </div>
         </div>
       </header>
 
-      {/* Week View Header (for week view) */}
-      {viewMode === 'week' && (
-        <div className="px-4 py-3 border-b border-border bg-muted/30">
-          <div className="grid grid-cols-7 gap-1">
-            {weekDates.map((date) => {
-              const dateKey = date.toISOString().split('T')[0];
-              const dayEvents = eventsByDate[dateKey] || [];
-              const isToday = isDateToday(date);
-              const isSelected = isSameDate(date, selectedDate);
+      {/* Main Content */}
+      {viewMode === 'day' ? (
+        <ScheduleCalendar
+          jobs={calendarJobs}
+          technicians={technicians}
+          initialDate={currentDate}
+          initialViewMode="day"
+          onDateChange={setCurrentDate}
+          onRefresh={loadEvents}
+          onNewJob={() => router.push('/jobs/new')}
+          onMarkComplete={handleMarkComplete}
+          onStartJob={handleStartJob}
+          onReschedule={handleReschedule}
+          loading={refreshing}
+          className="flex-1"
+        />
+      ) : viewMode === 'week' ? (
+        <ScheduleCalendar
+          jobs={calendarJobs}
+          technicians={technicians}
+          initialDate={currentDate}
+          initialViewMode="week"
+          onDateChange={setCurrentDate}
+          onRefresh={loadEvents}
+          onNewJob={() => router.push('/jobs/new')}
+          onMarkComplete={handleMarkComplete}
+          onStartJob={handleStartJob}
+          onReschedule={handleReschedule}
+          loading={refreshing}
+          className="flex-1"
+        />
+      ) : (
+        <div className="flex-1 overflow-auto">
+          {/* Month View Header */}
+          <div className="sticky top-0 bg-background border-b border-border px-4 py-3 z-10">
+            <div className="flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigateMonth('prev')}
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <span className="font-semibold text-lg">
+                {MONTH_NAMES[currentDate.getMonth()]} {currentDate.getFullYear()}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigateMonth('next')}
+              >
+                <ChevronRight className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="flex justify-center mt-2">
+              <Button variant="outline" size="sm" onClick={goToToday}>
+                Today
+              </Button>
+            </div>
+          </div>
 
-              return (
-                <button
-                  key={dateKey}
-                  onClick={() => setSelectedDate(date)}
-                  className={cn(
-                    'flex flex-col items-center p-2 rounded-lg transition-colors',
-                    isSelected && 'bg-primary text-white',
-                    isToday && !isSelected && 'bg-primary/10',
-                    !isSelected && 'hover:bg-muted'
-                  )}
-                >
-                  <span className="text-xs uppercase">{DAY_NAMES[date.getDay()]}</span>
-                  <span className="text-lg font-semibold">{date.getDate()}</span>
-                  {dayEvents.length > 0 && (
-                    <span
-                      className={cn(
-                        'text-xs px-1.5 rounded-full',
-                        isSelected ? 'bg-white/20' : 'bg-primary/10 text-primary'
-                      )}
-                    >
-                      {dayEvents.length}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+          {/* Month Grid */}
+          <div className="p-4">
+            <MonthView
+              currentDate={currentDate}
+              eventsByDate={eventsByDate}
+              selectedDate={selectedDate}
+              onSelectDate={(date) => {
+                setSelectedDate(date);
+                setCurrentDate(date);
+                setViewMode('day');
+              }}
+            />
           </div>
         </div>
       )}
 
-      {/* Main Content */}
-      <div className="px-4 py-4">
-        {viewMode === 'month' ? (
-          <MonthView
-            currentDate={currentDate}
-            eventsByDate={eventsByDate}
-            selectedDate={selectedDate}
-            onSelectDate={(date) => {
-              setSelectedDate(date);
-              setViewMode('day');
-            }}
-          />
-        ) : (
-          <DayEventsList
-            date={selectedDate}
-            events={selectedDateEvents}
-            viewMode={viewMode}
-          />
-        )}
-      </div>
-
-      {/* FAB */}
-      <Link href="/jobs/new" className="fab">
-        <Plus className="h-6 w-6" />
-      </Link>
+      {/* FAB for new job */}
+      {viewMode === 'month' && (
+        <Link href="/jobs/new" className="fab">
+          <Plus className="h-6 w-6" />
+        </Link>
+      )}
     </div>
   );
 }
@@ -338,7 +387,6 @@ function MonthView({
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
     const startDate = new Date(firstDay);
     startDate.setDate(startDate.getDate() - firstDay.getDay());
 
@@ -356,7 +404,7 @@ function MonthView({
       {/* Day headers */}
       <div className="grid grid-cols-7 gap-1 mb-2">
         {DAY_NAMES.map((day) => (
-          <div key={day} className="text-center text-xs font-medium text-text-muted py-2">
+          <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
             {day}
           </div>
         ))}
@@ -368,17 +416,20 @@ function MonthView({
           const dateKey = date.toISOString().split('T')[0];
           const dayEvents = eventsByDate[dateKey] || [];
           const isCurrentMonth = date.getMonth() === currentDate.getMonth();
-          const isToday = isDateToday(date);
-          const isSelected = isSameDate(date, selectedDate);
+          const isToday = date.toDateString() === new Date().toDateString();
+          const isSelected =
+            date.getFullYear() === selectedDate.getFullYear() &&
+            date.getMonth() === selectedDate.getMonth() &&
+            date.getDate() === selectedDate.getDate();
 
           return (
             <button
               key={index}
               onClick={() => onSelectDate(date)}
               className={cn(
-                'aspect-square p-1 rounded-lg flex flex-col items-center justify-start transition-colors',
+                'aspect-square p-1 rounded-lg flex flex-col items-center justify-start transition-colors min-h-[56px]',
                 !isCurrentMonth && 'opacity-40',
-                isSelected && 'bg-primary text-white',
+                isSelected && 'bg-primary text-primary-foreground',
                 isToday && !isSelected && 'bg-primary/10',
                 !isSelected && 'hover:bg-muted'
               )}
@@ -391,12 +442,20 @@ function MonthView({
                       key={i}
                       className={cn(
                         'w-1.5 h-1.5 rounded-full',
-                        event.type === 'job' && 'bg-primary',
+                        event.type === 'job' && (isSelected ? 'bg-primary-foreground' : 'bg-primary'),
                         event.type === 'personal' && 'bg-gray-400',
-                        event.type === 'break' && 'bg-warning'
+                        event.type === 'break' && 'bg-amber-500'
                       )}
                     />
                   ))}
+                  {dayEvents.length > 3 && (
+                    <span className={cn(
+                      'text-[8px]',
+                      isSelected ? 'text-primary-foreground' : 'text-muted-foreground'
+                    )}>
+                      +{dayEvents.length - 3}
+                    </span>
+                  )}
                 </div>
               )}
             </button>
@@ -407,195 +466,28 @@ function MonthView({
   );
 }
 
-// Day Events List Component
-function DayEventsList({
-  date,
-  events,
-  viewMode,
-}: {
-  date: Date;
-  events: CalendarDisplayEvent[];
-  viewMode: ViewMode;
-}) {
-  if (events.length === 0) {
-    return (
-      <div className="card p-8 text-center">
-        <Calendar className="h-12 w-12 text-text-muted mx-auto mb-3" />
-        <h3 className="font-medium text-text mb-1">No events</h3>
-        <p className="text-sm text-text-muted mb-4">
-          {viewMode === 'day'
-            ? formatDateLong(date)
-            : `${FULL_DAY_NAMES[date.getDay()]}, ${MONTH_NAMES[date.getMonth()]} ${date.getDate()}`}
-        </p>
-        <Link href="/jobs/new">
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Schedule Job
-          </Button>
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      <h2 className="font-semibold text-text">
-        {viewMode === 'day'
-          ? 'Today\'s Schedule'
-          : `${FULL_DAY_NAMES[date.getDay()]}, ${MONTH_NAMES[date.getMonth()]} ${date.getDate()}`}
-      </h2>
-
-      {events.map((event) => (
-        <EventCard key={event.id} event={event} />
-      ))}
-    </div>
-  );
-}
-
-// Event Card Component
-function EventCard({ event }: { event: CalendarDisplayEvent }) {
-  const startTime = new Date(event.start);
-  const endTime = new Date(event.end);
-  const isJob = event.type === 'job';
-
-  const content = (
-    <div
-      className={cn(
-        'card p-4 border-l-4',
-        event.type === 'job' && 'border-l-primary',
-        event.type === 'personal' && 'border-l-gray-400',
-        event.type === 'break' && 'border-l-warning'
-      )}
-    >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="min-w-0 flex-1">
-          <h3 className="font-medium text-text">{event.title}</h3>
-          {event.customer && (
-            <p className="text-sm text-text-muted">{event.customer.name}</p>
-          )}
-        </div>
-        <Badge
-          className={cn(
-            'shrink-0',
-            event.type === 'job' && 'bg-primary/10 text-primary',
-            event.type === 'personal' && 'bg-gray-100 text-gray-600',
-            event.type === 'break' && 'bg-warning/10 text-warning'
-          )}
-        >
-          {event.type === 'job' ? 'Job' : event.type === 'personal' ? 'Personal' : 'Break'}
-        </Badge>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-muted">
-        <div className="flex items-center gap-1">
-          <Clock className="h-3.5 w-3.5" />
-          <span>
-            {formatTimeString(startTime)} - {formatTimeString(endTime)}
-          </span>
-        </div>
-        {event.source === 'external' && (
-          <div className="flex items-center gap-1">
-            <Calendar className="h-3.5 w-3.5" />
-            <span>External</span>
-          </div>
-        )}
-      </div>
-
-      {/* Quick actions for jobs */}
-      {isJob && event.customer && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border">
-          {event.customer.phone && (
-            <a
-              href={`tel:${event.customer.phone}`}
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1.5 text-sm text-primary"
-            >
-              <Phone className="h-4 w-4" />
-              Call
-            </a>
-          )}
-          {(event.address || event.city) && (
-            <AddressLink
-              address={event.address || undefined}
-              city={event.city || undefined}
-              state={event.state || undefined}
-              zip={event.zip || undefined}
-              className="flex items-center gap-1.5 text-sm text-primary"
-              iconClassName="h-4 w-4"
-              onClick={(e) => e.stopPropagation()}
-            />
-          )}
-        </div>
-      )}
-    </div>
-  );
-
-  if (isJob && event.job_id) {
-    return (
-      <Link href={`/jobs/${event.job_id}`} className="block active:scale-[0.99] transition-transform">
-        {content}
-      </Link>
-    );
-  }
-
-  return content;
-}
-
 // Calendar Skeleton
 function CalendarSkeleton() {
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky-header bg-background border-b border-border">
+    <div className="h-screen flex flex-col bg-background">
+      <header className="shrink-0 bg-background border-b border-border">
         <div className="px-4 py-3">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between">
             <div className="h-7 w-24 skeleton rounded" />
             <div className="flex gap-2">
-              <div className="h-10 w-10 skeleton rounded-lg" />
-              <div className="h-10 w-10 skeleton rounded-lg" />
+              <div className="h-8 w-16 skeleton rounded-lg" />
+              <div className="h-8 w-8 skeleton rounded-lg" />
             </div>
           </div>
-          <div className="h-10 skeleton rounded-lg" />
         </div>
       </header>
-      <div className="px-4 py-4 space-y-3">
+      <div className="flex-1 p-4 space-y-3">
+        <div className="h-12 skeleton rounded-lg" />
+        <div className="h-12 skeleton rounded-lg" />
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="card p-4 h-24 skeleton" />
+          <div key={i} className="h-20 skeleton rounded-lg" />
         ))}
       </div>
     </div>
   );
-}
-
-// Helper functions
-function getStartOfWeek(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  d.setDate(d.getDate() - day);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function isDateToday(date: Date): boolean {
-  const today = new Date();
-  return isSameDate(date, today);
-}
-
-function isSameDate(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
-
-function formatDateLong(date: Date): string {
-  return `${FULL_DAY_NAMES[date.getDay()]}, ${MONTH_NAMES[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
-}
-
-function formatTimeString(date: Date): string {
-  return date.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
 }

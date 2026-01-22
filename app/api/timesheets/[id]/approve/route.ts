@@ -5,49 +5,49 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getServerSession } from '@/lib/permissions/check-permission';
 import { approveTimeEntry } from '@/lib/timesheets';
 import { apiLogger } from '@/lib/logger';
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const session = await getServerSession();
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id, role')
-      .eq('auth_user_id', user.id)
-      .single();
+    const body = await request.json().catch(() => ({}));
+    
+    // Determine business ID
+    let businessId = session.user.businessId;
+    if ((session.user.role === 'admin' || session.user.role === 'super_admin') && body.businessId) {
+      businessId = body.businessId;
+    }
 
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!businessId) {
+      return NextResponse.json({ error: 'Business ID not found' }, { status: 404 });
     }
 
     // Only admins/owners can approve
-    if (profile.role === 'technician') {
+    if (session.user.role === 'technician') {
       return NextResponse.json(
         { error: 'Only administrators can approve time entries' },
         { status: 403 }
       );
     }
 
+    const supabase = await createClient();
+
     // Verify entry belongs to this business
     const { data: entry } = await supabase
       .from('timesheets')
       .select('status')
       .eq('id', id)
-      .eq('business_id', profile.business_id)
+      .eq('business_id', businessId)
       .single();
 
     if (!entry) {
@@ -61,7 +61,7 @@ export async function POST(
       );
     }
 
-    const updatedEntry = await approveTimeEntry(id, profile.id);
+    const updatedEntry = await approveTimeEntry(id, session.user.id);
 
     return NextResponse.json({ entry: updatedEntry });
   } catch (error) {

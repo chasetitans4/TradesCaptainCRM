@@ -49,6 +49,7 @@ const config: Config = {
         // Dark Charcoal (from "TRADES" text)
         dark: {
           DEFAULT: '#1E293B',
+          foreground: '#FFFFFF',
           50: '#F8FAFC',
           100: '#F1F5F9',
           200: '#E2E8F0',
@@ -130,15 +131,15 @@ const config: Config = {
 
         // Neutral Palette
         surface: {
-          DEFAULT: '#ffffff',
-          secondary: '#f8fafc',
-          tertiary: '#f1f5f9',
+          DEFAULT: 'hsl(var(--card))',
+          secondary: 'hsl(var(--muted))',
+          tertiary: 'hsl(var(--accent))',
         },
         text: {
-          DEFAULT: '#1e293b',
-          secondary: '#475569',
-          muted: '#64748b',
-          light: '#94a3b8',
+          DEFAULT: 'hsl(var(--foreground))',
+          secondary: 'hsl(var(--muted-foreground))',
+          muted: 'hsl(var(--muted-foreground))',
+          light: 'hsl(var(--muted-foreground))',
         },
 
         // UI colors (shadcn/ui compatibility)

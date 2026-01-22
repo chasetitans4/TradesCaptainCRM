@@ -5,7 +5,8 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserProfile } from '@/lib/supabase/server';
+import { getServerUserProfile, createAdminClient } from '@/lib/supabase/server';
+import { getPortalSession } from '@/lib/portal/session';
 import { apiLogger } from '@/lib/logger';
 import {
   uploadDocument,
@@ -15,12 +16,27 @@ import {
   getExpiredDocuments,
   getStorageStats,
 } from '@/lib/documents';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
   try {
-    const profile = await getServerUserProfile();
+    let profile = await getServerUserProfile();
+    let businessId: string | undefined;
+    let supabaseClient: SupabaseClient | undefined;
 
-    if (!profile) {
+    if (profile) {
+      businessId = profile.business_id;
+    } else {
+      // Check for portal session
+      const portalSession = await getPortalSession();
+      if (portalSession) {
+        businessId = portalSession.businessId;
+        // Use admin client for portal users to bypass RLS (since they use custom JWT)
+        supabaseClient = createAdminClient();
+      }
+    }
+
+    if (!businessId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -35,25 +51,30 @@ export async function GET(request: NextRequest) {
     const withinDays = parseInt(searchParams.get('withinDays') || '30');
 
     if (stats) {
-      const storageStats = await getStorageStats(profile.business_id);
+      const storageStats = await getStorageStats(businessId, supabaseClient);
       return NextResponse.json(storageStats);
     }
 
     if (expiring) {
-      const expiringDocs = await getExpiringDocuments(profile.business_id, withinDays);
+      const expiringDocs = await getExpiringDocuments(businessId, withinDays, supabaseClient);
       return NextResponse.json(expiringDocs);
     }
 
     if (expired) {
-      const expiredDocs = await getExpiredDocuments(profile.business_id);
+      const expiredDocs = await getExpiredDocuments(businessId, supabaseClient);
       return NextResponse.json(expiredDocs);
     }
 
     if (search) {
-      const results = await searchDocuments(profile.business_id, search, {
-        documentType,
-        entityType,
-      });
+      const results = await searchDocuments(
+        businessId,
+        search,
+        {
+          documentType,
+          entityType,
+        },
+        supabaseClient
+      );
       return NextResponse.json(results);
     }
 
@@ -64,7 +85,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const documents = await getDocuments(entityType, entityId, documentType);
+    const documents = await getDocuments(entityType, entityId, documentType, supabaseClient);
     return NextResponse.json(documents);
   } catch (error) {
     apiLogger.error({ error, route: 'GET /api/documents' });
@@ -77,9 +98,23 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const profile = await getServerUserProfile();
+    let profile = await getServerUserProfile();
+    let businessId: string | undefined;
+    let supabaseClient: SupabaseClient | undefined;
 
-    if (!profile) {
+    if (profile) {
+      businessId = profile.business_id;
+    } else {
+      // Check for portal session
+      const portalSession = await getPortalSession();
+      if (portalSession) {
+        businessId = portalSession.businessId;
+        // Use admin client for portal users
+        supabaseClient = createAdminClient();
+      }
+    }
+
+    if (!businessId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -100,18 +135,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const document = await uploadDocument({
-      businessId: profile.business_id,
-      entityType,
-      entityId,
-      file,
-      documentType,
-      name: name || undefined,
-      description: description || undefined,
-      tags: tags ? JSON.parse(tags) : undefined,
-      expirationDate: expirationDate ? new Date(expirationDate) : undefined,
-      uploadedBy: profile.id,
-    });
+    const document = await uploadDocument(
+      {
+        businessId,
+        entityType,
+        entityId,
+        file,
+        documentType,
+        name: name || undefined,
+        description: description || undefined,
+        tags: tags ? JSON.parse(tags) : undefined,
+        expirationDate: expirationDate ? new Date(expirationDate) : undefined,
+        uploadedBy: profile?.id, // Optional now
+      },
+      supabaseClient
+    );
 
     return NextResponse.json(document);
   } catch (error) {

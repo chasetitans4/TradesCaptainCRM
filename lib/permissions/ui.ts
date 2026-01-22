@@ -39,7 +39,11 @@ export function getRoleDisplayName(role: UserRole): string {
   const names: Record<UserRole, string> = {
     owner: 'Owner',
     admin: 'Admin',
-    technician: 'Technician'
+    technician: 'Technician',
+    super_admin: 'Super Admin',
+    finance: 'Finance',
+    manager: 'Manager',
+    agent: 'Agent'
   };
   return names[role];
 }
@@ -51,7 +55,11 @@ export function getRoleDescription(role: UserRole): string {
   const descriptions: Record<UserRole, string> = {
     owner: 'Full access to all features including billing',
     admin: 'Full access except billing and subscription',
-    technician: 'View assigned jobs, add notes and photos, update status'
+    technician: 'View assigned jobs, add notes and photos, update status',
+    super_admin: 'Full platform administration access',
+    finance: 'Access to reports, billing, and commissions',
+    manager: 'Team management, onboarding, and leads oversight',
+    agent: 'View assigned leads and submit feature requests'
   };
   return descriptions[role];
 }
@@ -79,6 +87,37 @@ export const DASHBOARD_SECTIONS: Record<UserRole, string[]> = {
     'leads',
     'needsFollowUp',
     'leadUsage'
+  ],
+  super_admin: [
+    'stats',
+    'messages',
+    'reminders',
+    'todayJobs',
+    'tomorrowJobs',
+    'leads',
+    'needsFollowUp',
+    'leadUsage'
+  ],
+  manager: [
+    'stats',
+    'messages',
+    'reminders',
+    'todayJobs',
+    'tomorrowJobs',
+    'leads',
+    'needsFollowUp',
+    'leadUsage'
+  ],
+  finance: [
+    'stats',
+    'leadUsage'
+  ],
+  agent: [
+    'stats',
+    'messages',
+    'reminders',
+    'leads',
+    'needsFollowUp'
   ],
   technician: ['reminders', 'todayJobs', 'tomorrowJobs']
 };

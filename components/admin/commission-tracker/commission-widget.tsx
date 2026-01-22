@@ -78,7 +78,7 @@ export function CommissionWidget() {
         </div>
 
         <Button variant="outline" size="sm" className="w-full" asChild>
-          <Link href="/admin-portal/commissions">
+          <Link href="/admin/commissions">
             View Full Dashboard
             <ArrowRight className="h-4 w-4 ml-2" />
           </Link>

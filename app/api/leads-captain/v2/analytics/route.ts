@@ -5,7 +5,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserProfile } from '@/lib/supabase/server';
+import { checkPermission, getServerSession } from '@/lib/permissions/check-permission';
 import { createAdminClient } from '@/lib/supabase/server';
 import { canAccessFeature } from '@/lib/leads-captain/v2/features';
 import { apiLogger } from '@/lib/logger';
@@ -13,13 +13,30 @@ import type { AnalyticsOverviewResponse, RuleAnalyticsResponse } from '@/types/l
 
 export async function GET(request: NextRequest) {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('view_leads_captain');
+    const session = await getServerSession();
+    
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const supabase = createAdminClient();
+
+    // Get business_id
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+
+    const businessId = userData.business_id;
+
     // Check feature access
-    const hasAccess = await canAccessFeature(profile.business_id, 'analytics');
+    const hasAccess = await canAccessFeature(businessId, 'analytics');
     if (!hasAccess) {
       return NextResponse.json(
         { error: 'Analytics not available on your plan. Upgrade to access.' },
@@ -27,7 +44,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = createAdminClient();
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type');
     const days = parseInt(searchParams.get('days') || '30');
@@ -36,7 +52,7 @@ export async function GET(request: NextRequest) {
     const { data: config } = await supabase
       .from('leads_captain_config')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', businessId)
       .single();
 
     if (!config) {

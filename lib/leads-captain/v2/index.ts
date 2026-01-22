@@ -31,5 +31,11 @@ export { handleCompliance, isOptedOut, sendComplianceResponse } from './complian
 // Feature gating
 export { canAccessFeature, getFeatureLimits, checkPlanLimit } from './features';
 
+// New orchestrator adapter (feature-flagged)
+export { processWithNewOrchestrator } from './orchestrator-adapter';
+
 // Re-export types
 export * from '@/types/leads-captain';
+
+// Re-export prompt types
+export * from '@/types/leads-captain/prompt-types';

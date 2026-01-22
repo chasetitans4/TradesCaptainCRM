@@ -4,6 +4,7 @@
 // =====================================================
 
 import { createClient } from '@/lib/supabase/server';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 export interface LaborEntry {
   id: string;
@@ -27,9 +28,10 @@ export interface LaborEntry {
 export async function clockIn(
   jobId: string,
   userId: string,
-  notes?: string
+  notes?: string,
+  client?: SupabaseClient
 ): Promise<{ success: boolean; entryId?: string; error?: string }> {
-  const supabase = await createClient();
+  const supabase = client ?? await createClient();
 
   // Check for existing open clock-in on any job
   const { data: existing } = await supabase
@@ -102,9 +104,10 @@ export async function clockOut(
   jobId: string,
   userId: string,
   breakMinutes: number = 0,
-  notes?: string
+  notes?: string,
+  client?: SupabaseClient
 ): Promise<{ success: boolean; totalMinutes?: number; laborCost?: number; error?: string }> {
-  const supabase = await createClient();
+  const supabase = client ?? await createClient();
 
   const { data: entry } = await supabase
     .from('job_labor')
@@ -283,8 +286,8 @@ export async function updateLaborEntry(
 /**
  * Delete labor entry
  */
-export async function deleteLaborEntry(entryId: string): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createClient();
+export async function deleteLaborEntry(entryId: string, client?: SupabaseClient): Promise<{ success: boolean; error?: string }> {
+  const supabase = client ?? await createClient();
 
   const { data: entry } = await supabase
     .from('job_labor')
@@ -312,14 +315,14 @@ export async function deleteLaborEntry(entryId: string): Promise<{ success: bool
 /**
  * Get labor entries for a job
  */
-export async function getJobLabor(jobId: string): Promise<LaborEntry[]> {
-  const supabase = await createClient();
+export async function getJobLabor(jobId: string, client?: SupabaseClient): Promise<LaborEntry[]> {
+  const supabase = client ?? await createClient();
 
   const { data } = await supabase
     .from('job_labor')
     .select(`
       *,
-      user:users(name)
+      user:users!job_labor_user_id_fkey(name)
     `)
     .eq('job_id', jobId)
     .order('clock_in', { ascending: false });
@@ -344,13 +347,13 @@ export async function getJobLabor(jobId: string): Promise<LaborEntry[]> {
 /**
  * Get active clock-in for a user
  */
-export async function getActiveClockIn(userId: string): Promise<{
+export async function getActiveClockIn(userId: string, client?: SupabaseClient): Promise<{
   jobId: string;
   jobTitle: string;
   clockIn: string;
   duration: number;
 } | null> {
-  const supabase = await createClient();
+  const supabase = client ?? await createClient();
 
   const { data } = await supabase
     .from('job_labor')
@@ -382,20 +385,21 @@ export async function getActiveClockIn(userId: string): Promise<{
 export async function getLaborSummary(
   userId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  client?: SupabaseClient
 ): Promise<{
   totalMinutes: number;
   totalCost: number;
   jobCount: number;
   entries: LaborEntry[];
 }> {
-  const supabase = await createClient();
+  const supabase = client ?? await createClient();
 
   const { data } = await supabase
     .from('job_labor')
     .select(`
       *,
-      user:users(name)
+      user:users!job_labor_user_id_fkey(name)
     `)
     .eq('user_id', userId)
     .gte('clock_in', startDate)

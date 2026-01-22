@@ -116,7 +116,7 @@ export default function NewCallLogPage() {
       } else if (leadId) {
         const { data } = await supabase
           .from('leads')
-          .select('*, customer:customers (*)')
+          .select('*, customer:customers!leads_customer_id_fkey (*)')
           .eq('id', leadId)
           .single();
         if (data) {

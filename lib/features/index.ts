@@ -14,6 +14,9 @@ export interface FeatureSettings {
   online_booking_enabled: boolean;
   route_optimization_enabled: boolean;
 
+  // Route Optimization Settings
+  send_arrival_sms: boolean; // Send SMS to customer when technician arrives
+
   // CRM Features
   timesheets_enabled: boolean;
   receipts_enabled: boolean;
@@ -32,6 +35,7 @@ export const DEFAULT_FEATURES: FeatureSettings = {
   auto_review_requests: false,
   online_booking_enabled: false,
   route_optimization_enabled: true,
+  send_arrival_sms: false,
   timesheets_enabled: true,
   receipts_enabled: true,
   quotes_enabled: true,
@@ -64,6 +68,7 @@ export async function getFeatureSettings(businessId: string): Promise<FeatureSet
     auto_review_requests: data.auto_review_requests ?? DEFAULT_FEATURES.auto_review_requests,
     online_booking_enabled: data.online_booking_enabled ?? DEFAULT_FEATURES.online_booking_enabled,
     route_optimization_enabled: data.route_optimization_enabled ?? DEFAULT_FEATURES.route_optimization_enabled,
+    send_arrival_sms: data.send_arrival_sms ?? DEFAULT_FEATURES.send_arrival_sms,
     timesheets_enabled: data.timesheets_enabled ?? DEFAULT_FEATURES.timesheets_enabled,
     receipts_enabled: data.receipts_enabled ?? DEFAULT_FEATURES.receipts_enabled,
     quotes_enabled: data.quotes_enabled ?? DEFAULT_FEATURES.quotes_enabled,

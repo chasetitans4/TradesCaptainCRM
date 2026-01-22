@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { logger } from '@/lib/logger';
+import { useDemoMode, getDemoInvoices, mergeWithDemoData } from '@/lib/portal/demo-data/use-demo-data';
 const portalInvoicesLogger = logger.child({ context: 'portal.invoices' });
 
 interface Invoice {
@@ -33,6 +34,7 @@ export default function InvoicesPage() {
   const [unpaid, setUnpaid] = useState<Invoice[]>([]);
   const [paid, setPaid] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const demoMode = useDemoMode();
 
   useEffect(() => {
     async function loadInvoices() {
@@ -40,6 +42,9 @@ export default function InvoicesPage() {
         const response = await fetch(
           `/api/portal/invoices?businessId=${businessId}`
         );
+        if (!response.ok) {
+          throw new Error('Failed to load invoices');
+        }
         const data = await response.json();
         setUnpaid(data.unpaid || []);
         setPaid(data.paid || []);
@@ -56,6 +61,13 @@ export default function InvoicesPage() {
 
     loadInvoices();
   }, [businessId]);
+
+  // Merge demo data with real data when demo mode is active
+  const demoInvoices = getDemoInvoices();
+  const demoUnpaid = demoInvoices.filter((inv) => inv.status !== 'paid') as Invoice[];
+  const demoPaid = demoInvoices.filter((inv) => inv.status === 'paid') as Invoice[];
+  const displayUnpaid = mergeWithDemoData(unpaid, demoUnpaid, demoMode);
+  const displayPaid = mergeWithDemoData(paid, demoPaid, demoMode);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -94,7 +106,7 @@ export default function InvoicesPage() {
     return <InvoicesSkeleton />;
   }
 
-  const totalDue = unpaid.reduce((sum, inv) => sum + inv.total, 0);
+  const totalDue = displayUnpaid.reduce((sum, inv) => sum + inv.total, 0);
 
   return (
     <div className="space-y-6">
@@ -112,7 +124,7 @@ export default function InvoicesPage() {
                 <p className="text-blue-100 text-sm">Total Amount Due</p>
                 <p className="text-3xl font-bold">{formatCurrency(totalDue)}</p>
                 <p className="text-blue-100 text-sm mt-1">
-                  {unpaid.length} unpaid invoice{unpaid.length !== 1 ? 's' : ''}
+                  {displayUnpaid.length} unpaid invoice{displayUnpaid.length !== 1 ? 's' : ''}
                 </p>
               </div>
               <CreditCard className="h-12 w-12 text-blue-200" />
@@ -124,15 +136,15 @@ export default function InvoicesPage() {
       <Tabs defaultValue="unpaid">
         <TabsList>
           <TabsTrigger value="unpaid">
-            Unpaid ({unpaid.length})
+            Unpaid ({displayUnpaid.length})
           </TabsTrigger>
           <TabsTrigger value="paid">
-            Paid ({paid.length})
+            Paid ({displayPaid.length})
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="unpaid" className="mt-4">
-          {unpaid.length === 0 ? (
+          {displayUnpaid.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
@@ -146,7 +158,7 @@ export default function InvoicesPage() {
             </Card>
           ) : (
             <div className="space-y-4">
-              {unpaid.map((invoice) => (
+              {displayUnpaid.map((invoice) => (
                 <InvoiceCard
                   key={invoice.id}
                   invoice={invoice}
@@ -160,7 +172,7 @@ export default function InvoicesPage() {
         </TabsContent>
 
         <TabsContent value="paid" className="mt-4">
-          {paid.length === 0 ? (
+          {displayPaid.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <Receipt className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -174,7 +186,7 @@ export default function InvoicesPage() {
             </Card>
           ) : (
             <div className="space-y-4">
-              {paid.map((invoice) => (
+              {displayPaid.map((invoice) => (
                 <InvoiceCard
                   key={invoice.id}
                   invoice={invoice}

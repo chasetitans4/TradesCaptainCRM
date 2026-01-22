@@ -4,21 +4,20 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAgentOrHigher } from '@/lib/admin/auth';
+import { checkPermission, getServerSession } from '@/lib/permissions/check-permission';
 import { getLeadsCaptainClients } from '@/lib/admin/leads-captain-dashboard';
 import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAgentOrHigher();
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    await checkPermission('view_leads_captain');
+    const session = await getServerSession();
+    const userId = session!.user.id;
 
     const { searchParams } = new URL(request.url);
     const filter = searchParams.get('filter') as 'all' | 'near_cap' | 'over_cap' | 'low_usage' | 'healthy' | null;
 
-    const clients = await getLeadsCaptainClients(auth.id, filter || 'all');
+    const clients = await getLeadsCaptainClients(userId, filter || 'all');
 
     return NextResponse.json({ clients });
   } catch (error) {

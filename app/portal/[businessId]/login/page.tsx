@@ -43,7 +43,8 @@ export default function PortalLoginPage() {
   }, [businessId]);
 
   const handleSuccess = () => {
-    router.push(`/portal/${businessId}`);
+    // Force a full page reload to ensure cookies are picked up
+    window.location.href = `/portal/${businessId}`;
   };
 
   if (loading) {

@@ -12,29 +12,33 @@ import {
 } from '@/lib/memberships/subscriptions';
 import { apiLogger } from '@/lib/logger';
 
+import { getServerSession } from '@/lib/permissions/check-permission';
+
 // GET /api/memberships/subscriptions - Get memberships
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: userData } = await supabase
-      .from('users')
-      .select('business_id')
-      .eq('id', user.id)
-      .single();
+    const { searchParams } = new URL(request.url);
+    let businessId = session.user.businessId;
 
-    if (!userData?.business_id) {
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      const queryBusinessId = searchParams.get('businessId');
+      if (queryBusinessId) businessId = queryBusinessId;
+    }
+
+    if (!businessId) {
+      if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+         return NextResponse.json({ memberships: [] });
+      }
       return NextResponse.json({ error: 'No business found' }, { status: 404 });
     }
 
-    const { searchParams } = new URL(request.url);
     const customerId = searchParams.get('customerId');
     const status = searchParams.get('status');
     const expiring = searchParams.get('expiring');
@@ -48,12 +52,12 @@ export async function GET(request: NextRequest) {
     // Get expiring memberships
     if (expiring) {
       const days = parseInt(expiring) || 30;
-      const memberships = await getExpiringMemberships(userData.business_id, days);
+      const memberships = await getExpiringMemberships(businessId, days);
       return NextResponse.json({ memberships });
     }
 
     // Get all business memberships
-    const memberships = await getBusinessMemberships(userData.business_id, status || undefined);
+    const memberships = await getBusinessMemberships(businessId, status || undefined);
     return NextResponse.json({ memberships });
   } catch (error) {
     apiLogger.error({ message: 'Error fetching memberships', error });
@@ -65,11 +69,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

@@ -3,6 +3,10 @@
 // Handles feature request management for clients and admins
 // =====================================================
 
+import { createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { SupabaseClient } from '@supabase/supabase-js';
+
 import type {
   FeatureRequest,
   FeatureRequestComment,
@@ -15,75 +19,7 @@ import type {
   FeatureRequestStats,
 } from '@/lib/admin/types';
 
-// Category labels for display
-export const FEATURE_CATEGORY_LABELS: Record<FeatureRequestCategory, string> = {
-  leads_customers: 'Leads & Customers',
-  jobs_scheduling: 'Jobs & Scheduling',
-  quotes_invoices: 'Quotes & Invoices',
-  communication: 'Communication (SMS/Email)',
-  reporting: 'Reports & Analytics',
-  integrations: 'Integrations',
-  mobile_app: 'Mobile App',
-  admin_settings: 'Admin & Settings',
-  other: 'Other',
-};
-
-// Status labels and colors
-export const FEATURE_STATUS_CONFIG: Record<FeatureRequestStatus, { label: string; color: string; description: string }> = {
-  submitted: {
-    label: 'Submitted',
-    color: 'bg-blue-100 text-blue-700',
-    description: 'Your request has been received',
-  },
-  under_review: {
-    label: 'Under Review',
-    color: 'bg-yellow-100 text-yellow-700',
-    description: 'Our team is evaluating this request',
-  },
-  planned: {
-    label: 'Planned',
-    color: 'bg-purple-100 text-purple-700',
-    description: 'This feature is on our roadmap',
-  },
-  in_progress: {
-    label: 'In Progress',
-    color: 'bg-orange-100 text-orange-700',
-    description: 'Currently being developed',
-  },
-  completed: {
-    label: 'Completed',
-    color: 'bg-green-100 text-green-700',
-    description: 'This feature has been released',
-  },
-  declined: {
-    label: 'Declined',
-    color: 'bg-gray-100 text-gray-600',
-    description: 'Not planned at this time',
-  },
-};
-
-// Priority config
-export const FEATURE_PRIORITY_CONFIG: Record<FeatureRequestPriority, { label: string; color: string }> = {
-  low: { label: 'Low', color: 'text-gray-500' },
-  medium: { label: 'Medium', color: 'text-blue-500' },
-  high: { label: 'High', color: 'text-orange-500' },
-};
-
-// In-memory storage (replace with Supabase in production)
-const featureRequests: Map<string, FeatureRequest> = new Map();
-const featureComments: Map<string, FeatureRequestComment[]> = new Map();
-let requestCounter = 1000;
-
-// Generate unique ID
-function generateId(): string {
-  return `fr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-}
-
-// Generate request number
-function generateRequestNumber(): string {
-  requestCounter++;
-  return `FR-${requestCounter}`;
-}
+export * from './constants';
 
 // Create a new feature request
 export async function createFeatureRequest(
@@ -97,94 +33,134 @@ export async function createFeatureRequest(
     crm_account_id?: string;
   }
 ): Promise<FeatureRequest> {
-  const id = generateId();
-  const now = new Date().toISOString();
+  const supabase = createAdminClient();
 
-  const featureRequest: FeatureRequest = {
-    id,
-    request_number: generateRequestNumber(),
-    source: submitter.source,
-    submitter_id: submitter.submitter_id,
-    submitter_name: submitter.submitter_name,
-    submitter_email: submitter.submitter_email,
-    business_name: submitter.business_name,
-    crm_account_id: submitter.crm_account_id,
-    title: input.title,
-    description: input.description,
-    use_case: input.use_case,
-    category: input.category,
-    priority: 'medium', // Default priority, admin can change
-    status: 'submitted',
-    upvotes: 1, // Auto-upvote by submitter
-    upvoted_by: [submitter.submitter_id],
-    created_at: now,
-    updated_at: now,
-  };
+  // Create the request
+  const { data: request, error } = await supabase
+    .from('feature_requests')
+    .insert({
+      source: submitter.source,
+      submitter_id: submitter.submitter_id,
+      submitter_name: submitter.submitter_name,
+      submitter_email: submitter.submitter_email,
+      business_name: submitter.business_name,
+      crm_account_id: submitter.crm_account_id,
+      title: input.title,
+      description: input.description,
+      use_case: input.use_case,
+      category: input.category,
+      priority: 'medium', // Default
+      status: 'submitted',
+    })
+    .select()
+    .single();
 
-  featureRequests.set(id, featureRequest);
-  featureComments.set(id, []);
+  if (error) throw error;
 
-  return featureRequest;
+  // Auto-upvote by submitter
+  await upvoteFeatureRequest(request.id, submitter.submitter_id);
+
+  // Fetch complete object with upvotes
+  return (await getFeatureRequest(request.id))!;
 }
 
 // Get a feature request by ID or request number
 export async function getFeatureRequest(idOrNumber: string): Promise<FeatureRequest | null> {
-  // Try by ID first
-  if (featureRequests.has(idOrNumber)) {
-    return featureRequests.get(idOrNumber)!;
+  const supabase = createAdminClient();
+  
+  let query = supabase.from('feature_requests').select('*');
+  
+  if (idOrNumber.startsWith('FR-')) {
+    query = query.eq('request_number', idOrNumber);
+  } else {
+    query = query.eq('id', idOrNumber);
   }
 
-  // Try by request number
-  for (const request of featureRequests.values()) {
-    if (request.request_number === idOrNumber) {
-      return request;
-    }
-  }
+  const { data: request, error } = await query.single();
+  
+  if (error || !request) return null;
 
-  return null;
+  // Fetch votes
+  const { data: votes } = await supabase
+    .from('feature_votes')
+    .select('user_id')
+    .eq('feature_request_id', request.id);
+
+  return {
+    ...request,
+    upvoted_by: votes?.map(v => v.user_id) || [],
+    upvotes: request.upvotes || 0 // Use the column from DB which is maintained by trigger
+  };
 }
 
 // Get all feature requests with optional filters
-export async function getFeatureRequests(filters?: {
+export async function getFeatureRequests(filters: {
   status?: FeatureRequestStatus;
   category?: FeatureRequestCategory;
   source?: FeatureRequestSource;
   submitter_id?: string;
   search?: string;
-}): Promise<FeatureRequest[]> {
-  let requests = Array.from(featureRequests.values());
+  page?: number;
+  limit?: number;
+} = {}) {
+  const supabase = createAdminClient();
+  const { page = 1, limit = 25 } = filters;
+  
+  let query = supabase.from('feature_requests').select('*', { count: 'exact' });
 
-  if (filters) {
-    if (filters.status) {
-      requests = requests.filter(r => r.status === filters.status);
-    }
-    if (filters.category) {
-      requests = requests.filter(r => r.category === filters.category);
-    }
-    if (filters.source) {
-      requests = requests.filter(r => r.source === filters.source);
-    }
-    if (filters.submitter_id) {
-      requests = requests.filter(r => r.submitter_id === filters.submitter_id);
-    }
-    if (filters.search) {
-      const query = filters.search.toLowerCase();
-      requests = requests.filter(
-        r =>
-          r.title.toLowerCase().includes(query) ||
-          r.description.toLowerCase().includes(query) ||
-          r.request_number.toLowerCase().includes(query)
-      );
-    }
+  if (filters.status) query = query.eq('status', filters.status);
+  if (filters.category) query = query.eq('category', filters.category);
+  if (filters.source) query = query.eq('source', filters.source);
+  if (filters.submitter_id) query = query.eq('submitter_id', filters.submitter_id);
+  if (filters.search) {
+    const s = filters.search;
+    query = query.or(`title.ilike.%${s}%,description.ilike.%${s}%,request_number.ilike.%${s}%`);
   }
 
-  // Sort by upvotes (most popular first), then by date
-  return requests.sort((a, b) => {
-    if (b.upvotes !== a.upvotes) {
-      return b.upvotes - a.upvotes;
-    }
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
+
+  const { data: requests, count, error } = await query
+    .order('upvotes', { ascending: false }) // Sort by upvotes first as default
+    .order('created_at', { ascending: false })
+    .range(from, to);
+
+  if (error) throw error;
+
+  // For list view, we might not need all upvoters IDs, but the type requires it.
+  // To avoid N+1, we fetch all votes for these requests.
+  const requestIds = requests.map(r => r.id);
+  
+  let votesMap = new Map<string, string[]>();
+  
+  if (requestIds.length > 0) {
+    const { data: allVotes } = await supabase
+      .from('feature_votes')
+      .select('feature_request_id, user_id')
+      .in('feature_request_id', requestIds);
+
+    allVotes?.forEach(v => {
+      const list = votesMap.get(v.feature_request_id) || [];
+      list.push(v.user_id);
+      votesMap.set(v.feature_request_id, list);
+    });
+  }
+
+  const data: FeatureRequest[] = requests.map(r => ({
+    ...r,
+    upvoted_by: votesMap.get(r.id) || [],
+    upvotes: r.upvotes || 0
+  }));
+
+  return {
+    data,
+    meta: {
+      total: count || 0,
+      page,
+      limit,
+      total_pages: Math.ceil((count || 0) / limit),
+    },
+  };
 }
 
 // Update a feature request (admin only)
@@ -193,29 +169,36 @@ export async function updateFeatureRequest(
   updates: UpdateFeatureRequestInput,
   reviewedBy?: string
 ): Promise<FeatureRequest | null> {
-  const request = featureRequests.get(id);
-  if (!request) return null;
+  const supabase = createAdminClient();
 
-  const now = new Date().toISOString();
-  const updated: FeatureRequest = {
-    ...request,
-    ...updates,
-    updated_at: now,
-  };
+  const updateData: any = { ...updates, updated_at: new Date().toISOString() };
 
-  // Track review info if status changed
-  if (updates.status && updates.status !== request.status) {
-    if (!request.reviewed_at) {
-      updated.reviewed_at = now;
-      updated.reviewed_by = reviewedBy;
-    }
-    if (updates.status === 'completed') {
-      updated.completed_at = now;
+  // Logic for status changes
+  if (updates.status) {
+    // We need to fetch current status to check if we need to set reviewed_at
+    const { data: current } = await supabase.from('feature_requests').select('status, reviewed_at').eq('id', id).single();
+    
+    if (current && updates.status !== current.status) {
+      if (!current.reviewed_at) {
+        updateData.reviewed_at = new Date().toISOString();
+        updateData.reviewed_by = reviewedBy;
+      }
+      if (updates.status === 'completed') {
+        updateData.completed_at = new Date().toISOString();
+      }
     }
   }
 
-  featureRequests.set(id, updated);
-  return updated;
+  const { data: updated, error } = await supabase
+    .from('feature_requests')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) return null;
+
+  return getFeatureRequest(id);
 }
 
 // Upvote a feature request
@@ -223,24 +206,30 @@ export async function upvoteFeatureRequest(
   id: string,
   userId: string
 ): Promise<{ success: boolean; upvotes: number }> {
-  const request = featureRequests.get(id);
-  if (!request) return { success: false, upvotes: 0 };
+  const supabase = createAdminClient();
 
-  // Check if already upvoted
-  if (request.upvoted_by.includes(userId)) {
-    // Remove upvote
-    request.upvoted_by = request.upvoted_by.filter(u => u !== userId);
-    request.upvotes = request.upvoted_by.length;
+  // Check if already voted
+  const { data: existing } = await supabase
+    .from('feature_votes')
+    .select('id')
+    .eq('feature_request_id', id)
+    .eq('user_id', userId)
+    .single();
+
+  if (existing) {
+    // Remove vote
+    await supabase.from('feature_votes').delete().eq('id', existing.id);
   } else {
-    // Add upvote
-    request.upvoted_by.push(userId);
-    request.upvotes = request.upvoted_by.length;
+    // Add vote
+    await supabase.from('feature_votes').insert({
+      feature_request_id: id,
+      user_id: userId
+    });
   }
 
-  request.updated_at = new Date().toISOString();
-  featureRequests.set(id, request);
-
-  return { success: true, upvotes: request.upvotes };
+  // Get updated count
+  const { data: req } = await supabase.from('feature_requests').select('upvotes').eq('id', id).single();
+  return { success: true, upvotes: req?.upvotes || 0 };
 }
 
 // Add a comment to a feature request
@@ -254,54 +243,66 @@ export async function addFeatureComment(
     is_official_response?: boolean;
   }
 ): Promise<FeatureRequestComment | null> {
-  if (!featureRequests.has(featureRequestId)) return null;
+  const supabase = createAdminClient();
 
-  const id = `fc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('feature_comments')
+    .insert({
+      feature_request_id: featureRequestId,
+      commenter_type: comment.commenter_type,
+      commenter_id: comment.commenter_id,
+      commenter_name: comment.commenter_name,
+      comment: comment.comment,
+      is_official_response: comment.is_official_response || false
+    })
+    .select()
+    .single();
 
-  const newComment: FeatureRequestComment = {
-    id,
-    feature_request_id: featureRequestId,
-    commenter_type: comment.commenter_type,
-    commenter_id: comment.commenter_id,
-    commenter_name: comment.commenter_name,
-    comment: comment.comment,
-    is_official_response: comment.is_official_response || false,
-    created_at: now,
-  };
-
-  const comments = featureComments.get(featureRequestId) || [];
-  comments.push(newComment);
-  featureComments.set(featureRequestId, comments);
-
-  // Update the feature request timestamp
-  const request = featureRequests.get(featureRequestId);
-  if (request) {
-    request.updated_at = now;
-    featureRequests.set(featureRequestId, request);
-  }
-
-  return newComment;
+  if (error) return null;
+  return data;
 }
 
 // Get comments for a feature request
 export async function getFeatureComments(featureRequestId: string): Promise<FeatureRequestComment[]> {
-  return featureComments.get(featureRequestId) || [];
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from('feature_comments')
+    .select('*')
+    .eq('feature_request_id', featureRequestId)
+    .order('created_at', { ascending: true });
+    
+  return data || [];
 }
 
 // Get feature request stats
 export async function getFeatureRequestStats(): Promise<FeatureRequestStats> {
-  const requests = Array.from(featureRequests.values());
-
-  return {
-    total: requests.length,
-    submitted: requests.filter(r => r.status === 'submitted').length,
-    under_review: requests.filter(r => r.status === 'under_review').length,
-    planned: requests.filter(r => r.status === 'planned').length,
-    in_progress: requests.filter(r => r.status === 'in_progress').length,
-    completed: requests.filter(r => r.status === 'completed').length,
-    declined: requests.filter(r => r.status === 'declined').length,
+  const supabase = createAdminClient();
+  
+  // We can do this with a single query using aggregation or multiple counts.
+  // Multiple counts is easier to write.
+  const { data: requests } = await supabase.from('feature_requests').select('status');
+  
+  const stats: FeatureRequestStats = {
+    total: 0,
+    submitted: 0,
+    under_review: 0,
+    planned: 0,
+    in_progress: 0,
+    completed: 0,
+    declined: 0,
   };
+
+  if (requests) {
+    stats.total = requests.length;
+    requests.forEach(r => {
+      const s = r.status as keyof Omit<FeatureRequestStats, 'total'>;
+      if (stats[s] !== undefined) {
+        stats[s]++;
+      }
+    });
+  }
+
+  return stats;
 }
 
 // Check if user has upvoted a request

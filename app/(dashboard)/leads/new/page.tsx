@@ -8,6 +8,7 @@ import { cn, formatPhoneNumber } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/components/ui/use-toast';
 import type { UserWithBusiness, Customer, LeadStatus, LeadUrgency, LeadSource } from '@/types';
 import {
   ArrowLeft,
@@ -66,6 +67,7 @@ export default function NewLeadPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const customerId = searchParams.get('customer_id');
+  const { toast } = useToast();
 
   const [user, setUser] = useState<UserWithBusiness | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,6 +96,34 @@ export default function NewLeadPage() {
     estimated_value: '',
     notes: '',
   });
+
+  // Prefill from query params
+  useEffect(() => {
+    const updates: Partial<FormData> = {};
+    const get = (key: string) => searchParams.get(key);
+    const setIf = <K extends keyof FormData>(field: K, value: string | null) => {
+      if (value && value.trim().length > 0) {
+        updates[field] = value as FormData[K];
+      }
+    };
+    setIf('name', get('name'));
+    setIf('phone', get('phone'));
+    setIf('email', get('email'));
+    // Address can arrive as a single "address" or individual parts
+    setIf('address_line1', get('address') || get('address_line1'));
+    setIf('city', get('city'));
+    setIf('state', get('state'));
+    setIf('zip', get('zip'));
+    setIf('service_needed', get('service_needed'));
+    setIf('notes', get('notes'));
+    const urgency = get('urgency');
+    if (urgency && ['low', 'normal', 'high', 'emergency'].includes(urgency)) {
+      updates.urgency = urgency as LeadUrgency;
+    }
+    if (Object.keys(updates).length > 0) {
+      setFormData((prev) => ({ ...prev, ...updates }));
+    }
+  }, [searchParams]);
 
   // Load user
   useEffect(() => {
@@ -275,6 +305,11 @@ export default function NewLeadPage() {
         .single();
 
       if (leadError) throw leadError;
+
+      toast({
+        title: 'Lead created',
+        description: `Lead for ${formData.name} has been added successfully.`,
+      });
 
       router.push(`/leads/${newLead.id}`);
     } catch (err) {

@@ -13,34 +13,37 @@ import {
   initializeDefaultCategories,
 } from '@/lib/expenses';
 
+import { getServerSession } from '@/lib/permissions/check-permission';
+
 export async function GET(_request: NextRequest) {
   try {
     const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const { searchParams } = new URL(_request.url);
+    let businessId = session.user.businessId;
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+       const queryBusinessId = searchParams.get('businessId');
+       if (queryBusinessId) businessId = queryBusinessId;
     }
 
-    const categories = await getExpenseCategories(profile.business_id);
+    if (!businessId) {
+        if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+             return NextResponse.json({ categories: [] });
+        }
+        return NextResponse.json({ error: 'User business not found' }, { status: 404 });
+    }
+
+    const categories = await getExpenseCategories(businessId);
 
     // If no categories exist, initialize defaults
     if (categories.length === 0) {
-      await initializeDefaultCategories(profile.business_id);
-      const newCategories = await getExpenseCategories(profile.business_id);
+      await initializeDefaultCategories(businessId);
+      const newCategories = await getExpenseCategories(businessId);
       return NextResponse.json({ categories: newCategories });
     }
 
@@ -57,27 +60,14 @@ export async function GET(_request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id, role')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
     // Only admins/owners can create categories
-    if (profile.role === 'technician') {
+    if (session.user.role === 'technician') {
       return NextResponse.json(
         { error: 'Only administrators can create categories' },
         { status: 403 }
@@ -85,7 +75,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, icon, color, is_taxable, is_reimbursable, is_billable, gl_code } = body;
+    const { name, icon, color, is_taxable, is_reimbursable, is_billable, gl_code, businessId: bodyBusinessId } = body;
+
+    let businessId = session.user.businessId;
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+        if (bodyBusinessId) businessId = bodyBusinessId;
+    }
+
+    if (!businessId) {
+        return NextResponse.json({ error: 'Business ID required' }, { status: 400 });
+    }
 
     if (!name) {
       return NextResponse.json(
@@ -94,7 +93,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const category = await createExpenseCategory(profile.business_id, {
+    const category = await createExpenseCategory(businessId, {
       name,
       icon,
       color,

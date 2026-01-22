@@ -45,7 +45,6 @@ export function Header({
   onSignOut,
   showPauseToggle = false,
 }: HeaderProps) {
-  const [searchOpen, setSearchOpen] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isLoadingPause, setIsLoadingPause] = useState(false);
   const { toast } = useToast();
@@ -57,6 +56,7 @@ export function Header({
     async function fetchPauseState() {
       try {
         const res = await fetch('/api/leads-captain/v2/config');
+        if (!res.ok) return; // Silently fail for non-critical feature
         const data = await res.json();
         if (data.config) {
           setIsPaused(data.config.global_mode === 'paused');
@@ -107,7 +107,17 @@ export function Header({
           {/* Search */}
           <div className="flex-1 max-w-xl" data-tour="header-search">
             <button
-              onClick={() => setSearchOpen(true)}
+              onClick={() => {
+                // Dispatch Cmd+K event to open the CommandPalette
+                const event = new KeyboardEvent('keydown', {
+                  key: 'k',
+                  code: 'KeyK',
+                  metaKey: true,
+                  ctrlKey: true,
+                  bubbles: true,
+                });
+                document.dispatchEvent(event);
+              }}
               className="w-full flex items-center gap-3 h-10 px-4 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground transition-colors"
             >
               <Search className="w-4 h-4" />

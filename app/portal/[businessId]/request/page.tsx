@@ -1,8 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { AlertCircle, CheckCircle, ArrowRight, Loader2 } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle,
+  ArrowRight,
+  Loader2,
+  Camera,
+  X,
+  ImagePlus,
+  AlertTriangle,
+  Clock,
+  Zap,
+} from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AvailabilityPicker } from '@/components/portal';
 import { logger } from '@/lib/logger';
 const portalRequestLogger = logger.child({ context: 'portal.request' });
 
@@ -51,6 +63,10 @@ export default function ServiceRequestPage() {
     urgency: 'normal',
     equipmentId: '',
   });
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
+  const [showScheduler, setShowScheduler] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -75,19 +91,64 @@ export default function ServiceRequestPage() {
     loadData();
   }, [businessId]);
 
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length + photos.length > 5) {
+      setError('Maximum 5 photos allowed');
+      return;
+    }
+
+    const validFiles = files.filter(file => {
+      if (!file.type.startsWith('image/')) {
+        setError('Only image files are allowed');
+        return false;
+      }
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        setError('Each photo must be under 10MB');
+        return false;
+      }
+      return true;
+    });
+
+    setPhotos(prev => [...prev, ...validFiles]);
+
+    // Create preview URLs
+    validFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreviewUrls(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos(prev => prev.filter((_, i) => i !== index));
+    setPhotoPreviewUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
 
     try {
+      const formDataToSend = new FormData();
+      formDataToSend.append('businessId', businessId);
+      formDataToSend.append('serviceType', formData.serviceType);
+      formDataToSend.append('description', formData.description);
+      formDataToSend.append('urgency', formData.urgency);
+      if (formData.preferredDate) formDataToSend.append('preferredDate', formData.preferredDate);
+      if (formData.preferredTimeSlot) formDataToSend.append('preferredTimeSlot', formData.preferredTimeSlot);
+      if (formData.equipmentId) formDataToSend.append('equipmentId', formData.equipmentId);
+      
+      photos.forEach(photo => {
+        formDataToSend.append('photos', photo);
+      });
+
       const response = await fetch('/api/portal/service-request', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          businessId,
-          ...formData,
-        }),
+        body: formDataToSend,
       });
 
       const data = await response.json();
@@ -229,58 +290,184 @@ export default function ServiceRequestPage() {
               />
             </div>
 
-            {/* Urgency */}
+            {/* Urgency - Visual Card Selection */}
             <div className="space-y-2">
-              <Label htmlFor="urgency">Urgency</Label>
-              <Select
-                value={formData.urgency}
-                onValueChange={(value) =>
-                  setFormData((prev) => ({ ...prev, urgency: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="normal">Normal - Schedule at convenience</SelectItem>
-                  <SelectItem value="urgent">Urgent - Within a few days</SelectItem>
-                  <SelectItem value="emergency">Emergency - As soon as possible</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>How urgent is this?</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData((prev) => ({ ...prev, urgency: 'normal' }))}
+                  className={`p-3 rounded-lg border-2 text-center transition-all ${
+                    formData.urgency === 'normal'
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <Clock className={`h-5 w-5 mx-auto mb-1 ${
+                    formData.urgency === 'normal' ? 'text-blue-600' : 'text-gray-400'
+                  }`} />
+                  <p className={`text-sm font-medium ${
+                    formData.urgency === 'normal' ? 'text-blue-700' : 'text-gray-700'
+                  }`}>Normal</p>
+                  <p className="text-xs text-gray-500">Schedule at convenience</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFormData((prev) => ({ ...prev, urgency: 'urgent' }))}
+                  className={`p-3 rounded-lg border-2 text-center transition-all ${
+                    formData.urgency === 'urgent'
+                      ? 'border-orange-500 bg-orange-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <AlertTriangle className={`h-5 w-5 mx-auto mb-1 ${
+                    formData.urgency === 'urgent' ? 'text-orange-600' : 'text-gray-400'
+                  }`} />
+                  <p className={`text-sm font-medium ${
+                    formData.urgency === 'urgent' ? 'text-orange-700' : 'text-gray-700'
+                  }`}>Urgent</p>
+                  <p className="text-xs text-gray-500">Within a few days</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFormData((prev) => ({ ...prev, urgency: 'emergency' }))}
+                  className={`p-3 rounded-lg border-2 text-center transition-all ${
+                    formData.urgency === 'emergency'
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <Zap className={`h-5 w-5 mx-auto mb-1 ${
+                    formData.urgency === 'emergency' ? 'text-red-600' : 'text-gray-400'
+                  }`} />
+                  <p className={`text-sm font-medium ${
+                    formData.urgency === 'emergency' ? 'text-red-700' : 'text-gray-700'
+                  }`}>Emergency</p>
+                  <p className="text-xs text-gray-500">ASAP</p>
+                </button>
+              </div>
             </div>
 
-            {/* Preferred Date */}
+            {/* Photo Upload */}
             <div className="space-y-2">
-              <Label htmlFor="preferredDate">Preferred Date (optional)</Label>
-              <Input
-                id="preferredDate"
-                type="date"
-                value={formData.preferredDate}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, preferredDate: e.target.value }))
-                }
-                min={new Date().toISOString().split('T')[0]}
-              />
+              <Label>Photos (optional)</Label>
+              <p className="text-xs text-gray-500 mb-2">
+                Add up to 5 photos to help us understand the issue
+              </p>
+
+              {/* Photo Preview Grid */}
+              {photoPreviewUrls.length > 0 && (
+                <div className="grid grid-cols-5 gap-2 mb-2">
+                  {photoPreviewUrls.map((url, index) => (
+                    <div key={index} className="relative aspect-square">
+                      <img
+                        src={url}
+                        alt={`Upload ${index + 1}`}
+                        className="w-full h-full object-cover rounded-lg border"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(index)}
+                        className="absolute -top-1 -right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add Photo Button */}
+              {photos.length < 5 && (
+                <div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handlePhotoSelect}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full border-dashed"
+                  >
+                    <Camera className="h-4 w-4 mr-2" />
+                    {photos.length === 0 ? 'Add Photos' : 'Add More Photos'}
+                  </Button>
+                </div>
+              )}
             </div>
 
-            {/* Preferred Time */}
+            {/* Scheduling Section */}
             <div className="space-y-2">
-              <Label htmlFor="preferredTimeSlot">Preferred Time (optional)</Label>
-              <Select
-                value={formData.preferredTimeSlot}
-                onValueChange={(value) =>
-                  setFormData((prev) => ({ ...prev, preferredTimeSlot: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a time slot" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="morning">Morning (8am - 12pm)</SelectItem>
-                  <SelectItem value="afternoon">Afternoon (12pm - 5pm)</SelectItem>
-                  <SelectItem value="anytime">Anytime</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center justify-between">
+                <Label>Scheduling Preference</Label>
+                <button
+                  type="button"
+                  onClick={() => setShowScheduler(!showScheduler)}
+                  className="text-sm text-blue-600 hover:underline"
+                >
+                  {showScheduler ? 'Use simple options' : 'Pick from calendar'}
+                </button>
+              </div>
+
+              {showScheduler ? (
+                <div className="border rounded-lg p-4">
+                  <AvailabilityPicker
+                    businessId={businessId}
+                    selectedDate={formData.preferredDate}
+                    selectedTime={formData.preferredTimeSlot}
+                    onSelect={(date, time) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        preferredDate: date,
+                        preferredTimeSlot: time,
+                      }));
+                    }}
+                  />
+                </div>
+              ) : (
+                <>
+                  {/* Preferred Date */}
+                  <div className="space-y-2">
+                    <Label htmlFor="preferredDate">Preferred Date (optional)</Label>
+                    <Input
+                      id="preferredDate"
+                      type="date"
+                      value={formData.preferredDate}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, preferredDate: e.target.value }))
+                      }
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                  </div>
+
+                  {/* Preferred Time */}
+                  <div className="space-y-2">
+                    <Label htmlFor="preferredTimeSlot">Preferred Time (optional)</Label>
+                    <Select
+                      value={formData.preferredTimeSlot}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({ ...prev, preferredTimeSlot: value }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a time slot" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="morning">Morning (8am - 12pm)</SelectItem>
+                        <SelectItem value="afternoon">Afternoon (12pm - 5pm)</SelectItem>
+                        <SelectItem value="anytime">Anytime</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
             </div>
 
             <Button

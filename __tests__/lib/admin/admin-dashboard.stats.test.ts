@@ -11,20 +11,19 @@ jest.mock('@/lib/supabase/server', () => {
               if (fields?.includes('status, monthly_amount, created_at, is_trial, cancelled_at')) {
                 const now = new Date();
                 const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 10);
-                return {
-                  is: () => ({
-                    data: [
-                      { status: 'active', monthly_amount: 100, created_at: lastMonth.toISOString(), is_trial: false },
-                      { status: 'trial', monthly_amount: 0, created_at: new Date().toISOString(), is_trial: true, trial_end_date: new Date().toISOString() },
-                      { status: 'cancelled', monthly_amount: 0, created_at: lastMonth.toISOString(), is_trial: false, cancelled_at: new Date().toISOString() },
-                    ],
-                  }),
-                };
+                return Promise.resolve({
+                  data: [
+                    { status: 'active', monthly_amount: 100, created_at: lastMonth.toISOString(), is_trial: false, cancelled_at: null },
+                    { status: 'trial', monthly_amount: 0, created_at: new Date().toISOString(), is_trial: true, cancelled_at: null },
+                    { status: 'cancelled', monthly_amount: 0, created_at: lastMonth.toISOString(), is_trial: false, cancelled_at: new Date().toISOString() },
+                  ],
+                  error: null,
+                });
               }
               // getAgentDashboardStats: select('monthly_amount') and select('status')
               return {
                 eq: () => ({
-                  gte: () => ({ data: [{ monthly_amount: 99 }] }),
+                  gte: () => Promise.resolve({ data: [{ monthly_amount: 99 }], error: null }),
                 }),
               };
             },
@@ -34,18 +33,17 @@ jest.mock('@/lib/supabase/server', () => {
           return {
             select: (fields?: string) => {
               if (fields?.includes('status, monthly_amount, created_at, cancelled_at')) {
-                return {
-                  is: () => ({
-                    data: [
-                      { status: 'active', monthly_amount: 200, created_at: new Date().toISOString() },
-                      { status: 'cancelled', monthly_amount: 0, created_at: new Date().toISOString(), cancelled_at: new Date().toISOString() },
-                    ],
-                  }),
-                };
+                return Promise.resolve({
+                  data: [
+                    { status: 'active', monthly_amount: 200, created_at: new Date().toISOString(), cancelled_at: null },
+                    { status: 'cancelled', monthly_amount: 0, created_at: new Date().toISOString(), cancelled_at: new Date().toISOString() },
+                  ],
+                  error: null,
+                });
               }
               return {
                 eq: () => ({
-                  gte: () => ({ data: [{ monthly_amount: 49 }] }),
+                  gte: () => Promise.resolve({ data: [{ monthly_amount: 49 }], error: null }),
                 }),
               };
             },
@@ -56,16 +54,17 @@ jest.mock('@/lib/supabase/server', () => {
             select: (fields?: string) => {
               if (fields === 'commission_amount') {
                 return {
-                  eq: () => ({ data: [{ commission_amount: 50 }, { commission_amount: 75 }] }),
+                  eq: () => Promise.resolve({ data: [{ commission_amount: 50 }, { commission_amount: 75 }], error: null }),
                 };
               }
               return {
-                eq: () => ({
+                eq: () => Promise.resolve({
                   data: [
                     { commission_amount: 20, status: 'eligible' },
                     { commission_amount: 30, status: 'paid', paid_at: new Date().toISOString() },
                     { commission_amount: 40, status: 'paid', paid_at: new Date(new Date().getFullYear() - 1, 1, 1).toISOString() },
                   ],
+                  error: null,
                 }),
               };
             },
@@ -73,18 +72,18 @@ jest.mock('@/lib/supabase/server', () => {
         }
         if (table === 'admin_users') {
           return {
-            select: (_fields?: string, opts?: any) => ({
+            select: (_fields?: string, _opts?: any) => ({
               eq: () => ({
-                eq: () => ({ count: 3 }),
+                eq: () => Promise.resolve({ count: 3, error: null }),
               }),
             }),
           } as any;
         }
         if (table === 'tc_leads') {
           return {
-            select: (_fields?: string, opts?: any) => ({
+            select: (_fields?: string, _opts?: any) => ({
               eq: () => ({
-                not: () => ({ count: 5 }),
+                not: () => Promise.resolve({ count: 5, error: null }),
               }),
             }),
           } as any;
@@ -132,31 +131,29 @@ describe('admin accounts: dashboard stats additional branches', () => {
       from: (table: string) => {
         if (table === 'crm_accounts') {
           return {
-            select: (fields?: string) => ({
-              is: (_c: string, _v: any) => ({
-                data: [
-                  { status: 'active', monthly_amount: 100, created_at: thisMonth, is_trial: false },
-                ],
-              }),
+            select: (_fields?: string) => Promise.resolve({
+              data: [
+                { status: 'active', monthly_amount: 100, created_at: thisMonth, is_trial: false, cancelled_at: null },
+              ],
+              error: null,
             }),
           } as any;
         }
         if (table === 'web_customers') {
           return {
-            select: (fields?: string) => ({
-              is: (_c: string, _v: any) => ({
-                data: [
-                  { status: 'active', monthly_amount: 50, created_at: thisMonth },
-                ],
-              }),
+            select: (_fields?: string) => Promise.resolve({
+              data: [
+                { status: 'active', monthly_amount: 50, created_at: thisMonth, cancelled_at: null },
+              ],
+              error: null,
             }),
           } as any;
         }
         if (table === 'commissions') {
-          return { select: () => ({ eq: () => ({ data: [] }) }) } as any;
+          return { select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) } as any;
         }
         if (table === 'admin_users') {
-          return { select: (_f: string, _o: any) => ({ eq: () => ({ eq: () => ({ count: 0 }) }) }) } as any;
+          return { select: (_f: string, _o: any) => ({ eq: () => ({ eq: () => Promise.resolve({ count: 0, error: null }) }) }) } as any;
         }
         return {} as any;
       },

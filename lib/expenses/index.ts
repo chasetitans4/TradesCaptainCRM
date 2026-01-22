@@ -4,6 +4,7 @@
 // =====================================================
 
 import { createClient } from '@/lib/supabase/server';
+import { SupabaseClient } from '@supabase/supabase-js';
 import { format } from 'date-fns';
 
 // =====================================================
@@ -283,9 +284,10 @@ export async function createExpense(
     tags?: string[];
     receiptUrl?: string;
     ocrData?: Record<string, any>;
-  }
+  },
+  client?: SupabaseClient
 ): Promise<Expense> {
-  const supabase = await createClient();
+  const supabase = client ?? await createClient();
 
   const taxAmount = expense.taxAmount || 0;
   const totalAmount = expense.amount + taxAmount;
@@ -336,8 +338,8 @@ export async function getExpenses(
     .select(`
       *,
       category:expense_categories(*),
-      user:users!expenses_user_id_fkey(id, first_name, last_name, email),
-      job:jobs(id, service_type, customer:customers(name)),
+      user:users!user_id(id, first_name, last_name, email),
+      job:jobs!job_id(id, service_type, customer:customers!customer_id(name)),
       receipts:expense_receipts(*)
     `, { count: 'exact' })
     .eq('business_id', businessId)
@@ -383,16 +385,19 @@ export async function getExpenses(
   return { expenses: data || [], total: count || 0 };
 }
 
-export async function getExpense(expenseId: string): Promise<Expense | null> {
-  const supabase = await createClient();
+export async function getExpense(
+  expenseId: string,
+  client?: SupabaseClient
+): Promise<Expense | null> {
+  const supabase = client ?? await createClient();
 
   const { data, error } = await supabase
     .from('expenses')
     .select(`
       *,
       category:expense_categories(*),
-      user:users!expenses_user_id_fkey(id, first_name, last_name, email),
-      job:jobs(id, service_type, customer:customers(name)),
+      user:users!user_id(id, first_name, last_name, email),
+      job:jobs!job_id(id, service_type, customer:customers!customer_id(name)),
       receipts:expense_receipts(*)
     `)
     .eq('id', expenseId)
@@ -423,9 +428,10 @@ export async function updateExpense(
     isReimbursable: boolean;
     notes: string;
     tags: string[];
-  }>
+  }>,
+  client?: SupabaseClient
 ): Promise<Expense> {
-  const supabase = await createClient();
+  const supabase = client ?? await createClient();
 
   const dbUpdates: Record<string, any> = { updated_at: new Date().toISOString() };
 
@@ -469,8 +475,8 @@ export async function updateExpense(
   return data;
 }
 
-export async function deleteExpense(expenseId: string): Promise<void> {
-  const supabase = await createClient();
+export async function deleteExpense(expenseId: string, client?: SupabaseClient): Promise<void> {
+  const supabase = client ?? await createClient();
 
   const { error } = await supabase
     .from('expenses')
@@ -623,9 +629,10 @@ export async function bulkApproveExpenses(
 export async function bulkRejectExpenses(
   expenseIds: string[],
   rejectedBy: string,
-  reason?: string
+  reason?: string,
+  client?: SupabaseClient
 ): Promise<{ count: number }> {
-  const supabase = await createClient();
+  const supabase = client ?? await createClient();
 
   const { error, count } = await supabase
     .from('expenses')
@@ -648,9 +655,10 @@ export async function bulkRejectExpenses(
 
 export async function markReimbursed(
   expenseId: string,
-  amount?: number
+  amount?: number,
+  client?: SupabaseClient
 ): Promise<Expense> {
-  const supabase = await createClient();
+  const supabase = client ?? await createClient();
 
   // Get the expense to use its total_amount if amount not specified
   const { data: expense } = await supabase
@@ -677,9 +685,10 @@ export async function markReimbursed(
 }
 
 export async function bulkMarkReimbursed(
-  expenseIds: string[]
+  expenseIds: string[],
+  client?: SupabaseClient
 ): Promise<{ count: number }> {
-  const supabase = await createClient();
+  const supabase = client ?? await createClient();
 
   const { error, count } = await supabase
     .from('expenses')
@@ -706,7 +715,7 @@ export async function getPendingReimbursements(
     .select(`
       *,
       category:expense_categories(*),
-      user:users!expenses_user_id_fkey(id, first_name, last_name, email)
+      user:users!user_id(id, first_name, last_name, email)
     `)
     .eq('business_id', businessId)
     .eq('is_reimbursable', true)
@@ -841,7 +850,7 @@ export async function getExpenseSummary(
     .select(`
       *,
       category:expense_categories(name),
-      user:users!expenses_user_id_fkey(first_name, last_name)
+      user:users!user_id(first_name, last_name)
     `)
     .eq('business_id', businessId)
     .gte('date', format(startDate, 'yyyy-MM-dd'))
@@ -880,7 +889,7 @@ export async function getExpenseSummary(
   const employeeMap = new Map<string, { amount: number; count: number }>();
   expenses.forEach((exp) => {
     const empName = exp.user
-      ? `${exp.user.first_name || ''} ${exp.user.last_name || ''}`.trim()
+      ? exp.user.name || 'Unknown'
       : 'Unknown';
     const current = employeeMap.get(empName) || { amount: 0, count: 0 };
     employeeMap.set(empName, {
@@ -911,20 +920,20 @@ export async function getExpenseSummary(
   };
 }
 
-export async function getJobExpenses(jobId: string): Promise<{
+export async function getJobExpenses(jobId: string, client?: SupabaseClient): Promise<{
   expenses: Expense[];
   totalAmount: number;
   billableAmount: number;
   billedAmount: number;
 }> {
-  const supabase = await createClient();
+  const supabase = client ?? await createClient();
 
   const { data, error } = await supabase
     .from('expenses')
     .select(`
       *,
       category:expense_categories(*),
-      user:users!expenses_user_id_fkey(id, first_name, last_name)
+      user:users!user_id(id, first_name, last_name)
     `)
     .eq('job_id', jobId)
     .order('date', { ascending: false });

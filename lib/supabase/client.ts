@@ -4,15 +4,30 @@
 
 import { createBrowserClient } from '@supabase/ssr';
 import { logger } from '@/lib/logger';
+import { SupabaseClient } from '@supabase/supabase-js';
+
+let client: SupabaseClient | undefined;
 
 /**
  * Create a Supabase client for browser/client-side usage
+ * Uses singleton pattern to avoid creating multiple instances
  */
 export function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  if (typeof window === 'undefined') {
+    return createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }
+
+  if (!client) {
+    client = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }
+
+  return client;
 }
 
 /**
@@ -45,12 +60,28 @@ export async function getCurrentUserProfile() {
     .single();
   
   if (error) {
+    // Handle "Row not found" (PGRST116) gracefully - user might exist in Auth but not in public.users
+    if (error.code === 'PGRST116') {
+      return null;
+    }
+
     logger.error({
       msg: 'Error fetching user profile',
       error: error ? { message: error.message, code: error.code, details: error.details } : undefined,
       userId: user.id,
     });
     return null;
+  }
+
+  // Map first_name and last_name to name/full_name if not present
+  if (profile) {
+    const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
+    if (!profile.name && fullName) {
+      profile.name = fullName;
+    }
+    if (!profile.full_name && fullName) {
+      profile.full_name = fullName;
+    }
   }
   
   return profile;

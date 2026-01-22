@@ -64,7 +64,7 @@ function ROICalculatorPageContent() {
 
       <footer className="border-t mt-12">
         <div className="container mx-auto px-4 py-8 text-center text-sm text-muted-foreground">
-          <p>© 2025 TradesCaptain. All rights reserved.</p>
+          <p>© 2026 TradesCaptain. All rights reserved.</p>
           <p className="mt-2">Leads Captain: $29/month • No contracts • Cancel anytime</p>
         </div>
       </footer>

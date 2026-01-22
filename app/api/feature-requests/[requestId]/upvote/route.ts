@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { upvoteFeatureRequest } from '@/lib/feature-requests';
+import { checkPermission } from '@/lib/permissions/check-permission';
 import { apiLogger } from '@/lib/logger';
 
 // POST - Toggle upvote on a feature request
@@ -13,6 +14,7 @@ export async function POST(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
+    await checkPermission('view_feature_requests');
     const { requestId } = await params;
     const body = await request.json();
     const { user_id } = body;

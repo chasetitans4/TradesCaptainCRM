@@ -4,7 +4,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAgentOrHigher } from '@/lib/admin/auth';
+import { checkPermission, getServerSession } from '@/lib/permissions/check-permission';
 import { updateOnboardingTask } from '@/lib/admin/onboarding';
 import type { OnboardingTaskStatus } from '@/lib/admin/types';
 import { apiLogger } from '@/lib/logger';
@@ -14,10 +14,8 @@ export async function PATCH(
   { params }: { params: Promise<{ clientId: string; taskId: string }> }
 ) {
   try {
-    const auth = await requireAgentOrHigher();
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    await checkPermission('manage_onboarding');
+    const session = await getServerSession();
 
     const { taskId } = await params;
     const body = await request.json();
@@ -26,7 +24,7 @@ export async function PATCH(
       status: body.status as OnboardingTaskStatus,
       blocked_reason: body.blocked_reason,
       notes: body.notes,
-      completed_by: auth.name || auth.email,
+      completed_by: session!.user.name || session!.user.email || 'Unknown',
     });
 
     return NextResponse.json({ task });

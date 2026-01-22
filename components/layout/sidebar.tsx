@@ -32,6 +32,8 @@ import {
   DollarSign,
   Clock,
   Megaphone,
+  Package,
+  Zap,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -65,6 +67,11 @@ const navigationGroups: NavGroup[] = [
     id: 'core',
     label: null, // No label for core items - always visible
     items: [
+      {
+        name: 'My Day',
+        href: '/my-day',
+        icon: Zap,
+      },
       {
         name: 'Dashboard',
         href: '/dashboard',
@@ -114,6 +121,11 @@ const navigationGroups: NavGroup[] = [
           { name: 'Quotes', href: '/quotes' },
           { name: 'Invoices', href: '/invoices' },
         ],
+      },
+      {
+        name: 'Inventory',
+        href: '/inventory',
+        icon: Package,
       },
     ],
   },

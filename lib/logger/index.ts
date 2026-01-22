@@ -146,6 +146,7 @@ export const smsLogger = logger.child({ context: 'sms' });
 export const emailLogger = logger.child({ context: 'email' });
 export const aiLogger = logger.child({ context: 'ai' });
 export const syncLogger = logger.child({ context: 'sync' });
+export const cleanupLogger = logger.child({ context: 'cleanup' });
 
 /**
  * Create a request-scoped logger

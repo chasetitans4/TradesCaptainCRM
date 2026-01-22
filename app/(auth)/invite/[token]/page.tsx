@@ -95,7 +95,8 @@ export default function AcceptInvitePage() {
           .select(`
             id,
             email,
-            name,
+            first_name,
+            last_name,
             role,
             invite_token,
             invited_at,
@@ -128,7 +129,8 @@ export default function AcceptInvitePage() {
           return;
         }
 
-        setName(user.name);
+        const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+        setName(fullName);
         setInviteData({
           id: user.id,
           email: user.email,

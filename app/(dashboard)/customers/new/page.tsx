@@ -8,6 +8,7 @@ import { formatPhoneNumber } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/components/ui/use-toast';
 import type { UserWithBusiness, LeadSource } from '@/types';
 import {
   ArrowLeft,
@@ -46,6 +47,7 @@ interface FormData {
 
 export default function NewCustomerPage() {
   const router = useRouter();
+  const { toast } = useToast();
 
   const [user, setUser] = useState<UserWithBusiness | null>(null);
   const [loading, setLoading] = useState(true);
@@ -145,6 +147,11 @@ export default function NewCustomerPage() {
 
       if (insertError) throw insertError;
 
+      toast({
+        title: 'Customer created',
+        description: `${formData.name} has been added successfully.`,
+      });
+
       router.push(`/customers/${newCustomer.id}`);
     } catch (err) {
       console.error('Error creating customer:', err);
@@ -169,8 +176,12 @@ export default function NewCustomerPage() {
       {/* Header */}
       <header className="sticky-header bg-background border-b border-border">
         <div className="flex items-center gap-3 px-4 py-3">
-          <button onClick={() => router.back()} className="p-2 -ml-2">
-            <ArrowLeft className="h-5 w-5 text-text" />
+          <button
+            onClick={() => router.back()}
+            className="p-2 -ml-2"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="h-5 w-5 text-text" aria-hidden="true" />
           </button>
           <h1 className="text-lg font-semibold text-text">New Customer</h1>
         </div>

@@ -4,6 +4,7 @@
 // =====================================================
 
 import { createClient as createServerClient } from '@/lib/supabase/server';
+import { SupabaseClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 import { logActivity } from '@/lib/activity';
 
@@ -19,7 +20,7 @@ export type DocumentType =
   | 'manual'
   | 'other';
 
-export type DocumentEntityType = 'customer' | 'job' | 'equipment' | 'business';
+export type DocumentEntityType = 'customer' | 'job' | 'equipment' | 'business' | 'inventory';
 
 export interface Document {
   id: string;
@@ -50,14 +51,14 @@ interface UploadDocumentParams {
   description?: string;
   tags?: string[];
   expirationDate?: Date;
-  uploadedBy: string;
+  uploadedBy?: string;
 }
 
 /**
  * Upload a document
  */
-export async function uploadDocument(params: UploadDocumentParams): Promise<Document> {
-  const supabase = await createServerClient();
+export async function uploadDocument(params: UploadDocumentParams, client?: SupabaseClient): Promise<Document> {
+  const supabase = client || await createServerClient();
 
   const fileId = uuidv4();
   const fileExt = params.file.name.split('.').pop() || 'bin';
@@ -91,7 +92,7 @@ export async function uploadDocument(params: UploadDocumentParams): Promise<Docu
       description: params.description,
       tags: params.tags,
       expiration_date: params.expirationDate?.toISOString(),
-      uploaded_by: params.uploadedBy,
+      uploaded_by: params.uploadedBy || null,
     })
     .select()
     .single();
@@ -99,7 +100,7 @@ export async function uploadDocument(params: UploadDocumentParams): Promise<Docu
   if (error) throw error;
 
   // Log activity if it's a customer document
-  if (params.entityType === 'customer') {
+  if (params.entityType === 'customer' && params.uploadedBy) {
     await logActivity({
       businessId: params.businessId,
       customerId: params.entityId,
@@ -119,9 +120,10 @@ export async function uploadDocument(params: UploadDocumentParams): Promise<Docu
 export async function getDocuments(
   entityType: DocumentEntityType,
   entityId: string,
-  documentType?: DocumentType
+  documentType?: DocumentType,
+  client?: SupabaseClient
 ): Promise<Document[]> {
-  const supabase = await createServerClient();
+  const supabase = client || await createServerClient();
 
   let query = supabase
     .from('documents')
@@ -143,8 +145,8 @@ export async function getDocuments(
 /**
  * Get a single document
  */
-export async function getDocument(documentId: string): Promise<Document | null> {
-  const supabase = await createServerClient();
+export async function getDocument(documentId: string, client?: SupabaseClient): Promise<Document | null> {
+  const supabase = client || await createServerClient();
 
   const { data, error } = await supabase
     .from('documents')
@@ -163,11 +165,11 @@ export async function getDocument(documentId: string): Promise<Document | null> 
 /**
  * Delete a document
  */
-export async function deleteDocument(documentId: string): Promise<void> {
-  const supabase = await createServerClient();
+export async function deleteDocument(documentId: string, client?: SupabaseClient): Promise<void> {
+  const supabase = client || await createServerClient();
 
   // Get document first
-  const doc = await getDocument(documentId);
+  const doc = await getDocument(documentId, client);
   if (!doc) throw new Error('Document not found');
 
   // Delete from storage
@@ -197,9 +199,10 @@ export async function updateDocument(
     tags?: string[];
     documentType?: DocumentType;
     expirationDate?: Date | null;
-  }
+  },
+  client?: SupabaseClient
 ): Promise<Document> {
-  const supabase = await createServerClient();
+  const supabase = client || await createServerClient();
 
   const { data, error } = await supabase
     .from('documents')
@@ -228,9 +231,10 @@ export async function searchDocuments(
     documentType?: DocumentType;
     entityType?: DocumentEntityType;
     tags?: string[];
-  }
+  },
+  client?: SupabaseClient
 ): Promise<Document[]> {
-  const supabase = await createServerClient();
+  const supabase = client || await createServerClient();
 
   let dbQuery = supabase
     .from('documents')
@@ -262,9 +266,10 @@ export async function searchDocuments(
  */
 export async function getExpiringDocuments(
   businessId: string,
-  withinDays: number = 30
+  withinDays: number = 30,
+  client?: SupabaseClient
 ): Promise<Document[]> {
-  const supabase = await createServerClient();
+  const supabase = client || await createServerClient();
 
   const futureDate = new Date();
   futureDate.setDate(futureDate.getDate() + withinDays);
@@ -285,8 +290,8 @@ export async function getExpiringDocuments(
 /**
  * Get expired documents
  */
-export async function getExpiredDocuments(businessId: string): Promise<Document[]> {
-  const supabase = await createServerClient();
+export async function getExpiredDocuments(businessId: string, client?: SupabaseClient): Promise<Document[]> {
+  const supabase = client || await createServerClient();
 
   const { data, error } = await supabase
     .from('documents')
@@ -303,13 +308,13 @@ export async function getExpiredDocuments(businessId: string): Promise<Document[
 /**
  * Get document storage stats for a business
  */
-export async function getStorageStats(businessId: string): Promise<{
+export async function getStorageStats(businessId: string, client?: SupabaseClient): Promise<{
   totalDocuments: number;
   totalSize: number;
   byType: Record<DocumentType, { count: number; size: number }>;
   byEntity: Record<DocumentEntityType, { count: number; size: number }>;
 }> {
-  const supabase = await createServerClient();
+  const supabase = client || await createServerClient();
 
   const { data: documents, error } = await supabase
     .from('documents')
@@ -355,12 +360,13 @@ export async function copyDocument(
   documentId: string,
   targetEntityType: DocumentEntityType,
   targetEntityId: string,
-  copiedBy: string
+  copiedBy: string,
+  client?: SupabaseClient
 ): Promise<Document> {
-  const supabase = await createServerClient();
+  const supabase = client || await createServerClient();
 
   // Get original document
-  const original = await getDocument(documentId);
+  const original = await getDocument(documentId, client);
   if (!original) throw new Error('Document not found');
 
   // Copy file in storage

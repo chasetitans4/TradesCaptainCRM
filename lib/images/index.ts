@@ -5,6 +5,19 @@
 
 import sharp from 'sharp';
 
+// Re-export the advanced processor functions
+export {
+  IMAGE_CONFIG,
+  processImage as processImageAdvanced,
+  uploadProcessedImage,
+  deleteImage,
+  getImage,
+  getCustomerImages,
+  getFullResolutionUrl,
+  type ProcessedImage,
+  type ImageUploadResult,
+} from './processor';
+
 interface ProcessImageOptions {
   maxWidth?: number;
   maxHeight?: number;

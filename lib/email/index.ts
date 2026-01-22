@@ -424,37 +424,6 @@ export function getTrialInviteEmailHtml(params: {
   `;
 }
 
-export function getFoundersInviteEmailHtml(params: {
-  businessName: string;
-  inviteUrl: string;
-}) {
-  const { businessName, inviteUrl } = params;
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    </head>
-    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.5; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="text-align: center; margin-bottom: 32px;">
-        <h1 style="color: #2d5aa0; font-size: 24px; margin: 0;">Trades Captain</h1>
-      </div>
-      <div style="background: #f9fafb; border-radius: 12px; padding: 32px; margin-bottom: 24px;">
-        <h2 style="font-size: 20px; margin: 0 0 16px 0;">Founders Program Invitation</h2>
-        <p style="margin: 0 0 16px 0;">You have been invited to join the Founders Program for <strong>${businessName}</strong>. Enjoy three months free.</p>
-        <p style="margin: 0 0 24px 0;">Click below to claim your Founders slot and set up your account.</p>
-        <div style="text-align: center;">
-          <a href="${inviteUrl}" style="display: inline-block; background: #2d5aa0; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">Join Founders</a>
-        </div>
-      </div>
-      <p style="color: #6b7280; font-size: 14px;">Limited availability. Invitation expires in 7 days.</p>
-      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;">
-      <p style="color: #9ca3af; font-size: 12px; text-align: center; margin: 0;">&copy; ${new Date().getFullYear()} Trades Captain. All rights reserved.</p>
-    </body>
-    </html>
-  `;
-}
 
 export function getWelcomeEmailHtml(params: {
   businessName: string;
@@ -512,38 +481,6 @@ export function getTrialReminderEmailHtml(params: {
         </div>
       </div>
       <p style="color: #6b7280; font-size: 14px;">You can upgrade plans at any time.</p>
-      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;">
-      <p style="color: #9ca3af; font-size: 12px; text-align: center; margin: 0;">&copy; ${new Date().getFullYear()} Trades Captain. All rights reserved.</p>
-    </body>
-    </html>
-  `;
-}
-
-export function getFoundersEndingEmailHtml(params: {
-  businessName: string;
-  daysLeft: number;
-  dashboardUrl: string;
-}) {
-  const { businessName, daysLeft, dashboardUrl } = params;
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    </head>
-    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.5; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="text-align: center; margin-bottom: 32px;">
-        <h1 style="color: #2d5aa0; font-size: 24px; margin: 0;">${businessName}</h1>
-      </div>
-      <div style="background: #f9fafb; border-radius: 12px; padding: 32px; margin-bottom: 24px;">
-        <h2 style="font-size: 20px; margin: 0 0 16px 0;">${daysLeft} Days Left in Founders Program</h2>
-        <p style="margin: 0 0 16px 0;">Your complimentary period is ending soon. Add a payment method to continue uninterrupted.</p>
-        <div style="text-align: center;">
-          <a href="${dashboardUrl}" style="display: inline-block; background: #2d5aa0; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">Manage Billing</a>
-        </div>
-      </div>
-      <p style="color: #6b7280; font-size: 14px;">Thank you for being an early supporter.</p>
       <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;">
       <p style="color: #9ca3af; font-size: 12px; text-align: center; margin: 0;">&copy; ${new Date().getFullYear()} Trades Captain. All rights reserved.</p>
     </body>

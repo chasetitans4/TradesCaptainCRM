@@ -126,7 +126,8 @@ export async function getPlanPricing(planType: string): Promise<PlanPricing | nu
 }
 
 /**
- * Get plans by track (nevermiss, blue, web, silver, gold, local_seo)
+ * Get plans by track (blue, web, seo_aeo)
+ * v6.0 - Discontinued tracks: leads_captain (now a feature), silver, gold, local_seo
  */
 export async function getPlansByTrack(track: string): Promise<PlanPricing[]> {
   const supabase = createAdminClient();
@@ -380,6 +381,7 @@ export async function getClientUpgradeOptions(
 
 /**
  * Get summary of all plan tracks for plan selection UI
+ * v6.0 - Only active tracks (Leads Captain is now a feature within Blue Pro/Enterprise, not a standalone plan)
  */
 export async function getPlanTracksSummary(): Promise<Array<{
   track: string;
@@ -389,12 +391,9 @@ export async function getPlanTracksSummary(): Promise<Array<{
   plans: PlanPricing[];
 }>> {
   const tracks = [
-    { track: 'leads_captain', name: 'Leads Captain', description: 'AI missed call text-back' },
-    { track: 'blue', name: 'Blue (CRM)', description: 'Full CRM & Calendar' },
+    { track: 'blue', name: 'Blue (CRM)', description: 'Full CRM & Calendar with Leads Captain AI' },
     { track: 'web', name: 'Web', description: 'Professional website' },
-    { track: 'silver', name: 'Silver', description: 'Website + SEO bundle' },
-    { track: 'gold', name: 'Gold', description: 'Complete business solution' },
-    { track: 'local_seo', name: 'Local SEO', description: 'Citation building & SEO' },
+    { track: 'seo_aeo', name: 'SEO/AEO', description: 'Search & AI engine optimization' },
   ];
 
   const result = [];

@@ -24,11 +24,11 @@ const MAX_MEMORY_ENTRIES = 10000;
 
 // Rate limit configurations
 const RATE_LIMIT_CONFIGS = {
-  api: { requests: 100, windowMs: 60000 },       // 100 requests per minute
-  auth: { requests: 10, windowMs: 900000 },      // 10 requests per 15 minutes
-  search: { requests: 60, windowMs: 60000 },     // 60 requests per minute
-  ai: { requests: 20, windowMs: 3600000 },       // 20 requests per hour
-  default: { requests: 200, windowMs: 60000 },   // 200 requests per minute
+  api: { requests: 10000, windowMs: 60000 },       // 10000 requests per minute
+  auth: { requests: 1000, windowMs: 900000 },      // 1000 requests per 15 minutes
+  search: { requests: 6000, windowMs: 60000 },     // 6000 requests per minute
+  ai: { requests: 2000, windowMs: 3600000 },       // 2000 requests per hour
+  default: { requests: 20000, windowMs: 60000 },   // 20000 requests per minute
 };
 
 /**

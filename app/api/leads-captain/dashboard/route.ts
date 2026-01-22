@@ -4,7 +4,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAgentOrHigher } from '@/lib/admin/auth';
+import { checkPermission, getServerSession } from '@/lib/permissions/check-permission';
 import {
   getLeadsCaptainDashboardSummary,
   getSmsUsageOverview,
@@ -13,17 +13,16 @@ import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
-    const admin = await requireAgentOrHigher();
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    await checkPermission('view_leads_captain');
+    const session = await getServerSession();
+    const userId = session!.user.id;
 
     const { searchParams } = new URL(request.url);
     const period = (searchParams.get('period') as 'this_month' | 'last_month') || 'this_month';
 
     const [summary, usageOverview] = await Promise.all([
-      getLeadsCaptainDashboardSummary(admin.id, period),
-      getSmsUsageOverview(admin.id),
+      getLeadsCaptainDashboardSummary(userId, period),
+      getSmsUsageOverview(userId),
     ]);
 
     return NextResponse.json({

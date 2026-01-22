@@ -122,7 +122,7 @@ export default function NewReminderPage() {
       } else if (jobId) {
         const { data } = await supabase
           .from('jobs')
-          .select('*, customer:customers (id, name)')
+          .select('*, customer:customers!jobs_customer_id_fkey (id, name)')
           .eq('id', jobId)
           .single();
         if (data) {
@@ -169,12 +169,12 @@ export default function NewReminderPage() {
           .limit(3),
         supabase
           .from('jobs')
-          .select('*, customer:customers (id, name)')
+          .select('*, customer:customers!jobs_customer_id_fkey (id, name)')
           .ilike('title', `%${searchQuery}%`)
           .limit(3),
         supabase
           .from('leads')
-          .select('*, customer:customers (id, name)')
+          .select('*, customer:customers!leads_customer_id_fkey (id, name)')
           .or(`service_needed.ilike.%${searchQuery}%,name.ilike.%${searchQuery}%`)
           .limit(3),
       ]);

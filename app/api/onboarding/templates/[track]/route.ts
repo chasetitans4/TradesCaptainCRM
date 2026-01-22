@@ -4,7 +4,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAgentOrHigher } from '@/lib/admin/auth';
+import { checkPermission } from '@/lib/permissions/check-permission';
 import { getOnboardingTemplate } from '@/lib/admin/onboarding';
 import { apiLogger } from '@/lib/logger';
 
@@ -13,10 +13,7 @@ export async function GET(
   { params }: { params: Promise<{ track: string }> }
 ) {
   try {
-    const auth = await requireAgentOrHigher();
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    await checkPermission('view_onboarding');
 
     const { track } = await params;
 

@@ -24,6 +24,7 @@ import { evaluateRules, executeRuleActions, isWithinBusinessHours, isWithinQuiet
 import { renderTemplate, buildTemplateVariables, addEmoji } from './template-renderer';
 import { generateAIResponse, requiresApproval } from './guardrails';
 import { canAccessFeature, checkPlanLimit } from './features';
+import { processWithNewOrchestrator } from './orchestrator-adapter';
 
 export interface ProcessorOptions {
   config_id: string;
@@ -73,6 +74,25 @@ export async function processInboundMessage(
 
   if (!config) {
     throw new Error(`Leads Captain config not found: ${options.config_id}`);
+  }
+
+  // Feature flag: Route to new orchestrator if enabled
+  if (config.use_new_orchestrator) {
+    jobLogger.info({
+      msg: 'Using new orchestrator',
+      configId: options.config_id,
+    });
+
+    return processWithNewOrchestrator({
+      ...options,
+      config,
+      rules,
+      templates,
+      priceList,
+      notificationRecipients,
+      intents,
+      supabase,
+    });
   }
 
   // Check if Leads Captain is paused
@@ -172,6 +192,53 @@ export async function processInboundMessage(
     options.customer_phone,
     options.is_missed_call
   );
+
+  // Check if customer has paused AI via portal
+  const customerAIPaused = await isCustomerAIPausedByPhone(
+    supabase,
+    options.business_id,
+    options.customer_phone
+  );
+  if (customerAIPaused) {
+    // Save the inbound message but flag for human response
+    await saveInboundMessage(supabase, conversation.id, sanitizedMessage, options.twilio_sid);
+
+    // Update conversation to require human attention
+    await supabase
+      .from('leads_captain_conversations_v2')
+      .update({
+        requires_human: true,
+        last_customer_message_at: new Date().toISOString(),
+        message_count: conversation.message_count + 1,
+      })
+      .eq('id', conversation.id);
+
+    return {
+      response_content: null,
+      should_send: false,
+      requires_approval: false,
+      classification: {
+        intent: 'customer_paused_ai',
+        confidence: 100,
+        sentiment: 'neutral',
+        language: 'en',
+        entities: {},
+        is_compliance: false,
+      },
+      rule_matched: null,
+      template_used: null,
+      ai_used: false,
+      explanation: 'Customer has paused AI responses via portal',
+      decision_details: { customer_paused_ai: true },
+      notifications: buildNotifications(notificationRecipients, 'every_message', false),
+      conversation_updates: {
+        requires_human: true,
+        last_customer_message_at: new Date().toISOString(),
+        message_count: conversation.message_count + 1,
+      },
+      should_escalate: false,
+    };
+  }
 
   // Check if conversation is muted (per-conversation kill switch, Section 7.3)
   if (conversation.muted_until && new Date(conversation.muted_until) > new Date()) {
@@ -545,6 +612,35 @@ export async function processInboundMessage(
 // =====================================================
 // Helper Functions
 // =====================================================
+
+/**
+ * Check if customer has paused AI responses via portal (lookup by phone)
+ */
+async function isCustomerAIPausedByPhone(
+  supabase: ReturnType<typeof createAdminClient>,
+  businessId: string,
+  customerPhone: string
+): Promise<boolean> {
+  // First, find customer by phone number
+  const { data: customer } = await supabase
+    .from('customers')
+    .select('id')
+    .eq('business_id', businessId)
+    .eq('phone', customerPhone)
+    .single();
+
+  if (!customer) return false;
+
+  // Check if customer has paused AI in portal access
+  const { data: portalAccess } = await supabase
+    .from('customer_portal_access')
+    .select('ai_paused')
+    .eq('business_id', businessId)
+    .eq('customer_id', customer.id)
+    .single();
+
+  return portalAccess?.ai_paused ?? false;
+}
 
 async function loadConfig(configId: string, supabase: ReturnType<typeof createAdminClient>): Promise<LeadsCaptainConfig | null> {
   const { data } = await supabase

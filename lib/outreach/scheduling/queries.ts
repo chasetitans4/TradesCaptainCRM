@@ -25,7 +25,7 @@ export async function getScheduledCallsForAgent(
     .select(`
       *,
       contact:outreach_contacts(*),
-      agent:admin_users(id, name, email)
+      agent:admin_users!scheduled_calls_agent_id_fkey(id, full_name, email)
     `)
     .eq('agent_id', agentId)
     .gte('scheduled_at', startOfDay.toISOString())
@@ -44,7 +44,7 @@ export async function getPendingAdminCalls(): Promise<ScheduledCallWithContact[]
     .select(`
       *,
       contact:outreach_contacts(*),
-      agent:admin_users(id, name, email)
+      agent:admin_users!scheduled_calls_agent_id_fkey(id, full_name, email)
     `)
     .eq('status', 'pending_admin_approval')
     .order('created_at', { ascending: true });
@@ -60,7 +60,7 @@ export async function getScheduledCallById(callId: string): Promise<ScheduledCal
     .select(`
       *,
       contact:outreach_contacts(*),
-      agent:admin_users(id, name, email)
+      agent:admin_users!scheduled_calls_agent_id_fkey(id, full_name, email)
     `)
     .eq('id', callId)
     .single();
@@ -78,7 +78,7 @@ export async function getUpcomingCallsForContact(
     .select(`
       *,
       contact:outreach_contacts(*),
-      agent:admin_users(id, name, email)
+      agent:admin_users!scheduled_calls_agent_id_fkey(id, full_name, email)
     `)
     .eq('contact_id', contactId)
     .gte('scheduled_at', new Date().toISOString())

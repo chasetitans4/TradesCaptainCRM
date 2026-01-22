@@ -110,7 +110,7 @@ export default function LeadDetailPage() {
         .from('leads')
         .select(`
           *,
-          customer:customers (*)
+          customer:customers!leads_customer_id_fkey (*)
         `)
         .eq('id', leadId)
         .single();

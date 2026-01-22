@@ -42,7 +42,7 @@ interface FormData {
   job_address_city: string;
   job_address_state: string;
   job_address_zip: string;
-  assigned_to: string;
+  assigned_user_id: string;
   customer_reminders_enabled: boolean;
 }
 
@@ -78,7 +78,7 @@ export default function EditJobPage() {
     job_address_city: '',
     job_address_state: '',
     job_address_zip: '',
-    assigned_to: '',
+    assigned_user_id: '',
     customer_reminders_enabled: true,
   });
 
@@ -137,7 +137,7 @@ export default function EditJobPage() {
         job_address_city: data.job_address_city || '',
         job_address_state: data.job_address_state || '',
         job_address_zip: data.job_address_zip || '',
-        assigned_to: data.assigned_to || '',
+        assigned_user_id: data.assigned_user_id || '',
         customer_reminders_enabled: data.customer_reminders_enabled ?? true,
       });
     } catch (err) {
@@ -204,7 +204,7 @@ export default function EditJobPage() {
         job_address_city: formData.job_address_city.trim() || null,
         job_address_state: formData.job_address_state.trim() || null,
         job_address_zip: formData.job_address_zip.trim() || null,
-        assigned_to: formData.assigned_to || null,
+        assigned_user_id: formData.assigned_user_id || null,
         customer_reminders_enabled: formData.customer_reminders_enabled,
       };
 
@@ -440,10 +440,10 @@ export default function EditJobPage() {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => updateField('assigned_to', '')}
+                onClick={() => updateField('assigned_user_id', '')}
                 className={cn(
                   'p-3 rounded-lg border text-left transition-colors',
-                  !formData.assigned_to
+                  !formData.assigned_user_id
                     ? 'bg-primary/10 border-primary'
                     : 'border-border hover:bg-muted'
                 )}
@@ -455,10 +455,10 @@ export default function EditJobPage() {
                 <button
                   key={member.id}
                   type="button"
-                  onClick={() => updateField('assigned_to', member.id)}
+                  onClick={() => updateField('assigned_user_id', member.id)}
                   className={cn(
                     'p-3 rounded-lg border text-left transition-colors',
-                    formData.assigned_to === member.id
+                    formData.assigned_user_id === member.id
                       ? 'bg-primary/10 border-primary'
                       : 'border-border hover:bg-muted'
                   )}

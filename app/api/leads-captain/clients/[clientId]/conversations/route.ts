@@ -4,7 +4,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAgentOrHigher } from '@/lib/admin/auth';
+import { checkPermission } from '@/lib/permissions/check-permission';
 import { getLeadsCaptainConversations } from '@/lib/admin/leads-captain-dashboard';
 import { apiLogger } from '@/lib/logger';
 
@@ -13,10 +13,7 @@ export async function GET(
   { params }: { params: Promise<{ clientId: string }> }
 ) {
   try {
-    const auth = await requireAgentOrHigher();
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    await checkPermission('view_leads_captain');
 
     const { clientId } = await params;
     const { searchParams } = new URL(request.url);

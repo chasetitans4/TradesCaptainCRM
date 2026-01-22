@@ -77,26 +77,37 @@ export default function MessagesPage() {
 
       if (error) throw error;
 
-      // Load last message for each conversation
-      const conversationsWithMessages = await Promise.all(
-        (convos || []).map(async (convo) => {
-          const { data: messages } = await supabase
-            .from('sms_messages')
-            .select('id, body, direction, created_at')
-            .eq('conversation_id', convo.id)
-            .order('created_at', { ascending: false })
-            .limit(1);
+      // Get all conversation IDs
+      const conversationIds = (convos || []).map(c => c.id);
 
-          return {
-            ...convo,
-            last_message: messages?.[0] || null,
-          } as ConversationWithDetails;
-        })
-      );
+      // Batch fetch last messages for all conversations in a single query
+      // Using a subquery pattern to get the most recent message per conversation
+      const { data: lastMessages } = conversationIds.length > 0
+        ? await supabase
+            .from('sms_messages')
+            .select('id, body, direction, created_at, conversation_id')
+            .in('conversation_id', conversationIds)
+            .order('created_at', { ascending: false })
+        : { data: [] as { id: string; body: string; direction: string; created_at: string; conversation_id: string }[] };
+
+      // Group messages by conversation and take the first (most recent) for each
+      type MessageType = { id: string; body: string; direction: string; created_at: string; conversation_id: string };
+      const messagesByConvo = new Map<string, MessageType>();
+      for (const msg of lastMessages || []) {
+        if (!messagesByConvo.has(msg.conversation_id)) {
+          messagesByConvo.set(msg.conversation_id, msg);
+        }
+      }
+
+      // Merge conversations with their last messages
+      const conversationsWithMessages = (convos || []).map((convo) => ({
+        ...convo,
+        last_message: messagesByConvo.get(convo.id) || null,
+      } as ConversationWithDetails));
 
       setConversations(conversationsWithMessages);
     } catch (error) {
-      console.error('Error loading conversations:', error);
+      console.error('Error loading conversations:', error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setLoading(false);
       setRefreshing(false);

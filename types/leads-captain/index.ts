@@ -215,6 +215,9 @@ export interface LeadsCaptainConfig {
   require_approval: ApprovalRequirement;
   approval_timeout_minutes: number;
 
+  // Feature flags
+  use_new_orchestrator: boolean;
+
   created_at: string;
   updated_at: string;
 }
@@ -1043,3 +1046,9 @@ export type NevermissTraining = LeadsCaptainTraining;
 export type NevermissAuditLog = LeadsCaptainAuditLog;
 /** @deprecated Use LeadsCaptainFeatureLimits instead */
 export type NevermissFeatureLimits = LeadsCaptainFeatureLimits;
+
+// =====================================================
+// RE-EXPORT PROMPT TYPES
+// =====================================================
+
+export * from './prompt-types';

@@ -70,6 +70,7 @@ interface SendSMSOptions {
   conversationId?: string;
   senderId?: string;
   isAIResponse?: boolean;
+  metadata?: Record<string, any>;
 }
 
 /**
@@ -82,7 +83,7 @@ export async function sendSMS(options: SendSMSOptions): Promise<{
   fromNumber?: string;  // Actual from number from Twilio response (v6.4.2)
   error?: string;
 }> {
-  const { to, body, businessId, conversationId, senderId, isAIResponse = false } = options;
+  const { to, body, businessId, conversationId, senderId, isAIResponse = false, metadata } = options;
 
   const supabase = createAdminClient();
 
@@ -101,14 +102,18 @@ export async function sendSMS(options: SendSMSOptions): Promise<{
     // Format the destination number
     const toFormatted = formatPhoneE164(to);
 
-    // Send via Twilio
-    const twilioMessage = await twilioClient.messages.create({
-      to: toFormatted,
-      from: business.twilio_phone_number,
-      body,
-      statusCallback: getWebhookUrl('/api/webhooks/twilio/status'),
-      ...(messagingServiceSid ? { messagingServiceSid } : {}),
-    });
+    const segments: string[] = [];
+    {
+      let remaining = body;
+      const limit = 160;
+      while (remaining.length > limit) {
+        let idx = remaining.lastIndexOf(' ', limit);
+        if (idx <= 0) idx = limit;
+        segments.push(remaining.slice(0, idx));
+        remaining = remaining.slice(idx).trimStart();
+      }
+      segments.push(remaining);
+    }
 
     // Get or create conversation
     let convId = conversationId;
@@ -119,30 +124,49 @@ export async function sendSMS(options: SendSMSOptions): Promise<{
       customerIdForLog = conversation.customer_id || undefined;
     }
 
-    // Log to database with actual from number from Twilio response (v6.4.2)
-    const { data: message, error: insertError } = await supabase
-      .from('sms_messages')
-      .insert({
+    let lastMessageId: string | undefined;
+    let lastTwilioSid: string | undefined;
+    let lastFromNumber: string | undefined;
+    for (let i = 0; i < segments.length; i++) {
+      const segBody = segments[i];
+      const twilioMessage = await twilioClient.messages.create({
+        to: toFormatted,
+        from: business.twilio_phone_number,
+        body: segBody,
+        statusCallback: getWebhookUrl('/api/webhooks/twilio/status'),
+        ...(messagingServiceSid ? { messagingServiceSid } : {}),
+      });
+      const insertPayload: Record<string, any> = {
         conversation_id: convId,
         direction: 'outbound',
         sender: isAIResponse ? 'ai' : 'staff',
         sender_user_id: senderId || null,
-        body,
-        status: 'queued',  // Start as queued, webhook will update to sent/delivered
+        body: segBody,
+        status: 'queued',
         twilio_sid: twilioMessage.sid,
         is_ai_response: isAIResponse,
-        from_number: twilioMessage.from,  // Actual from number from Twilio (v6.4.2)
-        to_number: toFormatted,            // Also track to number (v6.4.2)
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      smsLogger.error({
-        msg: 'Error logging SMS to database',
-        error: { message: insertError.message, details: insertError },
-        businessId,
-      });
+        from_number: twilioMessage.from,
+        to_number: toFormatted,
+      };
+      if (metadata && i === 0) {
+        insertPayload.metadata = metadata;
+      }
+      const { data: message, error: insertError } = await supabase
+        .from('sms_messages')
+        .insert(insertPayload)
+        .select()
+        .single();
+      if (insertError) {
+        smsLogger.error({
+          msg: 'Error logging SMS to database',
+          error: { message: insertError.message, details: insertError },
+          businessId,
+        });
+      }
+      logSms(toFormatted, 'sent', businessId, customerIdForLog);
+      lastMessageId = message?.id;
+      lastTwilioSid = twilioMessage.sid;
+      lastFromNumber = twilioMessage.from;
     }
 
     // Update AI response count if it's an AI response
@@ -150,13 +174,11 @@ export async function sendSMS(options: SendSMSOptions): Promise<{
       await supabase.rpc('increment_ai_response_count', { conv_id: convId });
     }
 
-    logSms(toFormatted, 'sent', businessId, customerIdForLog);
-
     return {
       success: true,
-      messageId: message?.id,
-      twilioSid: twilioMessage.sid,
-      fromNumber: twilioMessage.from,  // Return actual from number (v6.4.2)
+      messageId: lastMessageId,
+      twilioSid: lastTwilioSid,
+      fromNumber: lastFromNumber,
     };
   } catch (error) {
     smsLogger.error({
@@ -228,6 +250,7 @@ export async function getOrCreateConversation(
       business_id: businessId,
       phone: formattedPhone,
       customer_id: customer?.id || null,
+      portal_customer_id: customer?.id || null,
       status: 'active',
     })
     .select()

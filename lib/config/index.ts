@@ -50,6 +50,9 @@ const envSchema = z.object({
   // Sentry
   NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
 
+  // Mapbox (for route optimization/geocoding)
+  MAPBOX_ACCESS_TOKEN: z.string().optional(),
+
   // Feature flags
   NEXT_PUBLIC_ENABLE_AI_SMS: z.coerce.boolean().default(false),
   NEXT_PUBLIC_ENABLE_ROUTE_OPTIMIZATION: z.coerce.boolean().default(false),
@@ -228,6 +231,16 @@ export const config = {
     },
   },
 
+  // Mapbox (route optimization/geocoding)
+  mapbox: {
+    get accessToken() {
+      return getEnv().MAPBOX_ACCESS_TOKEN;
+    },
+    get isConfigured() {
+      return !!getEnv().MAPBOX_ACCESS_TOKEN;
+    },
+  },
+
   // Feature flags
   features: {
     get aiSms() {
@@ -263,6 +276,7 @@ export function checkIntegrations(): Record<string, boolean> {
     resend: config.resend.isConfigured,
     openai: config.openai.isConfigured,
     nylas: config.nylas.isConfigured,
+    mapbox: config.mapbox.isConfigured,
     sentry: config.sentry.isConfigured,
   };
 }

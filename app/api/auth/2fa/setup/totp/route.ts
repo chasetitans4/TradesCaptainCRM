@@ -2,29 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { generateTOTPSecret, verifyTOTPSetup } from '@/lib/auth/totp';
 import { apiLogger } from '@/lib/logger';
+import { getServerSession } from '@/lib/permissions/check-permission';
 
 // GET - Generate TOTP secret and QR code
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user email
-    const { data: profile } = await supabase
-      .from('users')
-      .select('email')
-      .eq('id', user.id)
-      .single();
-
-    const email = profile?.email || user.email || '';
-
-    const result = await generateTOTPSecret(user.id, email);
+    const email = session.user.email || '';
+    const result = await generateTOTPSecret(session.user.id, email);
 
     return NextResponse.json({
       qrCode: result.qrCodeUrl,
@@ -39,12 +29,9 @@ export async function GET() {
 // POST - Verify TOTP setup with code
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -57,7 +44,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isValid = await verifyTOTPSetup(user.id, code);
+    const isValid = await verifyTOTPSetup(session.user.id, code);
 
     if (isValid) {
       return NextResponse.json({ success: true });

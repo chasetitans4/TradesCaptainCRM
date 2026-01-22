@@ -108,8 +108,8 @@ export async function getReceipts(filters: ReceiptFilters): Promise<Receipt[]> {
     .from('receipts')
     .select(`
       *,
-      user:users(id, name),
-      job:jobs(id, title, customer_name)
+      user:users!receipts_user_id_fkey(id, name),
+      job:jobs!receipts_job_id_fkey(id, title, customer_name)
     `)
     .eq('business_id', filters.businessId)
     .order('receipt_date', { ascending: false });
@@ -166,8 +166,8 @@ export async function getReceipt(receiptId: string): Promise<Receipt | null> {
     .from('receipts')
     .select(`
       *,
-      user:users(id, name),
-      job:jobs(id, title, customer_name)
+      user:users!receipts_user_id_fkey(id, name),
+      job:jobs!receipts_job_id_fkey(id, title, customer_name)
     `)
     .eq('id', receiptId)
     .single();
@@ -352,7 +352,7 @@ export async function getMonthlyExpenseSummary(
     .select(`
       amount,
       category,
-      user:users(id, name)
+      user:users!receipts_user_id_fkey(id, name)
     `)
     .eq('business_id', businessId)
     .eq('status', 'approved')

@@ -3,5 +3,5 @@
 // Version: 5.8
 // =====================================================
 
-export { DocumentList } from './document-list';
+export { DocumentList } from '@/components/documents/document-list';
 export { TemplateList } from './template-list';

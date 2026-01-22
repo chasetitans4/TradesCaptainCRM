@@ -4,42 +4,38 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getServerSession } from '@/lib/permissions/check-permission';
 import { getCallStats, getTodayCallSummary } from '@/lib/calls';
 import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Get authenticated user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const session = await getServerSession();
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's business
-    const { data: profile } = await supabase
-      .from('users')
-      .select('business_id')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const { searchParams } = new URL(request.url);
+    
+    // Determine business ID
+    let businessId = session.user.businessId;
+    const queryBusinessId = searchParams.get('businessId');
+    
+    if ((session.user.role === 'admin' || session.user.role === 'super_admin') && queryBusinessId) {
+      businessId = queryBusinessId;
     }
 
-    const { searchParams } = new URL(request.url);
+    if (!businessId) {
+      return NextResponse.json({ error: 'Business ID not found' }, { status: 404 });
+    }
+
     const period = searchParams.get('period'); // 'today', 'week', 'month', 'custom'
     const startDate = searchParams.get('start_date');
     const endDate = searchParams.get('end_date');
 
     // Handle today's summary specially
     if (period === 'today') {
-      const summary = await getTodayCallSummary(profile.business_id);
+      const summary = await getTodayCallSummary(businessId);
       return NextResponse.json(summary);
     }
 
@@ -67,7 +63,7 @@ export async function GET(request: NextRequest) {
         break;
     }
 
-    const stats = await getCallStats(profile.business_id, start, end);
+    const stats = await getCallStats(businessId, start, end);
 
     return NextResponse.json(stats);
   } catch (error) {

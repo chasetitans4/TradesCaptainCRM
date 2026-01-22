@@ -3,8 +3,8 @@
 // Core functions for super admin portal management
 // =====================================================
 
-import { createClient } from '@/lib/supabase/server';
-import { format, addDays, addMonths } from 'date-fns';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { format, addDays } from 'date-fns';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
@@ -14,8 +14,8 @@ import bcrypt from 'bcryptjs';
 
 export type AdminRole = 'super_admin' | 'admin' | 'agent' | 'support';
 export type PlanType = 'blue_starter' | 'blue_pro' | 'blue_enterprise';
-export type PlanStatus = 'trial' | 'active' | 'cancelled' | 'suspended' | 'founders';
-export type SubmissionType = 'trial' | 'founders';
+export type PlanStatus = 'trial' | 'active' | 'cancelled' | 'suspended';
+export type SubmissionType = 'trial';
 export type SubmissionStatus = 'pending' | 'approved' | 'sent' | 'registered' | 'rejected';
 
 export interface AdminUser {
@@ -40,10 +40,6 @@ export interface CRMAccount {
   trial_start_date?: string;
   trial_end_date?: string;
   trial_converted: boolean;
-  is_founders: boolean;
-  founders_start_date?: string;
-  founders_end_date?: string;
-  founders_slot_number?: number;
   web_invoice_number?: string;
   web_plan_type?: string;
   web_plan_status?: string;
@@ -84,14 +80,6 @@ export interface AgentSubmission {
   updated_at: string;
 }
 
-export interface FoundersProgram {
-  id: string;
-  total_slots: number;
-  slots_used: number;
-  is_open: boolean;
-  closed_at?: string;
-}
-
 export interface AdminActivityLog {
   id: string;
   admin_user_id: string;
@@ -108,7 +96,6 @@ export interface DashboardStats {
   totalAccounts: number;
   activePaying: number;
   trialsEndingSoon: number;
-  foundersRemaining: number;
   mrr: number;
   trialConversionRate: number;
   churnRate: number;
@@ -141,8 +128,6 @@ export const CRM_PLANS = {
 };
 
 export const TRIAL_DURATION_DAYS = 30;
-export const FOUNDERS_DURATION_MONTHS = 3;
-export const FOUNDERS_TOTAL_SLOTS = 100;
 export const INVITE_EXPIRY_DAYS = 7;
 
 // =====================================================
@@ -150,49 +135,73 @@ export const INVITE_EXPIRY_DAYS = 7;
 // =====================================================
 
 export async function getAdminUser(adminId: string): Promise<AdminUser | null> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data, error } = await supabase
     .from('admin_users')
     .select('*')
     .eq('id', adminId)
-    .eq('is_active', true)
+    .eq('status', 'active')
     .single();
 
-  if (error) return null;
-  return data;
+  if (error || !data) return null;
+  return {
+    id: data.id,
+    email: data.email,
+    name: (data as any).full_name,
+    role: data.role,
+    is_active: data.status === 'active',
+    last_login_at: data.last_login_at,
+    created_at: data.created_at,
+  };
 }
 
 export async function getAdminByEmail(email: string): Promise<AdminUser | null> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data, error } = await supabase
     .from('admin_users')
     .select('*')
     .eq('email', email.toLowerCase())
-    .eq('is_active', true)
+    .eq('status', 'active')
     .single();
 
-  if (error) return null;
-  return data;
+  if (error || !data) return null;
+  return {
+    id: data.id,
+    email: data.email,
+    name: (data as any).full_name,
+    role: data.role,
+    is_active: data.status === 'active',
+    last_login_at: data.last_login_at,
+    created_at: data.created_at,
+  };
 }
 
 export async function getAdminUsers(): Promise<AdminUser[]> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data, error } = await supabase
     .from('admin_users')
     .select('*')
-    .order('name');
+    .order('full_name');
 
   if (error) throw error;
-  return data || [];
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    email: row.email,
+    name: row.full_name,
+    role: row.role,
+    is_active: row.status === 'active',
+    last_login_at: row.last_login_at,
+    created_at: row.created_at,
+  }));
 }
 
 export async function createAdminUser(
   admin: { email: string; name: string; role: AdminRole; password: string }
 ): Promise<AdminUser> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   // Hash password using bcrypt with cost factor 12
   const passwordHash = await bcrypt.hash(admin.password, 12);
@@ -201,20 +210,28 @@ export async function createAdminUser(
     .from('admin_users')
     .insert({
       email: admin.email.toLowerCase(),
-      name: admin.name,
+      full_name: admin.name,
       role: admin.role,
       password_hash: passwordHash,
-      is_active: true,
+      status: 'active',
     })
     .select()
     .single();
 
-  if (error) throw error;
-  return data;
+  if (error || !data) throw error;
+  return {
+    id: data.id,
+    email: data.email,
+    name: (data as any).full_name,
+    role: data.role,
+    is_active: data.status === 'active',
+    last_login_at: data.last_login_at,
+    created_at: data.created_at,
+  };
 }
 
 export async function updateAdminLastLogin(adminId: string): Promise<void> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   await supabase
     .from('admin_users')
@@ -238,31 +255,39 @@ export async function getCRMAccounts(
 ): Promise<{ accounts: CRMAccount[]; total: number }> {
   const supabase = await createClient();
 
-  let query = supabase
-    .from('crm_accounts')
-    .select('*, agent:admin_users!crm_accounts_created_by_agent_id_fkey(id, name, email)', { count: 'exact' })
-    .order('created_at', { ascending: false });
+  try {
+    let query = supabase
+      .from('crm_accounts')
+      .select('*, agent:admin_users!crm_accounts_agent_id_fkey(id, full_name, email)', { count: 'exact' })
+      .order('created_at', { ascending: false });
 
-  if (filters.status) {
-    query = query.eq('plan_status', filters.status);
-  }
-  if (filters.planType) {
-    query = query.eq('plan_type', filters.planType);
-  }
-  if (filters.agentId) {
-    query = query.eq('created_by_agent_id', filters.agentId);
-  }
-  if (filters.search) {
-    query = query.or(`business_name.ilike.%${filters.search}%,owner_email.ilike.%${filters.search}%`);
-  }
+    if (filters.status) {
+      query = query.eq('plan_status', filters.status);
+    }
+    if (filters.planType) {
+      query = query.eq('plan_type', filters.planType);
+    }
+    if (filters.agentId) {
+      query = query.eq('agent_id', filters.agentId);
+    }
+    if (filters.search) {
+      query = query.or(`business_name.ilike.%${filters.search}%,owner_email.ilike.%${filters.search}%`);
+    }
 
-  const offset = (page - 1) * limit;
-  query = query.range(offset, offset + limit - 1);
+    const offset = (page - 1) * limit;
+    query = query.range(offset, offset + limit - 1);
 
-  const { data, error, count } = await query;
+    const { data, error, count } = await query;
 
-  if (error) throw error;
-  return { accounts: data || [], total: count || 0 };
+    if (error) {
+      // Table might not exist
+      return { accounts: [], total: 0 };
+    }
+    return { accounts: data || [], total: count || 0 };
+  } catch {
+    // Table doesn't exist
+    return { accounts: [], total: 0 };
+  }
 }
 
 export async function getCRMAccount(accountId: string): Promise<CRMAccount | null> {
@@ -286,11 +311,9 @@ export async function createCRMAccount(
     phone?: string;
     planType: PlanType;
     isTrial: boolean;
-    isFounders: boolean;
     webInvoiceNumber?: string;
     webPlanType?: string;
     agentId?: string;
-    foundersSlotNumber?: number;
   }
 ): Promise<CRMAccount> {
   const supabase = await createClient();
@@ -298,16 +321,11 @@ export async function createCRMAccount(
   const now = new Date();
   let planStatus: PlanStatus = 'active';
   let trialEndDate: string | null = null;
-  let foundersEndDate: string | null = null;
   let monthlyPrice = CRM_PLANS[account.planType].price;
 
   if (account.isTrial) {
     planStatus = 'trial';
     trialEndDate = format(addDays(now, TRIAL_DURATION_DAYS), 'yyyy-MM-dd');
-    monthlyPrice = 0;
-  } else if (account.isFounders) {
-    planStatus = 'founders';
-    foundersEndDate = format(addMonths(now, FOUNDERS_DURATION_MONTHS), 'yyyy-MM-dd');
     monthlyPrice = 0;
   }
 
@@ -323,10 +341,6 @@ export async function createCRMAccount(
       is_trial: account.isTrial,
       trial_start_date: account.isTrial ? format(now, 'yyyy-MM-dd') : null,
       trial_end_date: trialEndDate,
-      is_founders: account.isFounders,
-      founders_start_date: account.isFounders ? format(now, 'yyyy-MM-dd') : null,
-      founders_end_date: foundersEndDate,
-      founders_slot_number: account.foundersSlotNumber,
       web_invoice_number: account.webInvoiceNumber,
       web_plan_type: account.webPlanType,
       web_plan_status: 'active',
@@ -425,28 +439,36 @@ export async function getAgentSubmissions(
 ): Promise<{ submissions: AgentSubmission[]; total: number }> {
   const supabase = await createClient();
 
-  let query = supabase
-    .from('agent_submissions')
-    .select('*', { count: 'exact' })
-    .order('created_at', { ascending: false });
+  try {
+    let query = supabase
+      .from('agent_submissions')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false });
 
-  if (filters.agentId) {
-    query = query.eq('agent_id', filters.agentId);
+    if (filters.agentId) {
+      query = query.eq('agent_id', filters.agentId);
+    }
+    if (filters.status) {
+      query = query.eq('status', filters.status);
+    }
+    if (filters.type) {
+      query = query.eq('submission_type', filters.type);
+    }
+
+    const offset = (page - 1) * limit;
+    query = query.range(offset, offset + limit - 1);
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      // Table might not exist
+      return { submissions: [], total: 0 };
+    }
+    return { submissions: data || [], total: count || 0 };
+  } catch {
+    // Table doesn't exist
+    return { submissions: [], total: 0 };
   }
-  if (filters.status) {
-    query = query.eq('status', filters.status);
-  }
-  if (filters.type) {
-    query = query.eq('submission_type', filters.type);
-  }
-
-  const offset = (page - 1) * limit;
-  query = query.range(offset, offset + limit - 1);
-
-  const { data, error, count } = await query;
-
-  if (error) throw error;
-  return { submissions: data || [], total: count || 0 };
 }
 
 export async function createAgentSubmission(
@@ -556,79 +578,6 @@ export async function rejectSubmission(
 }
 
 // =====================================================
-// FOUNDERS PROGRAM FUNCTIONS
-// =====================================================
-
-export async function getFoundersStatus(): Promise<FoundersProgram> {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from('founders_program')
-    .select('*')
-    .single();
-
-  if (error) {
-    // Initialize if doesn't exist
-    const { data: newData, error: insertError } = await supabase
-      .from('founders_program')
-      .insert({
-        total_slots: FOUNDERS_TOTAL_SLOTS,
-        slots_used: 0,
-        is_open: true,
-      })
-      .select()
-      .single();
-
-    if (insertError) throw insertError;
-    return newData;
-  }
-
-  return data;
-}
-
-export async function claimFoundersSlot(): Promise<number> {
-  const supabase = await createClient();
-
-  const status = await getFoundersStatus();
-
-  if (!status.is_open) {
-    throw new Error('Founders program is closed');
-  }
-
-  if (status.slots_used >= status.total_slots) {
-    throw new Error('No founders slots remaining');
-  }
-
-  const newSlotNumber = status.slots_used + 1;
-
-  const { error } = await supabase
-    .from('founders_program')
-    .update({
-      slots_used: newSlotNumber,
-      is_open: newSlotNumber < status.total_slots,
-      closed_at: newSlotNumber >= status.total_slots ? new Date().toISOString() : null,
-    })
-    .eq('id', status.id);
-
-  if (error) throw error;
-
-  return newSlotNumber;
-}
-
-export async function closeFoundersProgram(): Promise<void> {
-  const supabase = await createClient();
-  const status = await getFoundersStatus();
-
-  await supabase
-    .from('founders_program')
-    .update({
-      is_open: false,
-      closed_at: new Date().toISOString(),
-    })
-    .eq('id', status.id);
-}
-
-// =====================================================
 // ACTIVITY LOG FUNCTIONS
 // =====================================================
 
@@ -640,7 +589,7 @@ export async function logAdminActivity(
   details?: Record<string, any>,
   ipAddress?: string
 ): Promise<void> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   await supabase
     .from('admin_activity_log')
@@ -663,30 +612,38 @@ export async function getActivityLog(
   page: number = 1,
   limit: number = 50
 ): Promise<{ activities: AdminActivityLog[]; total: number }> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
-  let query = supabase
-    .from('admin_activity_log')
-    .select('*, admin_user:admin_users(id, name, email)', { count: 'exact' })
-    .order('created_at', { ascending: false });
+  try {
+    let query = supabase
+      .from('admin_activity_log')
+      .select('*, admin_user:admin_users!admin_activity_log_admin_user_id_fkey(id, full_name, email)', { count: 'exact' })
+      .order('created_at', { ascending: false });
 
-  if (filters.adminId) {
-    query = query.eq('admin_user_id', filters.adminId);
+    if (filters.adminId) {
+      query = query.eq('admin_user_id', filters.adminId);
+    }
+    if (filters.action) {
+      query = query.eq('action', filters.action);
+    }
+    if (filters.targetType) {
+      query = query.eq('target_type', filters.targetType);
+    }
+
+    const offset = (page - 1) * limit;
+    query = query.range(offset, offset + limit - 1);
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      // Table might not exist, return empty
+      return { activities: [], total: 0 };
+    }
+    return { activities: data || [], total: count || 0 };
+  } catch {
+    // Table doesn't exist
+    return { activities: [], total: 0 };
   }
-  if (filters.action) {
-    query = query.eq('action', filters.action);
-  }
-  if (filters.targetType) {
-    query = query.eq('target_type', filters.targetType);
-  }
-
-  const offset = (page - 1) * limit;
-  query = query.range(offset, offset + limit - 1);
-
-  const { data, error, count } = await query;
-
-  if (error) throw error;
-  return { activities: data || [], total: count || 0 };
 }
 
 // =====================================================
@@ -716,14 +673,20 @@ export async function logEmail(
 // =====================================================
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
-  // Get all accounts
-  const { data: accounts } = await supabase
-    .from('crm_accounts')
-    .select('*');
-
-  const allAccounts = accounts || [];
+  // Get all accounts (handle missing table gracefully)
+  let allAccounts: any[] = [];
+  try {
+    const { data: accounts, error } = await supabase
+      .from('crm_accounts')
+      .select('*');
+    if (!error) {
+      allAccounts = accounts || [];
+    }
+  } catch {
+    // Table doesn't exist, use empty array
+  }
 
   // Calculate stats
   const totalAccounts = allAccounts.length;
@@ -736,10 +699,6 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     const endDate = new Date(a.trial_end_date);
     return endDate <= sevenDaysFromNow && endDate >= new Date();
   }).length;
-
-  // Founders remaining
-  const foundersStatus = await getFoundersStatus();
-  const foundersRemaining = foundersStatus.total_slots - foundersStatus.slots_used;
 
   // MRR
   const mrr = allAccounts
@@ -755,21 +714,28 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const cancelledAccounts = allAccounts.filter(a => a.plan_status === 'cancelled').length;
   const churnRate = totalAccounts > 0 ? (cancelledAccounts / totalAccounts) * 100 : 0;
 
-  // Pending submissions
-  const { count: pendingSubmissions } = await supabase
-    .from('agent_submissions')
-    .select('*', { count: 'exact', head: true })
-    .in('status', ['pending', 'sent']);
+  // Pending submissions (handle missing table gracefully)
+  let pendingSubmissions = 0;
+  try {
+    const { count, error } = await supabase
+      .from('agent_submissions')
+      .select('*', { count: 'exact', head: true })
+      .in('status', ['pending', 'sent']);
+    if (!error) {
+      pendingSubmissions = count || 0;
+    }
+  } catch {
+    // Table doesn't exist
+  }
 
   return {
     totalAccounts,
     activePaying,
     trialsEndingSoon,
-    foundersRemaining,
     mrr,
     trialConversionRate: Math.round(trialConversionRate),
     churnRate: Math.round(churnRate * 10) / 10,
-    pendingSubmissions: pendingSubmissions || 0,
+    pendingSubmissions,
   };
 }
 

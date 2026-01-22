@@ -3,7 +3,7 @@
 // Manage checklist templates and job checklists
 // =====================================================
 
-import { createClient as createServerClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { v4 as uuidv4 } from 'uuid';
 
 export type ChecklistType = 'pre_job' | 'service' | 'post_job' | 'safety';
@@ -63,7 +63,7 @@ export async function createChecklistTemplate(
     checklistType?: ChecklistType;
   }
 ): Promise<ChecklistTemplate> {
-  const supabase = await createServerClient();
+  const supabase = await createServerSupabaseClient();
 
   const itemsWithIds = items.map(item => ({
     ...item,
@@ -95,7 +95,7 @@ export async function getChecklistTemplates(
   businessId: string,
   jobType?: string
 ): Promise<ChecklistTemplate[]> {
-  const supabase = await createServerClient();
+  const supabase = await createServerSupabaseClient();
 
   let query = supabase
     .from('checklist_templates')
@@ -120,7 +120,7 @@ export async function getTemplatesForJobType(
   businessId: string,
   jobType: string
 ): Promise<ChecklistTemplate[]> {
-  const supabase = await createServerClient();
+  const supabase = await createServerSupabaseClient();
 
   const { data, error } = await supabase
     .from('checklist_templates')
@@ -140,7 +140,7 @@ export async function applyChecklistToJob(
   jobId: string,
   templateId: string
 ): Promise<JobChecklist> {
-  const supabase = await createServerClient();
+  const supabase = await createServerSupabaseClient();
 
   // Get template
   const { data: template, error: templateError } = await supabase
@@ -190,7 +190,7 @@ export async function createJobChecklist(
   items: Omit<ChecklistItem, 'id' | 'completed' | 'completed_at' | 'completed_by' | 'value'>[],
   checklistType?: ChecklistType
 ): Promise<JobChecklist> {
-  const supabase = await createServerClient();
+  const supabase = await createServerSupabaseClient();
 
   const itemsWithIds = items.map(item => ({
     ...item,
@@ -228,7 +228,7 @@ export async function updateChecklistItem(
     notes?: string;
   }
 ): Promise<JobChecklist> {
-  const supabase = await createServerClient();
+  const supabase = await createServerSupabaseClient();
 
   // Get current checklist
   const { data: checklist, error: fetchError } = await supabase
@@ -281,7 +281,7 @@ export async function updateChecklistItem(
  * Get all checklists for a job
  */
 export async function getJobChecklists(jobId: string): Promise<JobChecklist[]> {
-  const supabase = await createServerClient();
+  const supabase = await createServerSupabaseClient();
 
   const { data, error } = await supabase
     .from('job_checklists')
@@ -332,7 +332,7 @@ export async function updateChecklistTemplate(
     isActive?: boolean;
   }
 ): Promise<ChecklistTemplate> {
-  const supabase = await createServerClient();
+  const supabase = await createServerSupabaseClient();
 
   const updateData: any = {
     updated_at: new Date().toISOString(),
@@ -365,7 +365,7 @@ export async function updateChecklistTemplate(
  * Delete a template (soft delete)
  */
 export async function deleteChecklistTemplate(templateId: string): Promise<void> {
-  const supabase = await createServerClient();
+  const supabase = await createServerSupabaseClient();
 
   const { error } = await supabase
     .from('checklist_templates')
@@ -379,7 +379,7 @@ export async function deleteChecklistTemplate(templateId: string): Promise<void>
  * Delete a job checklist
  */
 export async function deleteJobChecklist(checklistId: string): Promise<void> {
-  const supabase = await createServerClient();
+  const supabase = await createServerSupabaseClient();
 
   const { error } = await supabase
     .from('job_checklists')

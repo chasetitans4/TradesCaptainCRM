@@ -4,34 +4,29 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { apiLogger } from '@/lib/logger';
 import { bulkApproveExpenses } from '@/lib/expenses';
+import { getServerSession } from '@/lib/permissions/check-permission';
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id, role')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    // Determine correct Supabase client
+    let supabase;
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      supabase = createAdminClient();
+    } else {
+      supabase = await createClient();
     }
 
     // Only admins/owners can bulk approve
-    if (profile.role === 'technician') {
+    if (session.user.role === 'technician') {
       return NextResponse.json(
         { error: 'Only administrators can approve expenses' },
         { status: 403 }
@@ -52,7 +47,7 @@ export async function POST(request: NextRequest) {
     const { data: expenses } = await supabase
       .from('expenses')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', session.user.businessId)
       .in('id', expense_ids);
 
     if (!expenses || expenses.length !== expense_ids.length) {
@@ -62,7 +57,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await bulkApproveExpenses(expense_ids, profile.id);
+    const result = await bulkApproveExpenses(expense_ids, session.user.id);
 
     return NextResponse.json({
       success: true,

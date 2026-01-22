@@ -4,9 +4,10 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { getExpense, markReimbursed } from '@/lib/expenses';
 import { apiLogger } from '@/lib/logger';
+import { getServerSession } from '@/lib/permissions/check-permission';
 
 export async function POST(
   request: NextRequest,
@@ -14,37 +15,30 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id, role')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    let supabase;
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      supabase = createAdminClient();
+    } else {
+      supabase = await createClient();
     }
 
     // Only admins/owners can mark reimbursed
-    if (profile.role === 'technician') {
+    if (session.user.role === 'technician') {
       return NextResponse.json(
         { error: 'Only administrators can mark expenses as reimbursed' },
         { status: 403 }
       );
     }
 
-    const expense = await getExpense(id);
+    const expense = await getExpense(id, supabase);
 
-    if (!expense || expense.business_id !== profile.business_id) {
+    if (!expense || expense.business_id !== session.user.businessId) {
       return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
     }
 
@@ -65,7 +59,7 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const amount = body.amount; // Optional: custom reimbursement amount
 
-    const updatedExpense = await markReimbursed(id, amount);
+    const updatedExpense = await markReimbursed(id, amount, supabase);
 
     return NextResponse.json({ expense: updatedExpense });
   } catch (error) {

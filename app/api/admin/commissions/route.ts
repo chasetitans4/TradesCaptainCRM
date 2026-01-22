@@ -5,14 +5,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getCommissions, createCommission, getPendingCommissions } from '@/lib/admin/commissions';
-import { verifyAdminAuth } from '@/lib/admin/auth';
+import { checkPermission, getServerSession } from '@/lib/permissions/check-permission';
 import { CommissionStatus, CommissionType } from '@/lib/admin/types';
 import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth(request);
-    if (!auth.valid || !auth.user) {
+    await checkPermission('view_admin_commissions');
+    const session = await getServerSession();
+
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -24,16 +26,22 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '25');
     const pending = searchParams.get('pending') === 'true';
 
-    // Non-management roles can only see their own commissions
-    const effectiveAgentId = ['super_admin', 'admin', 'finance'].includes(auth.user.role)
-      ? agentId
-      : auth.user.id;
+    // Role-based data access
+    const userRole = session.user.role;
+    const canViewOthers = ['super_admin', 'admin', 'finance', 'manager'].includes(userRole);
+    
+    // If user can view others and requested an agent ID, use it.
+    // Otherwise, force their own ID.
+    const effectiveAgentId = (canViewOthers && agentId) 
+      ? agentId 
+      : session.user.id;
 
     if (pending) {
-      const commissions = await getPendingCommissions();
-      const filtered =
-        effectiveAgentId ? commissions.filter((c) => c.agent_id === effectiveAgentId) : commissions;
-      return NextResponse.json({ commissions: filtered, total: filtered.length });
+      // If user is not management, they can only see their own pending commissions
+      // If user is management, they can see all pending commissions, or filter by agentId
+      const targetAgentId = canViewOthers ? (agentId || undefined) : session.user.id;
+      const commissions = await getPendingCommissions(targetAgentId);
+      return NextResponse.json({ commissions, total: commissions.length });
     }
 
     const result = await getCommissions({
@@ -59,18 +67,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await verifyAdminAuth(request);
-    if (!auth.valid || !auth.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    await checkPermission('manage_admin_commissions');
 
-    // Only admins and finance can create manual commissions
-    if (!['super_admin', 'admin', 'finance'].includes(auth.user.role)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    const body = await request.json();
-    const commission = await createCommission(body);
+    const data = await request.json();
+    const commission = await createCommission(data);
 
     return NextResponse.json({ success: true, commission });
   } catch (error) {

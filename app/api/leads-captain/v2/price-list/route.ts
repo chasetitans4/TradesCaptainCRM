@@ -5,7 +5,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserProfile } from '@/lib/supabase/server';
+import { checkPermission, getServerSession } from '@/lib/permissions/check-permission';
 import { createAdminClient } from '@/lib/supabase/server';
 import { checkPlanLimit } from '@/lib/leads-captain/v2/features';
 import { apiLogger } from '@/lib/logger';
@@ -13,18 +13,29 @@ import type { CreatePriceItemRequest } from '@/types/leads-captain';
 
 export async function GET() {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('view_leads_captain');
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const supabase = createAdminClient();
 
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+
     // Get config ID
     const { data: config } = await supabase
       .from('leads_captain_config')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', userData.business_id)
       .single();
 
     if (!config) {
@@ -40,7 +51,7 @@ export async function GET() {
     if (error) throw error;
 
     // Get limit info
-    const limitInfo = await checkPlanLimit(profile.business_id, 'price_list_items');
+    const limitInfo = await checkPlanLimit(userData.business_id, 'price_list_items');
 
     return NextResponse.json({
       items: items || [],
@@ -61,8 +72,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('manage_leads_captain');
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -73,11 +85,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Service name is required' }, { status: 400 });
     }
 
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+
     // Get config ID
     const { data: config } = await supabase
       .from('leads_captain_config')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', userData.business_id)
       .single();
 
     if (!config) {
@@ -85,7 +107,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check plan limit
-    const limitInfo = await checkPlanLimit(profile.business_id, 'price_list_items');
+    const limitInfo = await checkPlanLimit(userData.business_id, 'price_list_items');
     if (!limitInfo.allowed) {
       return NextResponse.json(
         {

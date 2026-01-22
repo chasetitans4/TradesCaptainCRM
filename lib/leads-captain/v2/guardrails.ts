@@ -1,9 +1,6 @@
-// =====================================================
-// Leads Captain v2.0 AI Guardrails
-// Constrained AI for fallback responses only
-// =====================================================
-
+import 'openai/shims/node';
 import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import {
   LeadsCaptainConfig,
   LeadsCaptainConversation,
@@ -25,6 +22,18 @@ function getAnthropic(): Anthropic {
     });
   }
   return anthropicClient;
+}
+
+let openaiClient: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!openaiClient) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY is not set.');
+    }
+    openaiClient = new OpenAI({ apiKey });
+  }
+  return openaiClient;
 }
 
 // Temperature mapping for creativity levels
@@ -50,47 +59,76 @@ export async function generateAIResponse(
   const systemPrompt = buildSystemPrompt(config, classification, options);
   const conversationMessages = buildConversationMessages(conversationHistory, message);
 
+  let usedModel = 'gpt-4o';
+  let tokensUsed = 0;
+  let rawText: string | null = null;
+
   try {
-    const response = await getAnthropic().messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 300, // Limit response length
+    const openai = getOpenAI();
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...conversationMessages,
+      ],
+      max_tokens: 300,
       temperature: CREATIVITY_TEMPERATURES[options.creativity_level],
-      system: systemPrompt,
-      messages: conversationMessages,
     });
-
-    const content = response.content[0];
-    if (content.type !== 'text') {
-      throw new Error('Unexpected response type');
-    }
-
-    let responseText = content.text;
-    const guardrailsApplied: string[] = [];
-
-    // Apply guardrails
-    const guardrailResult = applyGuardrails(responseText, config, options, classification);
-    responseText = guardrailResult.text;
-    guardrailsApplied.push(...guardrailResult.applied);
-
-    // Calculate a confidence score based on intent match and response quality
-    const confidence = calculateConfidence(classification, responseText);
-
-    return {
-      content: responseText,
-      confidence,
-      model: 'claude-3-5-sonnet-20241022',
-      tokens_used: response.usage.input_tokens + response.usage.output_tokens,
-      guardrails_applied: guardrailsApplied,
-    };
+    rawText = response.choices[0]?.message?.content || null;
+    tokensUsed = (response.usage?.total_tokens as number) || 0;
   } catch (error) {
     jobLogger.error({
-      msg: 'AI generation error',
+      msg: 'OpenAI generation error',
       error: error instanceof Error
         ? { name: error.name, message: error.message, stack: error.stack }
         : String(error),
     });
-    throw error;
+    rawText = null;
   }
+
+  if (!rawText || rawText.trim().length === 0) {
+    try {
+      const anthropic = getAnthropic();
+      const response = await anthropic.messages.create({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 300,
+        temperature: CREATIVITY_TEMPERATURES[options.creativity_level],
+        system: systemPrompt,
+        messages: conversationMessages,
+      });
+      const content = response.content[0];
+      if (content.type !== 'text') {
+        throw new Error('Unexpected response type');
+      }
+      rawText = content.text;
+      usedModel = 'claude-3-5-sonnet-20241022';
+      tokensUsed = (response.usage.input_tokens + response.usage.output_tokens);
+    } catch (error) {
+      jobLogger.error({
+        msg: 'Anthropic generation error',
+        error: error instanceof Error
+          ? { name: error.name, message: error.message, stack: error.stack }
+          : String(error),
+      });
+      throw error;
+    }
+  }
+
+  let responseText = rawText!;
+  const guardrailsApplied: string[] = [];
+  const guardrailResult = applyGuardrails(responseText, config, options, classification);
+  responseText = guardrailResult.text;
+  guardrailsApplied.push(...guardrailResult.applied);
+
+  const confidence = calculateConfidence(classification, responseText);
+
+  return {
+    content: responseText,
+    confidence,
+    model: usedModel,
+    tokens_used: tokensUsed,
+    guardrails_applied: guardrailsApplied,
+  };
 }
 
 /**

@@ -6,7 +6,6 @@ jest.mock('@/lib/supabase/server', () => {
     const resolveBase = (table: string) => {
       switch (table) {
         case 'crm_accounts': return (m.crm_accounts || []).slice();
-        case 'founders_program': return (m.founders_program || []).slice();
         case 'agent_submissions': return (m.agent_submissions || []).slice();
         default: return [];
       }
@@ -58,13 +57,16 @@ jest.mock('@/lib/supabase/server', () => {
       }),
     };
   };
-  return { createClient: jest.fn(() => buildClient()) };
+  return {
+    createClient: jest.fn(() => buildClient()),
+    createAdminClient: jest.fn(() => buildClient())
+  };
 });
 
-describe('admin index: dashboard trials and founders', () => {
+describe('admin index: dashboard trials', () => {
   beforeEach(() => { (globalThis as any).__admIndexTFMock = {}; });
 
-  it('computes trialsEndingSoon and foundersRemaining', async () => {
+  it('computes trialsEndingSoon', async () => {
     const now = new Date();
     const soon = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
     const later = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000).toISOString();
@@ -74,14 +76,10 @@ describe('admin index: dashboard trials and founders', () => {
         { plan_status: 'cancelled', monthly_price: 0, is_trial: true, trial_end_date: later, trial_converted: false },
         { plan_status: 'active', monthly_price: 50, is_trial: false, trial_converted: true },
       ],
-      founders_program: [
-        { id: 'fp1', total_slots: 10, slots_used: 7, is_open: true },
-      ],
       agent_submissions: [],
     };
     const stats = await getDashboardStats();
     expect(stats.trialsEndingSoon).toBe(1);
-    expect(stats.foundersRemaining).toBe(3);
     expect(stats.churnRate).toBeGreaterThan(0);
     expect(stats.trialConversionRate).toBeGreaterThan(0);
   });

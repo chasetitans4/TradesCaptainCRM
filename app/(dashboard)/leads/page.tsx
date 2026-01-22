@@ -24,10 +24,31 @@ import {
   Briefcase,
   ArrowUpDown,
   RefreshCw,
+  CheckSquare,
+  Square,
+  UserPlus,
+  Users,
+  Check,
+  Loader2,
+  List,
+  LayoutGrid,
 } from 'lucide-react';
+import { BottomSheet } from '@/components/mobile/bottom-sheet';
+import { Avatar } from '@/components/ui/avatar';
+import { LeadsKanban } from '@/components/leads';
+
+type ViewMode = 'list' | 'kanban';
 
 interface LeadWithCustomer extends Lead {
   customer?: Pick<Customer, 'id' | 'name' | 'phone' | 'email'> | null;
+}
+
+interface TeamMember {
+  id: string;
+  full_name: string | null;
+  email: string;
+  role: string;
+  avatar_url?: string | null;
 }
 
 type SortOption = 'newest' | 'oldest' | 'urgency' | 'name';
@@ -73,6 +94,15 @@ export default function LeadsPage() {
   );
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+
+  // Bulk selection state
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
+  const [showAssignSheet, setShowAssignSheet] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [loadingTeam, setLoadingTeam] = useState(false);
+  const [assigning, setAssigning] = useState(false);
 
   // Load user
   useEffect(() => {
@@ -98,7 +128,7 @@ export default function LeadsPage() {
         .from('leads')
         .select(`
           *,
-          customer:customers (
+          customer:customers!leads_customer_id_fkey (
             id,
             name,
             phone,
@@ -134,6 +164,106 @@ export default function LeadsPage() {
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadLeads();
+  };
+
+  // Load team members for assignment
+  const loadTeamMembers = useCallback(async () => {
+    setLoadingTeam(true);
+    try {
+      const response = await fetch('/api/team/members');
+      if (response.ok) {
+        const data = await response.json();
+        setTeamMembers(data.members || []);
+      }
+    } catch (error) {
+      console.error('Error loading team members:', error);
+    } finally {
+      setLoadingTeam(false);
+    }
+  }, []);
+
+  // Toggle selection mode
+  const toggleSelectionMode = () => {
+    if (selectionMode) {
+      setSelectedLeadIds(new Set());
+    }
+    setSelectionMode(!selectionMode);
+  };
+
+  // Toggle lead selection
+  const toggleLeadSelection = (leadId: string) => {
+    setSelectedLeadIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(leadId)) {
+        newSet.delete(leadId);
+      } else {
+        newSet.add(leadId);
+      }
+      return newSet;
+    });
+  };
+
+  // Select all visible leads
+  const selectAllLeads = () => {
+    setSelectedLeadIds(new Set(filteredLeads.map((l) => l.id)));
+  };
+
+  // Clear selection
+  const clearSelection = () => {
+    setSelectedLeadIds(new Set());
+  };
+
+  // Handle bulk assignment
+  const handleBulkAssign = async (assigneeId: string | null) => {
+    if (selectedLeadIds.size === 0) return;
+
+    setAssigning(true);
+    try {
+      const response = await fetch('/api/leads/bulk-assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lead_ids: Array.from(selectedLeadIds),
+          assigned_to: assigneeId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: 'Success',
+          description: data.message,
+        });
+        setShowAssignSheet(false);
+        setSelectedLeadIds(new Set());
+        setSelectionMode(false);
+        loadLeads(); // Refresh leads list
+      } else {
+        toast({
+          title: 'Error',
+          description: data.error || 'Failed to assign leads',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error assigning leads:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to assign leads. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  // Open assign sheet and load team members
+  const openAssignSheet = () => {
+    setShowAssignSheet(true);
+    if (teamMembers.length === 0) {
+      loadTeamMembers();
+    }
   };
 
   // Filter and sort leads
@@ -213,14 +343,57 @@ export default function LeadsPage() {
               >
                 <RefreshCw className={cn('h-5 w-5', refreshing && 'animate-spin')} />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => setShowFilters(!showFilters)}
-                className={showFilters ? 'text-primary' : ''}
-              >
-                <Filter className="h-5 w-5" />
-              </Button>
+              {/* View toggle */}
+              <div className="flex bg-muted rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={cn(
+                    'p-1.5 rounded transition-colors',
+                    viewMode === 'list' ? 'bg-background shadow-sm' : ''
+                  )}
+                  title="List view"
+                  aria-label="Switch to list view"
+                  aria-pressed={viewMode === 'list'}
+                >
+                  <List className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <button
+                  onClick={() => setViewMode('kanban')}
+                  className={cn(
+                    'p-1.5 rounded transition-colors',
+                    viewMode === 'kanban' ? 'bg-background shadow-sm' : ''
+                  )}
+                  title="Kanban view"
+                  aria-label="Switch to kanban view"
+                  aria-pressed={viewMode === 'kanban'}
+                >
+                  <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+              {hasPermission(user.role, 'manage_leads') && viewMode === 'list' && (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={toggleSelectionMode}
+                  className={selectionMode ? 'text-primary' : ''}
+                  aria-label={selectionMode ? 'Exit selection mode' : 'Enter selection mode'}
+                  aria-pressed={selectionMode}
+                >
+                  <CheckSquare className="h-5 w-5" aria-hidden="true" />
+                </Button>
+              )}
+              {viewMode === 'list' && (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={showFilters ? 'text-primary' : ''}
+                  aria-label={showFilters ? 'Hide filters' : 'Show filters'}
+                  aria-expanded={showFilters}
+                >
+                  <Filter className="h-5 w-5" aria-hidden="true" />
+                </Button>
+              )}
             </div>
           </div>
 
@@ -238,8 +411,9 @@ export default function LeadsPage() {
               <button
                 onClick={() => setSearchQuery('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
+                aria-label="Clear search"
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4" aria-hidden="true" />
               </button>
             )}
           </div>
@@ -277,91 +451,254 @@ export default function LeadsPage() {
           )}
         </div>
 
-        {/* Status Tabs */}
-        <div className="px-4 pb-2 overflow-x-auto scrollbar-hide">
-          <div className="flex gap-2">
-            {LEAD_STATUSES.map((status) => (
-              <button
-                key={status.value}
-                onClick={() => setStatusFilter(status.value)}
-                className={cn(
-                  'px-3 py-1.5 text-sm rounded-full whitespace-nowrap transition-colors flex items-center gap-1.5',
-                  statusFilter === status.value
-                    ? 'bg-primary text-white'
-                    : 'bg-muted text-text hover:bg-muted/80'
-                )}
-              >
-                {status.label}
-                {statusCounts[status.value] !== undefined && (
-                  <span
-                    className={cn(
-                      'text-xs px-1.5 py-0.5 rounded-full',
-                      statusFilter === status.value
-                        ? 'bg-white/20'
-                        : 'bg-background'
-                    )}
-                  >
-                    {statusCounts[status.value]}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      </header>
-
-      {/* Leads List */}
-      <div className="px-4 py-4">
-        {filteredLeads.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <User className="h-12 w-12 text-text-muted mb-4" />
-            <h3 className="text-lg font-medium text-text mb-1">
-              {searchQuery || statusFilter !== 'all'
-                ? 'No leads found'
-                : 'No leads yet'}
-            </h3>
-            <p className="text-sm text-text-muted mb-4">
-              {searchQuery || statusFilter !== 'all'
-                ? 'Try adjusting your search or filters'
-                : 'Add your first lead to get started'}
-            </p>
-            {!searchQuery && statusFilter === 'all' && hasPermission(user.role, 'create_leads') && (
-              <Link href="/leads/new">
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Lead
-                </Button>
-              </Link>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filteredLeads.map((lead) => (
-              <LeadCard key={lead.id} lead={lead} />
-            ))}
+        {/* Status Tabs - only show in list view */}
+        {viewMode === 'list' && (
+          <div className="px-4 pb-2 overflow-x-auto scrollbar-hide">
+            <div className="flex gap-2">
+              {LEAD_STATUSES.map((status) => (
+                <button
+                  key={status.value}
+                  onClick={() => setStatusFilter(status.value)}
+                  className={cn(
+                    'px-3 py-1.5 text-sm rounded-full whitespace-nowrap transition-colors flex items-center gap-1.5',
+                    statusFilter === status.value
+                      ? 'bg-primary text-white'
+                      : 'bg-muted text-text hover:bg-muted/80'
+                  )}
+                >
+                  {status.label}
+                  {statusCounts[status.value] !== undefined && (
+                    <span
+                      className={cn(
+                        'text-xs px-1.5 py-0.5 rounded-full',
+                        statusFilter === status.value
+                          ? 'bg-white/20'
+                          : 'bg-background'
+                      )}
+                    >
+                      {statusCounts[status.value]}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
         )}
-      </div>
+
+        {/* Bulk Selection Bar */}
+        {selectionMode && (
+          <div className="px-4 py-2 bg-primary/5 border-t border-primary/20 animate-in slide-in-from-top-2 fade-in duration-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={selectedLeadIds.size === filteredLeads.length ? clearSelection : selectAllLeads}
+                  className="flex items-center gap-2 text-sm text-primary font-medium"
+                >
+                  {selectedLeadIds.size === filteredLeads.length ? (
+                    <CheckSquare className="h-4 w-4" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )}
+                  {selectedLeadIds.size === filteredLeads.length ? 'Deselect All' : 'Select All'}
+                </button>
+                <span className="text-sm text-text-muted">
+                  {selectedLeadIds.size} selected
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedLeadIds.size > 0 && (
+                  <Button
+                    size="sm"
+                    onClick={openAssignSheet}
+                    className="flex items-center gap-1.5"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Assign
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleSelectionMode}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </header>
+
+      {/* Leads Content */}
+      {viewMode === 'kanban' ? (
+        <LeadsKanban
+          leads={leads}
+          onRefresh={loadLeads}
+        />
+      ) : (
+        <div className="px-4 py-4">
+          {filteredLeads.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <User className="h-12 w-12 text-text-muted mb-4" />
+              <h3 className="text-lg font-medium text-text mb-1">
+                {searchQuery || statusFilter !== 'all'
+                  ? 'No leads found'
+                  : 'No leads yet'}
+              </h3>
+              <p className="text-sm text-text-muted mb-4">
+                {searchQuery || statusFilter !== 'all'
+                  ? 'Try adjusting your search or filters'
+                  : 'Add your first lead to get started'}
+              </p>
+              {!searchQuery && statusFilter === 'all' && hasPermission(user.role, 'create_leads') && (
+                <Link href="/leads/new">
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Lead
+                  </Button>
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredLeads.map((lead) => (
+                <LeadCard
+                  key={lead.id}
+                  lead={lead}
+                  selectionMode={selectionMode}
+                  isSelected={selectedLeadIds.has(lead.id)}
+                  onToggleSelect={() => toggleLeadSelection(lead.id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* FAB */}
-      {hasPermission(user.role, 'create_leads') && (
+      {hasPermission(user.role, 'create_leads') && !selectionMode && (
         <Link href="/leads/new" className="fab">
           <Plus className="h-6 w-6" />
         </Link>
       )}
+
+      {/* Assign Bottom Sheet */}
+      <BottomSheet open={showAssignSheet} onOpenChange={setShowAssignSheet}>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Assign {selectedLeadIds.size} Lead{selectedLeadIds.size !== 1 ? 's' : ''}</h3>
+            <Button variant="ghost" size="icon" onClick={() => setShowAssignSheet(false)}>
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {loadingTeam ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+              {/* Unassign option */}
+              <button
+                onClick={() => handleBulkAssign(null)}
+                disabled={assigning}
+                className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors text-left"
+              >
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                  <X className="h-5 w-5 text-text-muted" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-sm">Unassign</p>
+                  <p className="text-xs text-text-muted">Remove current assignment</p>
+                </div>
+                {assigning && <Loader2 className="h-4 w-4 animate-spin" />}
+              </button>
+
+              {/* Team members */}
+              {teamMembers.map((member) => (
+                <button
+                  key={member.id}
+                  onClick={() => handleBulkAssign(member.id)}
+                  disabled={assigning}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors text-left"
+                >
+                  <Avatar
+                    src={member.avatar_url || undefined}
+                    fallback={member.full_name?.charAt(0) || member.email.charAt(0)}
+                    size="md"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{member.full_name || member.email}</p>
+                    <p className="text-xs text-text-muted truncate">{member.role}</p>
+                  </div>
+                  {assigning && <Loader2 className="h-4 w-4 animate-spin" />}
+                </button>
+              ))}
+
+              {teamMembers.length === 0 && !loadingTeam && (
+                <div className="py-8 text-center text-sm text-text-muted">
+                  <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No team members found</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </BottomSheet>
     </div>
   );
 }
 
-function LeadCard({ lead }: { lead: LeadWithCustomer }) {
+interface LeadCardProps {
+  lead: LeadWithCustomer;
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
+}
+
+function LeadCard({ lead, selectionMode, isSelected, onToggleSelect }: LeadCardProps) {
   const name = lead.customer?.name || lead.name || 'Unknown';
   const phone = lead.customer?.phone || lead.phone;
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (selectionMode) {
+      e.preventDefault();
+      onToggleSelect?.();
+    }
+  };
+
+  const CardWrapper = selectionMode ? 'div' : Link;
+  const cardProps = selectionMode
+    ? { onClick: handleClick }
+    : { href: `/leads/${lead.id}` };
+
   return (
-    <Link
-      href={`/leads/${lead.id}`}
-      className="card p-4 flex items-start gap-3 active:scale-[0.99] transition-transform"
+    <CardWrapper
+      {...(cardProps as any)}
+      className={cn(
+        'card p-4 flex items-start gap-3 active:scale-[0.99] transition-all cursor-pointer',
+        selectionMode && isSelected && 'ring-2 ring-primary bg-primary/5'
+      )}
     >
+      {/* Checkbox in selection mode */}
+      {selectionMode && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSelect?.();
+          }}
+          className="shrink-0 mt-1"
+        >
+          {isSelected ? (
+            <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center">
+              <Check className="h-4 w-4 text-white" />
+            </div>
+          ) : (
+            <div className="w-6 h-6 rounded-md border-2 border-border" />
+          )}
+        </button>
+      )}
+
       {/* Avatar / Urgency indicator */}
       <div
         className={cn(
@@ -407,8 +744,8 @@ function LeadCard({ lead }: { lead: LeadWithCustomer }) {
           )}
         </div>
 
-        {/* Quick actions */}
-        {phone && (
+        {/* Quick actions - hide in selection mode */}
+        {phone && !selectionMode && (
           <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border">
             <a
               href={`tel:${phone}`}
@@ -430,8 +767,8 @@ function LeadCard({ lead }: { lead: LeadWithCustomer }) {
         )}
       </div>
 
-      <ChevronRight className="h-5 w-5 text-text-muted shrink-0 mt-2" />
-    </Link>
+      {!selectionMode && <ChevronRight className="h-5 w-5 text-text-muted shrink-0 mt-2" />}
+    </CardWrapper>
   );
 }
 

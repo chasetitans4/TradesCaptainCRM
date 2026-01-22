@@ -101,9 +101,9 @@ export async function getCallLogs(
     .select(
       `
       *,
-      customer:customers(id, name, phone),
-      lead:leads(id, name, service_needed),
-      user:users(id, name)
+      customer:customers!call_logs_customer_id_fkey(id, name, phone),
+      lead:leads!call_logs_lead_id_fkey(id, name, service_needed),
+      user:users!call_logs_user_id_fkey(id, first_name, last_name)
     `,
       { count: 'exact' }
     )
@@ -160,7 +160,15 @@ export async function getCallLogs(
   }
 
   return {
-    calls: (data as CallLogWithRelations[]) || [],
+    calls: (data || []).map((log: any) => ({
+      ...log,
+      user: log.user
+        ? {
+            id: log.user.id,
+            name: `${log.user.first_name || ''} ${log.user.last_name || ''}`.trim(),
+          }
+        : null,
+    })) as CallLogWithRelations[],
     total: count || 0,
   };
 }
@@ -176,9 +184,9 @@ export async function getCallLog(callId: string): Promise<CallLogWithRelations |
     .select(
       `
       *,
-      customer:customers(id, name, phone),
-      lead:leads(id, name, service_needed),
-      user:users(id, name)
+      customer:customers!call_logs_customer_id_fkey(id, name, phone),
+      lead:leads!call_logs_lead_id_fkey(id, name, service_needed),
+      user:users!call_logs_user_id_fkey(id, first_name, last_name)
     `
     )
     .eq('id', callId)
@@ -190,7 +198,16 @@ export async function getCallLog(callId: string): Promise<CallLogWithRelations |
     throw new Error('Failed to fetch call log');
   }
 
-  return data as CallLogWithRelations;
+  const call = data as any;
+  return {
+    ...call,
+    user: call.user
+      ? {
+          id: call.user.id,
+          name: `${call.user.first_name || ''} ${call.user.last_name || ''}`.trim(),
+        }
+      : null,
+  } as CallLogWithRelations;
 }
 
 /**
@@ -265,7 +282,7 @@ export async function getCallStats(
       outcome,
       duration_seconds,
       user_id,
-      user:users(id, name)
+      user:users!call_logs_user_id_fkey(id, name)
     `
     )
     .eq('business_id', businessId);
@@ -358,7 +375,7 @@ export async function getCustomerCallHistory(
     .select(
       `
       *,
-      user:users(id, name)
+      user:users!call_logs_user_id_fkey(id, name)
     `
     )
     .eq('customer_id', customerId)
@@ -392,7 +409,7 @@ export async function getLeadCallHistory(
     .select(
       `
       *,
-      user:users(id, name)
+      user:users!call_logs_user_id_fkey(id, first_name, last_name)
     `
     )
     .eq('lead_id', leadId)

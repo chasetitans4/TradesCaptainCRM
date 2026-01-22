@@ -15,6 +15,7 @@ import {
   getJobChecklists,
   getChecklistProgress,
 } from '@/lib/checklists';
+import { checkPermission } from '@/lib/permissions/check-permission';
 import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
@@ -82,6 +83,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Default action: apply template to job
+    await checkPermission('view_checklists');
+
     if (!jobId || !templateId) {
       return NextResponse.json(
         { error: 'jobId and templateId are required' },

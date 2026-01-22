@@ -12,8 +12,8 @@ export async function POST(_request: NextRequest) {
     const cookieStore = await cookies();
 
     // Clear auth cookies
-    cookieStore.delete('admin_token');
-    cookieStore.delete('admin_refresh_token');
+    cookieStore.delete({ name: 'admin_token', path: '/' });
+    cookieStore.delete({ name: 'admin_refresh_token', path: '/' });
 
     return NextResponse.json({ success: true });
   } catch (error) {

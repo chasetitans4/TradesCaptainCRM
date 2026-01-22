@@ -65,11 +65,11 @@ interface UserPricingInfo {
   monthlyUserCharge: number;
 }
 
-// Updated for v5.9.2 - renamed growth→pro, pro→enterprise
+// Updated for v6.3 - Leads Captain now $49/mo add-on
 const PLAN_DETAILS = {
   starter: {
     name: 'Starter Plan',
-    price: 49,
+    price: 39, // v6.3: reduced from $49
     leads: 0,
     users: 1,
     features: ['1 user included', 'Contact management', 'Calendar & scheduling', 'Mobile app access'],
@@ -78,15 +78,27 @@ const PLAN_DETAILS = {
     name: 'Pro Plan',
     price: 99,
     leads: 200,
-    users: 3,
-    features: ['3 users included', 'AI SMS (1,000/mo)', 'Full pipeline', 'Invoicing & payments'],
+    users: 5, // v6.3: increased from 3
+    features: ['5 users included', '+$10/mo per extra user', 'Full pipeline', 'Invoicing & payments'],
   },
   enterprise: {
     name: 'Enterprise Plan',
     price: 199,
     leads: 300,
     users: 10,
-    features: ['10 users included', 'AI SMS (1,500/mo)', 'Team management', 'Priority support'],
+    features: ['10 users included', '+$10/mo per extra user', 'Team management', 'Priority support'],
+  },
+};
+
+// Leads Captain Add-on (v6.3)
+const LEADS_CAPTAIN_ADDON = {
+  name: 'Leads Captain',
+  price: 49,
+  description: 'AI-powered missed call text-back',
+  smsLimits: {
+    starter: 1000,
+    pro: 2000,
+    enterprise: 3000,
   },
 };
 

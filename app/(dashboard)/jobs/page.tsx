@@ -28,7 +28,9 @@ import {
   RefreshCw,
   User as UserIcon,
   ChevronLeft,
+  MoreVertical,
 } from 'lucide-react';
+import { QuickStatusButton, JobQuickActions } from '@/components/jobs';
 
 interface JobWithDetails extends Job {
   customer: Pick<Customer, 'id' | 'name' | 'phone' | 'address_line1' | 'city'>;
@@ -97,20 +99,20 @@ export default function JobsPage() {
         .from('jobs')
         .select(`
           *,
-          customer:customers!jobs_customer_id_fkey (
+          customer:customers (
             id,
             name,
             phone,
             address_line1,
             city
           ),
-          assigned_user:users!jobs_assigned_user_id_fkey (
+          assigned_user:users (
             id,
             name
           )
         `)
         .order('scheduled_date', { ascending: true })
-        .order('scheduled_time', { ascending: true });
+        .order('scheduled_time_start', { ascending: true });
 
       // Apply date filter
       if (dateFilter !== 'all') {
@@ -156,10 +158,24 @@ export default function JobsPage() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setJobs((data as JobWithDetails[]) || []);
-    } catch (error) {
-      console.error('Error loading jobs:', error);
-      toast({ title: 'Error', description: 'Failed to load jobs. Please try again.', variant: 'destructive' });
+
+      // Transform data to match JobWithDetails interface
+      const formattedJobs = (data || []).map((job: any) => ({
+        ...job,
+        assigned_user: job.assigned_user ? {
+          id: job.assigned_user.id,
+          name: job.assigned_user.name || 'Unknown'
+        } : null
+      }));
+
+      setJobs(formattedJobs as JobWithDetails[]);
+    } catch (error: any) {
+      console.error('Error loading jobs:', error?.message || error?.code || JSON.stringify(error));
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to load jobs. Please try again.',
+        variant: 'destructive'
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -449,7 +465,7 @@ export default function JobsPage() {
             ) : (
               <div className="space-y-3">
                 {(jobsByDate[selectedDate.toISOString().split('T')[0]] || []).map((job) => (
-                  <JobCard key={job.id} job={job} />
+                  <JobCard key={job.id} job={job} onRefresh={handleRefresh} />
                 ))}
               </div>
             )}
@@ -482,7 +498,7 @@ export default function JobsPage() {
             ) : (
               <div className="space-y-3">
                 {filteredJobs.map((job) => (
-                  <JobCard key={job.id} job={job} showDate />
+                  <JobCard key={job.id} job={job} showDate onRefresh={handleRefresh} />
                 ))}
               </div>
             )}
@@ -500,72 +516,114 @@ export default function JobsPage() {
   );
 }
 
-function JobCard({ job, showDate = false }: { job: JobWithDetails; showDate?: boolean }) {
+function JobCard({ job, showDate = false, onRefresh }: { job: JobWithDetails; showDate?: boolean; onRefresh?: () => void }) {
+  const [showQuickActions, setShowQuickActions] = useState(false);
+
   return (
-    <Link
-      href={`/jobs/${job.id}`}
-      className="card p-4 block active:scale-[0.99] transition-transform"
-    >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="min-w-0 flex-1">
-          <h3 className="font-medium text-text truncate">{job.title}</h3>
-          <p className="text-sm text-text-muted truncate">{job.customer?.name}</p>
+    <>
+      <Link
+        href={`/jobs/${job.id}`}
+        className="card p-4 block active:scale-[0.99] transition-transform"
+      >
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="min-w-0 flex-1">
+            <h3 className="font-medium text-text truncate">{job.title}</h3>
+            <p className="text-sm text-text-muted truncate">{job.customer?.name}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Badge className={cn('border', STATUS_COLORS[job.status])}>
+              {job.status.replace('_', ' ')}
+            </Badge>
+            {/* Quick action menu button */}
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowQuickActions(true);
+              }}
+              className="p-1 -mr-1 rounded hover:bg-muted transition-colors"
+            >
+              <MoreVertical className="h-4 w-4 text-text-muted" />
+            </button>
+          </div>
         </div>
-        <Badge className={cn('shrink-0 border', STATUS_COLORS[job.status])}>
-          {job.status.replace('_', ' ')}
-        </Badge>
-      </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-muted">
-        {showDate && job.scheduled_date && (
-          <div className="flex items-center gap-1">
-            <Calendar className="h-3.5 w-3.5" />
-            <span>{formatDate(job.scheduled_date, 'EEE, MMM d')}</span>
-          </div>
-        )}
-        {job.scheduled_time && (
-          <div className="flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5" />
-            <span>{formatTime(job.scheduled_time)}</span>
-          </div>
-        )}
-        {job.customer?.city && (
-          <div className="flex items-center gap-1">
-            <MapPin className="h-3.5 w-3.5" />
-            <span>{job.customer.city}</span>
-          </div>
-        )}
-        {job.assigned_user && (
-          <div className="flex items-center gap-1">
-            <UserIcon className="h-3.5 w-3.5" />
-            <span>{job.assigned_user.name}</span>
-          </div>
-        )}
-      </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-muted">
+          {showDate && job.scheduled_date && (
+            <div className="flex items-center gap-1">
+              <Calendar className="h-3.5 w-3.5" />
+              <span>{formatDate(job.scheduled_date, 'EEE, MMM d')}</span>
+            </div>
+          )}
+          {job.scheduled_time && (
+            <div className="flex items-center gap-1">
+              <Clock className="h-3.5 w-3.5" />
+              <span>{formatTime(job.scheduled_time)}</span>
+            </div>
+          )}
+          {job.customer?.city && (
+            <div className="flex items-center gap-1">
+              <MapPin className="h-3.5 w-3.5" />
+              <span>{job.customer.city}</span>
+            </div>
+          )}
+          {job.assigned_user && (
+            <div className="flex items-center gap-1">
+              <UserIcon className="h-3.5 w-3.5" />
+              <span>{job.assigned_user.name}</span>
+            </div>
+          )}
+        </div>
 
-      {/* Quick actions */}
-      <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border">
-        {job.customer?.phone && (
-          <a
-            href={`tel:${job.customer.phone}`}
-            onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-1.5 text-sm text-primary"
-          >
-            <Phone className="h-4 w-4" />
-            Call
-          </a>
-        )}
-        {job.customer?.address_line1 && (
-          <AddressLink
-            address={job.customer.address_line1}
-            city={job.customer.city}
-            className="flex items-center gap-1.5 text-sm text-primary"
-            iconClassName="h-4 w-4"
-            onClick={(e) => e.stopPropagation()}
+        {/* Quick actions row */}
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
+          <div className="flex items-center gap-3">
+            {job.customer?.phone && (
+              <a
+                href={`tel:${job.customer.phone}`}
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-1.5 text-sm text-primary"
+              >
+                <Phone className="h-4 w-4" />
+                Call
+              </a>
+            )}
+            {job.customer?.address_line1 && (
+              <AddressLink
+                address={job.customer.address_line1}
+                city={job.customer.city}
+                className="flex items-center gap-1.5 text-sm text-primary"
+                iconClassName="h-4 w-4"
+                onClick={(e) => e.stopPropagation()}
+              />
+            )}
+          </div>
+          {/* Quick status button */}
+          <QuickStatusButton
+            job={{
+              id: job.id,
+              title: job.title || job.service_type || 'Job',
+              status: job.status,
+              customer: job.customer,
+            }}
+            onStatusChange={onRefresh}
           />
-        )}
-      </div>
-    </Link>
+        </div>
+      </Link>
+
+      {/* Quick Actions Bottom Sheet */}
+      <JobQuickActions
+        job={{
+          id: job.id,
+          title: job.title || job.service_type || 'Job',
+          status: job.status,
+          customer: job.customer,
+        }}
+        open={showQuickActions}
+        onOpenChange={setShowQuickActions}
+        onStatusChange={onRefresh}
+      />
+    </>
   );
 }
 

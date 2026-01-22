@@ -365,14 +365,15 @@ describe('admin plans branch coverage', () => {
     });
 
     it('returns single price when min equals max', async () => {
+      // Note: getPlanTracksSummary only supports tracks: blue, web, seo_aeo
       (globalThis as any).__plansBranchMock = {
         plan_pricing: [
-          { id: 'p1', plan_type: 'leads_captain_solo', track: 'leads_captain', monthly_price_cents: 2900, is_active: true, display_order: 1 },
+          { id: 'p1', plan_type: 'seo_solo', track: 'seo_aeo', monthly_price_cents: 2900, is_active: true, display_order: 1 },
         ],
       };
       const result = await getPlanTracksSummary();
-      const lc = result.find(r => r.track === 'leads_captain');
-      expect(lc?.price_range).toBe('$29/mo');
+      const seo = result.find((r: any) => r.track === 'seo_aeo');
+      expect(seo?.price_range).toBe('$29/mo');
     });
 
     it('returns price range when min differs from max', async () => {

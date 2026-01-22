@@ -72,29 +72,25 @@ export class Cache {
 
     // Try memory fallback first if Redis is unavailable
     if (this.useMemoryFallback) {
-      const entry = memoryStore.get(fullKey);
-      if (entry && entry.expiresAt > Date.now()) {
-        if (typeof entry.data === 'string') {
-          try {
-            return JSON.parse(entry.data) as T;
-          } catch {
-            return null;
-          }
-        }
-        return entry.data as unknown as T;
-      }
-      memoryStore.delete(fullKey);
-      return null;
+      return this.getFromMemory<T>(fullKey);
     }
 
     try {
       const redis = tryGetRedis();
       if (!redis) {
         this.useMemoryFallback = true;
-        return this.get(key);
+        return this.getFromMemory<T>(fullKey);
       }
 
-      const data = await redis.get(fullKey);
+      // Add timeout for Redis get
+      const timeoutPromise = new Promise<null>((_, reject) => 
+        setTimeout(() => reject(new Error('Redis timeout')), 200)
+      );
+
+      const redisPromise = redis.get(fullKey);
+      
+      const data = await Promise.race([redisPromise, timeoutPromise]);
+      
       if (!data) return null;
 
       if (typeof data === 'string') {
@@ -110,10 +106,25 @@ export class Cache {
         msg: 'Cache get error',
         error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: String(error) },
       });
-      // Fall back to memory
-      this.useMemoryFallback = true;
-      return null;
+      // Fallback to memory on error
+      return this.getFromMemory<T>(fullKey);
     }
+  }
+
+  private getFromMemory<T>(fullKey: string): T | null {
+    const entry = memoryStore.get(fullKey);
+    if (entry && entry.expiresAt > Date.now()) {
+      if (typeof entry.data === 'string') {
+        try {
+          return JSON.parse(entry.data) as T;
+        } catch {
+          return null;
+        }
+      }
+      return entry.data as unknown as T;
+    }
+    memoryStore.delete(fullKey);
+    return null;
   }
 
   /**

@@ -4,61 +4,73 @@ import { apiLogger } from '@/lib/logger';
 import { getDispatchTechnicians, getTechnicianSchedule, getDispatchStats } from '@/lib/dispatch/data';
 import { updateTechnicianLocation, updateTechnicianStatus, setTechnicianSchedule, addTimeOff } from '@/lib/dispatch/actions';
 import { findQualifiedTechnicians, getWorkloadDistribution } from '@/lib/dispatch/routing';
+import { hasServerPermission } from '@/lib/permissions/check-permission';
+import { getServerSession } from '@/lib/permissions/check-permission';
 
 // GET /api/dispatch/technicians - Get technicians for dispatch
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    
+    const user = session.user;
+    let businessId = user.businessId;
 
-    const { data: userData } = await supabase
-      .from('users')
-      .select('business_id')
-      .eq('id', user.id)
-      .single();
+    const { searchParams } = new URL(request.url);
+    const queryBusinessId = searchParams.get('businessId');
 
-    if (!userData?.business_id) {
+    // Allow admins to override business ID
+    if ((user.role === 'admin' || user.role === 'super_admin') && queryBusinessId) {
+      businessId = queryBusinessId;
+    }
+
+    if (!businessId) {
       return NextResponse.json({ error: 'No business found' }, { status: 404 });
     }
 
-    const { searchParams } = new URL(request.url);
     const view = searchParams.get('view');
     const date = searchParams.get('date') || new Date().toISOString().split('T')[0];
     const jobType = searchParams.get('jobType');
     const userId = searchParams.get('userId');
 
+    // Get technician schedule - Allow own schedule or view_team permission
+    if (view === 'schedule' && userId) {
+      const isOwnSchedule = userId === user.id;
+      // Admins can view anyone's schedule
+      if (!isOwnSchedule && user.role !== 'admin' && user.role !== 'super_admin' && !await hasServerPermission('view_team')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      const schedule = await getTechnicianSchedule(userId, date, businessId);
+      return NextResponse.json({ schedule });
+    }
+
+    // All other views require view_team permission
+    if (user.role !== 'admin' && user.role !== 'super_admin' && !await hasServerPermission('view_team')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     // Get workload distribution
     if (view === 'workload') {
-      const workload = await getWorkloadDistribution(userData.business_id, date);
+      const workload = await getWorkloadDistribution(businessId, date);
       return NextResponse.json({ workload });
     }
 
     // Get qualified technicians for job type
     if (view === 'qualified' && jobType) {
-      const result = await findQualifiedTechnicians(userData.business_id, jobType, date);
+      const result = await findQualifiedTechnicians(businessId, jobType, date);
       return NextResponse.json(result);
-    }
-
-    // Get technician schedule
-    if (view === 'schedule' && userId) {
-      const schedule = await getTechnicianSchedule(userId, date);
-      return NextResponse.json({ schedule });
     }
 
     // Get dispatch stats
     if (view === 'stats') {
-      const stats = await getDispatchStats(userData.business_id, date);
+      const stats = await getDispatchStats(businessId, date);
       return NextResponse.json({ stats });
     }
 
     // Default: get all technicians
-    const technicians = await getDispatchTechnicians(userData.business_id);
+    const technicians = await getDispatchTechnicians(businessId);
 
     return NextResponse.json({ technicians });
   } catch (error) {
@@ -70,24 +82,25 @@ export async function GET(request: NextRequest) {
 // POST /api/dispatch/technicians - Update technician data
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const user = session.user;
 
     const body = await request.json();
     const { action, userId, ...data } = body;
 
     const targetUserId = userId || user.id;
+    const isOwnAction = targetUserId === user.id;
 
     let result;
 
     switch (action) {
       case 'updateLocation':
+        if (!isOwnAction && user.role !== 'admin' && user.role !== 'super_admin' && !await hasServerPermission('manage_team')) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
         if (!data.latitude || !data.longitude) {
           return NextResponse.json(
             { error: 'Latitude and longitude are required' },
@@ -104,6 +117,9 @@ export async function POST(request: NextRequest) {
         break;
 
       case 'updateStatus':
+        if (!isOwnAction && user.role !== 'admin' && user.role !== 'super_admin' && !await hasServerPermission('manage_team')) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
         if (!data.status) {
           return NextResponse.json(
             { error: 'Status is required' },
@@ -114,6 +130,9 @@ export async function POST(request: NextRequest) {
         break;
 
       case 'setSchedule':
+        if (user.role !== 'admin' && user.role !== 'super_admin' && !await hasServerPermission('manage_team')) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
         if (!data.schedule || !Array.isArray(data.schedule)) {
           return NextResponse.json(
             { error: 'Schedule array is required' },
@@ -124,6 +143,9 @@ export async function POST(request: NextRequest) {
         break;
 
       case 'addTimeOff':
+        if (user.role !== 'admin' && user.role !== 'super_admin' && !await hasServerPermission('manage_team')) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
         if (!data.startDate || !data.endDate) {
           return NextResponse.json(
             { error: 'Start and end dates are required' },

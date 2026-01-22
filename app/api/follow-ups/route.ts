@@ -8,40 +8,43 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { apiLogger } from '@/lib/logger';
 
+import { getServerSession } from '@/lib/permissions/check-permission';
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id')
-      .eq('auth_user_id', user.id)
-      .single();
+    const { searchParams } = new URL(request.url);
+    let businessId = session.user.businessId;
 
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      const queryBusinessId = searchParams.get('businessId');
+      if (queryBusinessId) businessId = queryBusinessId;
     }
 
-    const { searchParams } = new URL(request.url);
+    if (!businessId) {
+       // If no business context, return empty list or error
+       // For admins without business selection, return empty
+       if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+          return NextResponse.json({ follow_ups: [] });
+       }
+       return NextResponse.json({ error: 'User business not found' }, { status: 404 });
+    }
+
     const status = searchParams.get('status');
     const entityType = searchParams.get('entity_type');
     const priority = searchParams.get('priority');
 
     let query = supabase
       .from('follow_ups')
-      .select(`
-        *,
-        assignee:users!follow_ups_assigned_to_fkey(full_name)
-      `)
-      .eq('business_id', profile.business_id)
+      .select('*')
+      .eq('business_id', businessId)
       .order('scheduled_date', { ascending: true });
 
     if (status && status !== 'all') {
@@ -64,7 +67,25 @@ export async function GET(request: NextRequest) {
     }
 
     // Enrich with entity data
-    const enrichedFollowUps = await enrichFollowUps(supabase, follow_ups || []);
+    let enrichedFollowUps = await enrichFollowUps(supabase, follow_ups || []);
+
+    // Enrich with assignee data manually to avoid ambiguous join issues
+    if (enrichedFollowUps.length > 0) {
+      const userIds = [...new Set(enrichedFollowUps.map((fu) => fu.assigned_to).filter(Boolean))];
+      if (userIds.length > 0) {
+        const { data: users } = await supabase
+          .from('users')
+          .select('id, full_name')
+          .in('id', userIds);
+        
+        const userMap = new Map(users?.map((u) => [u.id, u]) || []);
+        
+        enrichedFollowUps = enrichedFollowUps.map((fu) => ({
+          ...fu,
+          assignee: fu.assigned_to ? userMap.get(fu.assigned_to) : null,
+        }));
+      }
+    }
 
     return NextResponse.json({ follow_ups: enrichedFollowUps });
   } catch (error) {
@@ -77,53 +98,73 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id')
-      .eq('auth_user_id', user.id)
-      .single();
+    let businessId = session.user.businessId;
+    const body = await request.json();
 
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    // If admin, allow overriding businessId from body
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      if (body.businessId) {
+        businessId = body.businessId;
+      }
     }
 
-    const body = await request.json();
+    if (!businessId) {
+      return NextResponse.json({ error: 'Business ID required' }, { status: 400 });
+    }
+
+    const {
+      entity_type,
+      entity_id,
+      description,
+      scheduled_date,
+      priority,
+      assigned_to,
+    } = body;
+
+    if (!entity_type || !entity_id || !description || !scheduled_date) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
 
     const { data: follow_up, error } = await supabase
       .from('follow_ups')
       .insert({
-        business_id: profile.business_id,
-        entity_type: body.entity_type,
-        entity_id: body.entity_id,
-        follow_up_type: body.follow_up_type,
-        scheduled_date: body.scheduled_date,
-        scheduled_time: body.scheduled_time || null,
-        notes: body.notes || null,
-        priority: body.priority || 'medium',
+        business_id: businessId,
+        entity_type,
+        entity_id,
+        description,
+        scheduled_date,
+        priority: priority || 'medium',
+        assigned_to: assigned_to || session.user.id,
         status: 'pending',
-        assigned_to: body.assigned_to || profile.id,
-        created_by: profile.id,
+        created_by: session.user.id,
       })
       .select()
       .single();
 
     if (error) {
       apiLogger.error({ message: 'Error creating follow-up', error });
-      return NextResponse.json({ error: 'Failed to create follow-up' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to create follow-up' },
+        { status: 500 }
+      );
     }
 
-    return NextResponse.json({ follow_up }, { status: 201 });
+    return NextResponse.json(follow_up, { status: 201 });
   } catch (error) {
     apiLogger.error({ message: 'Error in POST /api/follow-ups', error });
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 

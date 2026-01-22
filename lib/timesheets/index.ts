@@ -40,7 +40,7 @@ export interface TimeEntry {
   // Joined data
   user?: {
     id: string;
-    full_name: string;
+    name: string;
     avatar_url?: string;
   };
   job?: {
@@ -300,8 +300,8 @@ export async function getTimeEntries(
     .from('time_entries')
     .select(`
       *,
-      user:users(id, name, avatar_url),
-      job:jobs(id, title, customer_name)
+      user:users!time_entries_user_id_fkey(id, name, avatar_url),
+      job:jobs!time_entries_job_id_fkey(id, title, customer_name)
     `)
     .eq('business_id', businessId)
     .order('clock_in', { ascending: false });
@@ -365,7 +365,7 @@ export async function getWeeklySummary(
     .from('time_entries')
     .select(`
       *,
-      job:jobs(id, title)
+      job:jobs!time_entries_job_id_fkey(id, title)
     `)
     .eq('user_id', userId)
     .in('status', ['completed', 'edited'])
@@ -913,7 +913,7 @@ export async function getJobTimeEntries(jobId: string): Promise<JobTimeEntry[]> 
     .from('job_time_entries')
     .select(`
       *,
-      user:users(full_name)
+      user:users!job_time_entries_user_id_fkey(name)
     `)
     .eq('job_id', jobId)
     .order('start_time', { ascending: true });
@@ -1123,7 +1123,7 @@ export async function getPayrollExport(
     .from('time_entries')
     .select(`
       *,
-      user:users(full_name)
+      user:users!time_entries_user_id_fkey(name)
     `)
     .eq('business_id', businessId)
     .gte('clock_in', startDate.toISOString())
@@ -1142,7 +1142,7 @@ export async function getPayrollExport(
     const overtimeHours = Math.max(0, totalHours - overtimeThreshold);
 
     return {
-      employee: entry.user?.full_name || 'Unknown',
+      employee: entry.user?.name || 'Unknown',
       date: format(clockIn, 'yyyy-MM-dd'),
       clockIn: format(clockIn, 'HH:mm'),
       clockOut: clockOut ? format(clockOut, 'HH:mm') : '',

@@ -5,9 +5,15 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserProfile } from '@/lib/supabase/server';
+import { getServerUserProfile, createAdminClient } from '@/lib/supabase/server';
 import { getCustomerTimeline, addNote, logActivity, type ActivityType } from '@/lib/activity';
 import { apiLogger } from '@/lib/logger';
+
+// Valid activity types for validation
+const VALID_ACTIVITY_TYPES = [
+  'note', 'call', 'email', 'sms', 'appointment', 'quote', 'invoice',
+  'payment', 'job', 'lead', 'status_change', 'system'
+] as const;
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,11 +26,33 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get('customerId');
     const activityType = searchParams.get('activityType');
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const limitParam = searchParams.get('limit') || '50';
+    const offsetParam = searchParams.get('offset') || '0';
+
+    // Validate and bound limit/offset parameters
+    const limit = Math.min(Math.max(parseInt(limitParam) || 50, 1), 100);
+    const offset = Math.max(parseInt(offsetParam) || 0, 0);
 
     if (!customerId) {
       return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 });
+    }
+
+    // Validate activityType if provided
+    if (activityType && !VALID_ACTIVITY_TYPES.includes(activityType as typeof VALID_ACTIVITY_TYPES[number])) {
+      return NextResponse.json({ error: 'Invalid activity type' }, { status: 400 });
+    }
+
+    // SECURITY: Verify customer belongs to the user's business
+    const supabase = createAdminClient();
+    const { data: customer, error: customerError } = await supabase
+      .from('customers')
+      .select('id, business_id')
+      .eq('id', customerId)
+      .eq('business_id', profile.business_id)
+      .single();
+
+    if (customerError || !customer) {
+      return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
 
     const activities = await getCustomerTimeline(customerId, {
@@ -56,6 +84,24 @@ export async function POST(request: NextRequest) {
 
     if (!customerId) {
       return NextResponse.json({ error: 'customerId is required' }, { status: 400 });
+    }
+
+    // SECURITY: Verify customer belongs to the user's business
+    const supabase = createAdminClient();
+    const { data: customer, error: customerError } = await supabase
+      .from('customers')
+      .select('id, business_id')
+      .eq('id', customerId)
+      .eq('business_id', profile.business_id)
+      .single();
+
+    if (customerError || !customer) {
+      return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
+    }
+
+    // Validate activityType if provided
+    if (activityType && !VALID_ACTIVITY_TYPES.includes(activityType as typeof VALID_ACTIVITY_TYPES[number])) {
+      return NextResponse.json({ error: 'Invalid activity type' }, { status: 400 });
     }
 
     // If it's a simple note

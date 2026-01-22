@@ -2,31 +2,33 @@ import { getActivityLog } from '@/lib/admin/index';
 
 jest.mock('@/lib/supabase/server', () => {
   const mget = () => (globalThis as any).__admActPagMock || {};
+  const buildClient = () => ({
+    from: (table: string) => {
+      const m: any = mget();
+      const ctx: any = { filters: [], countOpts: null, orderKey: null, rangeVals: null };
+      const chain: any = {
+        select: (_fields?: string, opts?: any) => { ctx.countOpts = opts || null; return chain; },
+        order: (key: string, _opts?: any) => { ctx.orderKey = key; return chain; },
+        eq: (col: string, val: any) => { ctx.filters.push({ type: 'eq', col, val }); return chain; },
+        range: (start: number, end: number) => { ctx.rangeVals = { start, end }; return chain; },
+        then: async (resolve: any) => {
+          let rows = (m[table] || []).slice();
+          for (const f of ctx.filters) {
+            if (f.type === 'eq') rows = rows.filter((r: any) => r[f.col] === f.val);
+          }
+          if (ctx.orderKey) rows.sort((a: any, b: any) => String(b[ctx.orderKey]).localeCompare(String(a[ctx.orderKey])));
+          const total = rows.length;
+          if (ctx.rangeVals) rows = rows.slice(ctx.rangeVals.start, ctx.rangeVals.end + 1);
+          const count = ctx.countOpts?.count === 'exact' ? total : undefined;
+          return resolve({ data: rows, error: null, count });
+        },
+      };
+      return chain;
+    },
+  });
   return {
-    createClient: jest.fn(() => ({
-      from: (table: string) => {
-        const m: any = mget();
-        const ctx: any = { filters: [], countOpts: null, orderKey: null, rangeVals: null };
-        const chain: any = {
-          select: (_fields?: string, opts?: any) => { ctx.countOpts = opts || null; return chain; },
-          order: (key: string, _opts?: any) => { ctx.orderKey = key; return chain; },
-          eq: (col: string, val: any) => { ctx.filters.push({ type: 'eq', col, val }); return chain; },
-          range: (start: number, end: number) => { ctx.rangeVals = { start, end }; return chain; },
-          then: async (resolve: any) => {
-            let rows = (m[table] || []).slice();
-            for (const f of ctx.filters) {
-              if (f.type === 'eq') rows = rows.filter(r => r[f.col] === f.val);
-            }
-            if (ctx.orderKey) rows.sort((a, b) => String(b[ctx.orderKey]).localeCompare(String(a[ctx.orderKey])));
-            const total = rows.length;
-            if (ctx.rangeVals) rows = rows.slice(ctx.rangeVals.start, ctx.rangeVals.end + 1);
-            const count = ctx.countOpts?.count === 'exact' ? total : undefined;
-            return resolve({ data: rows, error: null, count });
-          },
-        };
-        return chain;
-      },
-    })),
+    createClient: jest.fn(() => buildClient()),
+    createAdminClient: jest.fn(() => buildClient())
   };
 });
 

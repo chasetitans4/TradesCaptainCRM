@@ -20,31 +20,31 @@ export async function GET(_request: NextRequest) {
     const { customerId, businessId } = session;
     const supabase = createAdminClient();
 
-    // Get customer's phone number
-    const { data: customer } = await supabase
+    // Get customer's phone number - handle missing table gracefully
+    const { data: customer, error: customerError } = await supabase
       .from('customers')
       .select('phone')
       .eq('id', customerId)
       .single();
 
-    if (!customer?.phone) {
+    if (customerError || !customer?.phone) {
       return NextResponse.json({ messages: [], hasPhone: false });
     }
 
-    // Find conversation for this customer
-    const { data: conversation } = await supabase
+    // Find conversation for this customer - handle missing table gracefully
+    const { data: conversation, error: convError } = await supabase
       .from('sms_conversations')
       .select('id')
       .eq('business_id', businessId)
-      .eq('customer_phone', customer.phone)
+      .eq('phone', customer.phone)
       .single();
 
-    if (!conversation) {
+    if (convError || !conversation) {
       return NextResponse.json({ messages: [], hasPhone: true });
     }
 
-    // Get messages
-    const { data: messages } = await supabase
+    // Get messages - handle missing table gracefully
+    const { data: messages, error: msgError } = await supabase
       .from('sms_messages')
       .select(`
         id,
@@ -52,11 +52,19 @@ export async function GET(_request: NextRequest) {
         sender,
         body,
         status,
-        created_at
+        created_at,
+        is_ai_response,
+        metadata,
+        ai_confidence,
+        detected_intent
       `)
       .eq('conversation_id', conversation.id)
       .order('created_at', { ascending: true })
       .limit(100);
+
+    if (msgError) {
+      return NextResponse.json({ messages: [], conversationId: conversation.id, hasPhone: true });
+    }
 
     return NextResponse.json({
       messages: messages || [],
@@ -65,7 +73,8 @@ export async function GET(_request: NextRequest) {
     });
   } catch (error) {
     apiLogger.error({ error, context: 'Error fetching portal messages' });
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    // Return empty messages instead of error for graceful degradation
+    return NextResponse.json({ messages: [], hasPhone: false });
   }
 }
 

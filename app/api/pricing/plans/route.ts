@@ -44,8 +44,8 @@ export async function GET(request: NextRequest) {
     // Get plans by track or all
     let plans = track ? getPlansByTrack(track) : ALL_PLANS.filter(p => p.is_active);
 
-    // Group by track for easier UI rendering
-    const tracks = ['blue', 'web', 'seo', 'gold'] as PlanTrack[];
+    // Group by track for easier UI rendering (v6.0 - only active tracks)
+    const tracks = ['blue', 'web', 'seo_aeo'] as PlanTrack[];
     const plansByTrack = tracks.reduce((acc, t) => {
       acc[t] = {
         label: getTrackLabel(t),

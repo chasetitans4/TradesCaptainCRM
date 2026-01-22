@@ -41,11 +41,13 @@
   "exclude": [
     "node_modules",
     ".next/**",
+    "__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
     "docs/requirements/**",
     "lib/supabase/# *.ts",
     "lib/supabase/Advanced Features*.ts",
     "lib/supabase/Untitled*.ts",
-    "lib/supabase/theme toggle.ts",
-    "__tests__/**"
+    "lib/supabase/theme toggle.ts"
   ]
 }

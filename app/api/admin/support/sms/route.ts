@@ -4,7 +4,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAgentOrHigher } from '@/lib/admin/auth';
+import { checkPermission } from '@/lib/permissions/check-permission';
 import {
   getSmsDeliveryFailures,
   checkSuppressionList,
@@ -15,11 +15,7 @@ import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
-    const admin = await requireAgentOrHigher();
-
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    await checkPermission('view_admin_support');
 
     const searchParams = request.nextUrl.searchParams;
     const organizationId = searchParams.get('organization_id');

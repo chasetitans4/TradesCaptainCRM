@@ -139,7 +139,7 @@ export async function getContactWithRelations(
       campaign:outreach_campaigns(*),
       conversation:outreach_conversations(*),
       scheduled_call:scheduled_calls(*),
-      assigned_agent:admin_users(id, name, email)
+      assigned_agent:admin_users!outreach_contacts_assigned_agent_id_fkey(id, name, email)
     `)
     .eq('id', id)
     .single();

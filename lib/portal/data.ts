@@ -3,35 +3,48 @@
 // Read customer data for portal views
 // =====================================================
 
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 
 /**
  * Get customer's upcoming appointments
  */
 export async function getCustomerAppointments(customerId: string) {
-  const supabase = await createClient();
+  try {
+    const supabase = createAdminClient();
 
-  const { data } = await supabase
-    .from('jobs')
-    .select(
+    const { data, error } = await supabase
+      .from('jobs')
+      .select(
+        `
+        id,
+        title:service_type,
+        description,
+        scheduled_date,
+        scheduled_time:scheduled_time_start,
+        estimated_duration,
+        status,
+        address:job_address_line1,
+        assigned_user:users!jobs_assigned_user_id_fkey(id, first_name, last_name, phone)
       `
-      id,
-      title,
-      description,
-      scheduled_date,
-      scheduled_time,
-      estimated_duration,
-      status,
-      address,
-      assigned_user:users(id, name, phone)
-    `
-    )
-    .eq('customer_id', customerId)
-    .in('status', ['scheduled', 'in_progress', 'on_the_way'])
-    .order('scheduled_date', { ascending: true })
-    .limit(10);
+      )
+      .eq('customer_id', customerId)
+      .in('status', ['scheduled', 'in_progress', 'on_the_way'])
+      .order('scheduled_date', { ascending: true })
+      .limit(10);
 
-  return data || [];
+    if (error) return [];
+    
+    // Map data to include full name
+    return (data || []).map((job: any) => ({
+      ...job,
+      assigned_user: job.assigned_user ? {
+        ...job.assigned_user,
+        name: [job.assigned_user.first_name, job.assigned_user.last_name].filter(Boolean).join(' ') || 'Technician'
+      } : null
+    }));
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -44,31 +57,36 @@ export async function getCustomerJobHistory(
     offset?: number;
   }
 ) {
-  const supabase = await createClient();
-  const limit = options?.limit || 20;
-  const offset = options?.offset || 0;
+  try {
+    const supabase = createAdminClient();
+    const limit = options?.limit || 20;
+    const offset = options?.offset || 0;
 
-  const { data, count } = await supabase
-    .from('jobs')
-    .select(
-      `
-      id,
-      title,
-      description,
-      scheduled_date,
-      completed_at,
-      status,
-      total,
-      job_type
-    `,
-      { count: 'exact' }
-    )
-    .eq('customer_id', customerId)
-    .eq('status', 'completed')
-    .order('completed_at', { ascending: false })
-    .range(offset, offset + limit - 1);
+    const { data, count, error } = await supabase
+      .from('jobs')
+      .select(
+        `
+        id,
+        title,
+        description,
+        scheduled_date,
+        completed_at,
+        status,
+        total,
+        job_type
+      `,
+        { count: 'exact' }
+      )
+      .eq('customer_id', customerId)
+      .eq('status', 'completed')
+      .order('completed_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
-  return { jobs: data || [], total: count || 0 };
+    if (error) return { jobs: [], total: 0 };
+    return { jobs: data || [], total: count || 0 };
+  } catch {
+    return { jobs: [], total: 0 };
+  }
 }
 
 /**
@@ -78,174 +96,189 @@ export async function getCustomerInvoices(
   customerId: string,
   status?: 'unpaid' | 'paid' | 'all'
 ) {
-  const supabase = await createClient();
+  try {
+    const supabase = createAdminClient();
 
-  let query = supabase
-    .from('invoices')
-    .select(
+    let query = supabase
+      .from('invoices')
+      .select(
+        `
+        id,
+        invoice_number,
+        status,
+        subtotal,
+        tax:tax_amount,
+        total,
+        due_date,
+        paid_at,
+        paid_amount:amount_paid,
+        payment_method,
+        created_at,
+        job:jobs(title:service_type)
       `
-      id,
-      invoice_number,
-      status,
-      subtotal,
-      tax,
-      total,
-      due_date,
-      paid_at,
-      paid_amount,
-      payment_method,
-      created_at,
-      job:jobs(title)
-    `
-    )
-    .eq('customer_id', customerId)
-    .order('created_at', { ascending: false });
+      )
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false });
 
-  if (status === 'unpaid') {
-    query = query.in('status', ['sent', 'overdue', 'partial']);
-  } else if (status === 'paid') {
-    query = query.eq('status', 'paid');
+    if (status === 'unpaid') {
+      query = query.in('status', ['sent', 'overdue', 'partial']);
+    } else if (status === 'paid') {
+      query = query.eq('status', 'paid');
+    }
+
+    const { data, error } = await query;
+    if (error) return [];
+    return data || [];
+  } catch {
+    return [];
   }
-
-  const { data } = await query;
-  return data || [];
 }
 
 /**
  * Get customer's quotes
  */
 export async function getCustomerQuotes(customerId: string) {
-  const supabase = await createClient();
+  try {
+    const supabase = createAdminClient();
 
-  const { data } = await supabase
-    .from('quotes')
-    .select(
+    const { data, error } = await supabase
+      .from('quotes')
+      .select(
+        `
+        id,
+        quote_number,
+        status,
+        total,
+        valid_until,
+        created_at,
+        items:quote_items(*)
       `
-      id,
-      quote_number,
-      status,
-      total,
-      valid_until,
-      created_at,
-      items
-    `
-    )
-    .eq('customer_id', customerId)
-    .in('status', ['sent', 'viewed'])
-    .order('created_at', { ascending: false });
+      )
+      .eq('customer_id', customerId)
+      .in('status', ['sent', 'viewed'])
+      .order('created_at', { ascending: false });
 
-  return data || [];
+    if (error) return [];
+    return data || [];
+  } catch {
+    return [];
+  }
 }
 
 /**
- * Get customer's equipment
+ * Get customer's equipment (simple version without business filter)
+ * @deprecated Use getCustomerEquipment from ./equipment instead
  */
-export async function getCustomerEquipment(customerId: string) {
-  const supabase = await createClient();
+export async function getCustomerEquipmentSimple(customerId: string) {
+  try {
+    const supabase = createAdminClient();
 
-  const { data } = await supabase
-    .from('customer_equipment')
-    .select(
+    const { data, error } = await supabase
+      .from('customer_equipment')
+      .select(
+        `
+        id,
+        equipment_type,
+        name,
+        brand,
+        model,
+        serial_number,
+        install_date,
+        warranty_expires,
+        last_service_date,
+        next_service_due,
+        notes,
+        status
       `
-      id,
-      equipment_type,
-      name,
-      brand,
-      model,
-      serial_number,
-      install_date,
-      warranty_expires,
-      last_service_date,
-      next_service_due,
-      notes,
-      status
-    `
-    )
-    .eq('customer_id', customerId)
-    .eq('status', 'active')
-    .order('equipment_type');
+      )
+      .eq('customer_id', customerId)
+      .eq('status', 'active')
+      .order('equipment_type');
 
-  return data || [];
+    if (error) return [];
+    return data || [];
+  } catch {
+    return [];
+  }
 }
 
 /**
  * Get customer's service agreements
  */
 export async function getCustomerAgreements(customerId: string) {
-  const supabase = await createClient();
+  try {
+    const supabase = createAdminClient();
 
-  const { data } = await supabase
-    .from('service_agreements')
-    .select(
+    const { data, error } = await supabase
+      .from('service_agreements')
+      .select(
+        `
+        id,
+        name,
+        type,
+        status,
+        start_date,
+        end_date,
+        billing_cycle,
+        amount,
+        services_included,
+        visits_remaining
       `
-      id,
-      name,
-      type,
-      status,
-      start_date,
-      end_date,
-      billing_cycle,
-      amount,
-      services_included,
-      visits_remaining
-    `
-    )
-    .eq('customer_id', customerId)
-    .in('status', ['active', 'pending'])
-    .order('end_date', { ascending: true });
+      )
+      .eq('customer_id', customerId)
+      .in('status', ['active', 'pending'])
+      .order('end_date', { ascending: true });
 
-  return data || [];
+    if (error) return [];
+    return data || [];
+  } catch {
+    return [];
+  }
 }
 
 /**
  * Get customer profile
  */
 export async function getCustomerProfile(customerId: string) {
-  const supabase = await createClient();
+  try {
+    const supabase = createAdminClient();
 
-  const { data } = await supabase
-    .from('customers')
-    .select(
-      `
-      id,
-      name,
-      email,
-      phone,
-      address,
-      city,
-      state,
-      zip,
-      created_at
-    `
-    )
-    .eq('id', customerId)
-    .single();
+    // Check if key is loaded
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('[Data] SUPABASE_SERVICE_ROLE_KEY is missing!');
+    }
 
-  return data;
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('id', customerId)
+      .single();
+
+    if (error) {
+      console.error('[Data] Error fetching customer:', error);
+      return null;
+    }
+    
+    if (!data) {
+      console.log('[Data] Customer query returned no data');
+    }
+
+    return data;
+  } catch (err) {
+    console.error('[Data] Exception fetching customer:', err);
+    return null;
+  }
 }
 
 /**
  * Get business info for portal branding
  */
 export async function getBusinessForPortal(businessId: string) {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data } = await supabase
     .from('businesses')
-    .select(
-      `
-      id,
-      name,
-      phone,
-      email,
-      address,
-      city,
-      state,
-      zip,
-      website,
-      logo_url
-    `
-    )
+    .select('*')
     .eq('id', businessId)
     .single();
 
@@ -256,28 +289,33 @@ export async function getBusinessForPortal(businessId: string) {
  * Get customer's service requests
  */
 export async function getCustomerServiceRequests(customerId: string) {
-  const supabase = await createClient();
+  try {
+    const supabase = createAdminClient();
 
-  const { data } = await supabase
-    .from('service_requests')
-    .select(
+    const { data, error } = await supabase
+      .from('service_requests')
+      .select(
+        `
+        id,
+        service_type,
+        description,
+        urgency,
+        status,
+        preferred_date,
+        preferred_time_slot,
+        job_id,
+        created_at
       `
-      id,
-      service_type,
-      description,
-      urgency,
-      status,
-      preferred_date,
-      preferred_time_slot,
-      job_id,
-      created_at
-    `
-    )
-    .eq('customer_id', customerId)
-    .order('created_at', { ascending: false })
-    .limit(20);
+      )
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false })
+      .limit(20);
 
-  return data || [];
+    if (error) return [];
+    return data || [];
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -295,9 +333,10 @@ export async function submitServiceRequest(
     flexibleScheduling?: boolean;
     equipmentId?: string;
     notes?: string;
+    photos?: string[];
   }
 ) {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data: request, error } = await supabase
     .from('service_requests')
@@ -312,6 +351,7 @@ export async function submitServiceRequest(
       flexible_scheduling: data.flexibleScheduling !== false,
       equipment_id: data.equipmentId,
       customer_notes: data.notes,
+      photos: data.photos || [],
       status: 'pending',
     })
     .select()
@@ -332,7 +372,7 @@ async function notifyNewServiceRequest(
   businessId: string,
   requestId: string
 ): Promise<void> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   // Get request details
   const { data: request } = await supabase
@@ -392,105 +432,128 @@ async function notifyNewServiceRequest(
 }
 
 /**
- * Get customer's documents
+ * Get customer's documents (simple version without business filter)
+ * @deprecated Use getCustomerDocuments from ./documents instead
  */
-export async function getCustomerDocuments(customerId: string) {
-  const supabase = await createClient();
+export async function getCustomerDocumentsSimple(customerId: string) {
+  try {
+    const supabase = createAdminClient();
 
-  const { data } = await supabase
-    .from('documents')
-    .select(
+    const { data, error } = await supabase
+      .from('documents')
+      .select(
+        `
+        id,
+        name,
+        type,
+        category,
+        file_url,
+        file_size,
+        created_at
       `
-      id,
-      name,
-      type,
-      category,
-      file_url,
-      file_size,
-      created_at
-    `
-    )
-    .eq('customer_id', customerId)
-    .eq('customer_visible', true)
-    .order('created_at', { ascending: false });
+      )
+      .eq('customer_id', customerId)
+      .eq('visibility', 'customer_visible')
+      .order('created_at', { ascending: false });
 
-  return data || [];
+    if (error) return [];
+    return data || [];
+  } catch {
+    return [];
+  }
 }
 
 /**
  * Get customer's payment methods (if stored)
  */
 export async function getCustomerPaymentMethods(customerId: string) {
-  const supabase = await createClient();
+  try {
+    const supabase = createAdminClient();
 
-  const { data } = await supabase
-    .from('payment_methods')
-    .select(
+    const { data, error } = await supabase
+      .from('payment_methods')
+      .select(
+        `
+        id,
+        type,
+        last_four,
+        brand,
+        exp_month,
+        exp_year,
+        is_default
       `
-      id,
-      type,
-      last_four,
-      brand,
-      exp_month,
-      exp_year,
-      is_default
-    `
-    )
-    .eq('customer_id', customerId)
-    .eq('status', 'active')
-    .order('is_default', { ascending: false });
+      )
+      .eq('customer_id', customerId)
+      .eq('status', 'active')
+      .order('is_default', { ascending: false });
 
-  return data || [];
+    if (error) return [];
+    return data || [];
+  } catch {
+    return [];
+  }
 }
 
 /**
  * Get customer dashboard summary
  */
 export async function getCustomerDashboardSummary(customerId: string) {
-  const supabase = await createClient();
+  try {
+    const supabase = createAdminClient();
 
-  // Get counts in parallel
-  const [
-    { count: upcomingAppointments },
-    { count: unpaidInvoices },
-    { data: totalDueData },
-    { count: activeEquipment },
-    { count: pendingRequests },
-  ] = await Promise.all([
-    supabase
-      .from('jobs')
-      .select('*', { count: 'exact', head: true })
-      .eq('customer_id', customerId)
-      .in('status', ['scheduled', 'in_progress']),
-    supabase
-      .from('invoices')
-      .select('*', { count: 'exact', head: true })
-      .eq('customer_id', customerId)
-      .in('status', ['sent', 'overdue']),
-    supabase
-      .from('invoices')
-      .select('total')
-      .eq('customer_id', customerId)
-      .in('status', ['sent', 'overdue']),
-    supabase
-      .from('customer_equipment')
-      .select('*', { count: 'exact', head: true })
-      .eq('customer_id', customerId)
-      .eq('status', 'active'),
-    supabase
-      .from('service_requests')
-      .select('*', { count: 'exact', head: true })
-      .eq('customer_id', customerId)
-      .eq('status', 'pending'),
-  ]);
+    // Get counts in parallel - handle errors gracefully
+    const results = await Promise.allSettled([
+      supabase
+        .from('jobs')
+        .select('*', { count: 'exact', head: true })
+        .eq('customer_id', customerId)
+        .in('status', ['scheduled', 'in_progress']),
+      supabase
+        .from('invoices')
+        .select('*', { count: 'exact', head: true })
+        .eq('customer_id', customerId)
+        .in('status', ['sent', 'overdue']),
+      supabase
+        .from('invoices')
+        .select('total')
+        .eq('customer_id', customerId)
+        .in('status', ['sent', 'overdue']),
+      supabase
+        .from('customer_equipment')
+        .select('*', { count: 'exact', head: true })
+        .eq('customer_id', customerId)
+        .eq('status', 'active'),
+      supabase
+        .from('service_requests')
+        .select('*', { count: 'exact', head: true })
+        .eq('customer_id', customerId)
+        .eq('status', 'pending'),
+    ]);
 
-  const totalDue = totalDueData?.reduce((sum, inv) => sum + (inv.total || 0), 0) || 0;
+    // Extract values with safe defaults
+    const upcomingAppointments = results[0].status === 'fulfilled' ? results[0].value.count || 0 : 0;
+    const unpaidInvoices = results[1].status === 'fulfilled' ? results[1].value.count || 0 : 0;
+    const totalDueData = results[2].status === 'fulfilled' ? results[2].value.data : null;
+    const activeEquipment = results[3].status === 'fulfilled' ? results[3].value.count || 0 : 0;
+    const pendingRequests = results[4].status === 'fulfilled' ? results[4].value.count || 0 : 0;
 
-  return {
-    upcomingAppointments: upcomingAppointments || 0,
-    unpaidInvoices: unpaidInvoices || 0,
-    totalDue,
-    activeEquipment: activeEquipment || 0,
-    pendingRequests: pendingRequests || 0,
-  };
+    const totalDue = totalDueData?.reduce((sum: number, inv: { total?: number }) => sum + (inv.total || 0), 0) || 0;
+
+    return {
+      upcomingAppointments,
+      unpaidInvoices,
+      totalDue,
+      activeEquipment,
+      pendingRequests,
+    };
+  } catch {
+    // Return safe defaults if something goes wrong
+    return {
+      upcomingAppointments: 0,
+      unpaidInvoices: 0,
+      totalDue: 0,
+      activeEquipment: 0,
+      pendingRequests: 0,
+    };
+  }
 }

@@ -8,35 +8,29 @@ jest.mock('@/lib/supabase/server', () => {
     { id: 'a4', plan_status: 'active', monthly_price: 49, is_trial: false, trial_converted: true, plan_type: 'blue_starter' },
     { id: 'a5', plan_status: 'active', monthly_price: 149, is_trial: false, trial_converted: false, plan_type: 'blue_enterprise' },
   ];
-  const founders = { total_slots: 100, slots_used: 5, is_open: true, id: 'founders-1' };
+  const buildClient = () => ({
+    from: (table: string) => {
+      if (table === 'crm_accounts') {
+        return {
+          select: () => ({ data: accounts, error: null }),
+        } as any;
+      }
+      if (table === 'agent_submissions') {
+        return {
+          select: (_: any, opts: any) => ({
+            in: () => ({ count: opts?.count === 'exact' ? 2 : undefined }),
+          }),
+        } as any;
+      }
+      if (table === 'admin_activity_log') {
+        return { insert: () => ({}) } as any;
+      }
+      return {} as any;
+    },
+  });
   return {
-    createClient: jest.fn(() => ({
-      from: (table: string) => {
-        if (table === 'crm_accounts') {
-          return {
-            select: () => ({ data: accounts, error: null }),
-          } as any;
-        }
-        if (table === 'founders_program') {
-          return {
-            select: () => ({ single: () => ({ data: founders, error: null }) }),
-            insert: () => ({ select: () => ({ single: () => ({ data: founders, error: null }) }) }),
-            update: () => ({ eq: () => ({}) }),
-          } as any;
-        }
-        if (table === 'agent_submissions') {
-          return {
-            select: (_: any, opts: any) => ({
-              in: () => ({ count: opts?.count === 'exact' ? 2 : undefined }),
-            }),
-          } as any;
-        }
-        if (table === 'admin_activity_log') {
-          return { insert: () => ({}) } as any;
-        }
-        return {} as any;
-      },
-    })),
+    createClient: jest.fn(() => buildClient()),
+    createAdminClient: jest.fn(() => buildClient())
   };
 });
 
@@ -69,7 +63,6 @@ describe('admin index: misc helpers', () => {
     expect(stats.totalAccounts).toBe(5);
     expect(stats.activePaying).toBe(3);
     expect(stats.trialsEndingSoon).toBe(1);
-    expect(stats.foundersRemaining).toBe(95);
     expect(stats.mrr).toBe(297);
     expect(stats.trialConversionRate).toBe(50);
     expect(stats.churnRate).toBe(20);

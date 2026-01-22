@@ -3,12 +3,22 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Wrench, Clock, Shield, Plus } from 'lucide-react';
+import Image from 'next/image';
+import { Wrench, Clock, Shield, Plus, ChevronDown, ChevronUp, History, CheckCircle, Camera, ChevronRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { logger } from '@/lib/logger';
+import { useDemoMode, getDemoEquipment, mergeWithDemoData } from '@/lib/portal/demo-data/use-demo-data';
 const portalEquipmentLogger = logger.child({ context: 'portal.equipment' });
+
+interface ServiceHistory {
+  id: string;
+  date: string;
+  type: string;
+  description: string;
+  technician?: string;
+}
 
 interface Equipment {
   id: string;
@@ -23,6 +33,10 @@ interface Equipment {
   next_service_due?: string;
   notes?: string;
   status: string;
+  photo_urls?: string[];
+  location_in_property?: string;
+  condition?: string;
+  service_history?: ServiceHistory[];
 }
 
 export default function EquipmentPage() {
@@ -30,6 +44,8 @@ export default function EquipmentPage() {
   const businessId = params.businessId as string;
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedEquipment, setExpandedEquipment] = useState<string | null>(null);
+  const demoMode = useDemoMode();
 
   useEffect(() => {
     async function loadEquipment() {
@@ -37,6 +53,9 @@ export default function EquipmentPage() {
         const response = await fetch(
           `/api/portal/equipment?businessId=${businessId}`
         );
+        if (!response.ok) {
+          throw new Error('Failed to load equipment');
+        }
         const data = await response.json();
         setEquipment(data || []);
       } catch (error) {
@@ -52,6 +71,31 @@ export default function EquipmentPage() {
 
     loadEquipment();
   }, [businessId]);
+
+  // Convert demo equipment to match page format and merge with real data
+  const demoEquipment = getDemoEquipment().map((eq) => ({
+    id: eq.id,
+    equipment_type: eq.type,
+    name: eq.name,
+    brand: eq.brand,
+    model: eq.model,
+    serial_number: eq.serial_number,
+    install_date: eq.install_date,
+    warranty_expires: eq.warranty_expiry,
+    next_service_due: eq.next_service_date,
+    notes: eq.notes,
+    status: eq.condition === 'needs_attention' || eq.condition === 'critical' ? 'needs_attention' : 'active',
+    condition: eq.condition,
+    location_in_property: eq.location,
+    service_history: eq.service_history.map((svc) => ({
+      id: svc.id,
+      date: svc.date,
+      type: svc.service_type,
+      description: svc.description,
+      technician: svc.technician,
+    })),
+  })) as Equipment[];
+  const displayEquipment = mergeWithDemoData(equipment, demoEquipment, demoMode);
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -92,7 +136,7 @@ export default function EquipmentPage() {
         </div>
       </div>
 
-      {equipment.length === 0 ? (
+      {displayEquipment.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <Wrench className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -106,11 +150,45 @@ export default function EquipmentPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {equipment.map((item) => (
-            <Card key={item.id}>
+          {displayEquipment.map((item) => (
+            <Card key={item.id} className="overflow-hidden">
               <CardContent className="pt-6">
+                {/* Photo Thumbnails */}
+                {item.photo_urls && item.photo_urls.length > 0 ? (
+                  <Link href={`/portal/${businessId}/equipment/${item.id}`} className="block mb-4">
+                    <div className="flex gap-2 overflow-hidden">
+                      {item.photo_urls.slice(0, 3).map((url, idx) => (
+                        <div
+                          key={url}
+                          className="relative w-20 h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0"
+                        >
+                          <Image
+                            src={url}
+                            alt={`${item.name} photo ${idx + 1}`}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                      ))}
+                      {item.photo_urls.length > 3 && (
+                        <div className="w-20 h-20 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 text-sm flex-shrink-0">
+                          +{item.photo_urls.length - 3}
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+                ) : (
+                  <Link
+                    href={`/portal/${businessId}/equipment/${item.id}`}
+                    className="block mb-4 p-4 rounded-lg border-2 border-dashed border-gray-200 hover:border-blue-300 transition-colors text-center"
+                  >
+                    <Camera className="h-6 w-6 mx-auto text-gray-400 mb-1" />
+                    <span className="text-sm text-gray-500">Add photos</span>
+                  </Link>
+                )}
+
                 <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
+                  <Link href={`/portal/${businessId}/equipment/${item.id}`} className="flex items-center gap-3 hover:opacity-80">
                     <div className="p-2 bg-gray-100 rounded-lg">
                       <Wrench className="h-5 w-5 text-gray-600" />
                     </div>
@@ -118,7 +196,7 @@ export default function EquipmentPage() {
                       <h3 className="font-semibold text-gray-900">{item.name}</h3>
                       <p className="text-sm text-gray-500">{item.equipment_type}</p>
                     </div>
-                  </div>
+                  </Link>
                   <Badge
                     className={
                       item.status === 'active'
@@ -214,6 +292,67 @@ export default function EquipmentPage() {
                     </Button>
                   </Link>
                 )}
+
+                {/* Service History Toggle */}
+                {item.service_history && item.service_history.length > 0 && (
+                  <div className="mt-4 border-t pt-4">
+                    <button
+                      onClick={() => setExpandedEquipment(
+                        expandedEquipment === item.id ? null : item.id
+                      )}
+                      className="flex items-center justify-between w-full text-sm font-medium text-gray-700 hover:text-gray-900"
+                    >
+                      <span className="flex items-center gap-2">
+                        <History className="h-4 w-4" />
+                        Service History ({item.service_history.length})
+                      </span>
+                      {expandedEquipment === item.id ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </button>
+
+                    {expandedEquipment === item.id && (
+                      <div className="mt-3 space-y-2">
+                        {item.service_history.map((service) => (
+                          <div
+                            key={service.id}
+                            className="flex items-start gap-2 p-2 bg-gray-50 rounded-lg text-sm"
+                          >
+                            <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium">{service.type}</span>
+                                <span className="text-gray-500 text-xs">
+                                  {formatDate(service.date)}
+                                </span>
+                              </div>
+                              <p className="text-gray-600 text-xs mt-0.5">
+                                {service.description}
+                              </p>
+                              {service.technician && (
+                                <p className="text-gray-400 text-xs">
+                                  Tech: {service.technician}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* View Details Link */}
+                <div className="mt-4 pt-4 border-t">
+                  <Link href={`/portal/${businessId}/equipment/${item.id}`}>
+                    <Button variant="outline" className="w-full gap-2">
+                      View Details
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                </div>
               </CardContent>
             </Card>
           ))}

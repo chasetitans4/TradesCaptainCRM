@@ -9,38 +9,42 @@ import {
 } from '@/lib/memberships/plans';
 import { apiLogger } from '@/lib/logger';
 
+import { getServerSession } from '@/lib/permissions/check-permission';
+
 // GET /api/memberships/plans - Get all plans
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: userData } = await supabase
-      .from('users')
-      .select('business_id')
-      .eq('id', user.id)
-      .single();
+    const { searchParams } = new URL(request.url);
+    let businessId = session.user.businessId;
 
-    if (!userData?.business_id) {
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      const queryBusinessId = searchParams.get('businessId');
+      if (queryBusinessId) businessId = queryBusinessId;
+    }
+
+    if (!businessId) {
+      if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+         return NextResponse.json({ plans: [] });
+      }
       return NextResponse.json({ error: 'No business found' }, { status: 404 });
     }
 
-    const { searchParams } = new URL(request.url);
     const includeInactive = searchParams.get('includeInactive') === 'true';
     const stats = searchParams.get('stats') === 'true';
 
     if (stats) {
-      const statistics = await getPlanStatistics(userData.business_id);
+      const statistics = await getPlanStatistics(businessId);
       return NextResponse.json({ stats: statistics });
     }
 
-    const plans = await getMembershipPlans(userData.business_id, includeInactive);
+    const plans = await getMembershipPlans(businessId, includeInactive);
     return NextResponse.json({ plans });
   } catch (error) {
     apiLogger.error({ message: 'Error fetching membership plans', error });
@@ -52,32 +56,29 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: userData } = await supabase
-      .from('users')
-      .select('business_id')
-      .eq('id', user.id)
-      .single();
-
-    if (!userData?.business_id) {
-      return NextResponse.json({ error: 'No business found' }, { status: 404 });
     }
 
     const body = await request.json();
     const { action, planId, ...data } = body;
 
+    let businessId = session.user.businessId;
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      if (data.businessId) businessId = data.businessId;
+    }
+
+    if (!businessId) {
+        return NextResponse.json({ error: 'Business ID required' }, { status: 400 });
+    }
+
     let result;
 
     switch (action) {
       case 'create':
-        result = await createMembershipPlan(userData.business_id, data);
+        result = await createMembershipPlan(businessId, data);
         break;
 
       case 'update':
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
 
       default:
         // Default to create if no action specified
-        result = await createMembershipPlan(userData.business_id, body);
+        result = await createMembershipPlan(businessId, body);
     }
 
     if (!result.success) {

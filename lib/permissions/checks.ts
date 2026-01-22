@@ -52,7 +52,7 @@ export function canViewJob(user: User, job: Job): boolean {
     return true;
   }
   // Technicians can only see assigned jobs
-  return job.assigned_to === user.id;
+  return job.assigned_user_id === user.id;
 }
 
 /**
@@ -63,7 +63,7 @@ export function canEditJob(user: User, job: Job): boolean {
     return true;
   }
   // Technicians can only update status of assigned jobs
-  return job.assigned_to === user.id;
+  return job.assigned_user_id === user.id;
 }
 
 /**

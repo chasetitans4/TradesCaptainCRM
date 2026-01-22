@@ -12,7 +12,7 @@ import { jwtVerify } from 'jose';
  * Get JWT secret key - throws if not configured
  */
 function getJwtSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+  const secret = process.env.JWT_SECRET;
   if (!secret) {
     throw new Error('JWT_SECRET environment variable must be configured');
   }
@@ -44,21 +44,45 @@ async function verifyToken(token: string): Promise<{ valid: boolean; payload?: R
 
 /**
  * Verify admin authentication from request
- * Can use either cookie or Authorization header
+ * Supports multiple auth methods:
+ * 1. admin_session cookie (base64 encoded JSON from /api/admin/login)
+ * 2. admin_token cookie (JWT from /api/admin/auth/login)
+ * 3. Authorization Bearer header
  */
-export async function verifyAdminAuth(request: NextRequest): Promise<{
+export async function verifyAdminAuth(_request: NextRequest): Promise<{
   valid: boolean;
   user?: AdminUser;
   error?: string;
 }> {
   try {
-    // Try cookie first
     const cookieStore = await cookies();
+
+    // Method 1: Try admin_session cookie first (set by /api/admin/login)
+    const sessionCookie = cookieStore.get('admin_session');
+    if (sessionCookie) {
+      try {
+        const sessionData = JSON.parse(
+          Buffer.from(sessionCookie.value, 'base64').toString()
+        ) as AdminSession;
+
+        // Check expiry
+        if (new Date(sessionData.expires) >= new Date()) {
+          const user = await getAdminUser(sessionData.adminId);
+          if (user && user.is_active) {
+            return { valid: true, user };
+          }
+        }
+      } catch {
+        // Invalid session format, continue to other methods
+      }
+    }
+
+    // Method 2: Try admin_token cookie (JWT)
     let token = cookieStore.get('admin_token')?.value;
 
-    // Try Authorization header as fallback
+    // Method 3: Try Authorization header as fallback
     if (!token) {
-      const authHeader = request.headers.get('authorization');
+      const authHeader = _request.headers.get('authorization');
       if (authHeader?.startsWith('Bearer ')) {
         token = authHeader.substring(7);
       }
@@ -121,19 +145,44 @@ export async function getAdminSession(): Promise<AdminSession | null> {
 export async function requireAdmin(
   allowedRoles?: AdminRole[]
 ): Promise<AdminUser | null> {
+  // 1. Try legacy session cookie
   const session = await getAdminSession();
 
-  if (!session) {
-    return null;
+  if (session) {
+    // Check role if specified
+    if (allowedRoles && !allowedRoles.includes(session.role)) {
+      return null;
+    }
+
+    const admin = await getAdminUser(session.adminId);
+    return admin;
   }
 
-  // Check role if specified
-  if (allowedRoles && !allowedRoles.includes(session.role)) {
-    return null;
+  // 2. Try JWT token (New Auth System)
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('admin_token')?.value;
+
+    if (token) {
+      const { valid, payload } = await verifyToken(token);
+      
+      if (valid && payload?.userId) {
+        const user = await getAdminUser(payload.userId as string);
+        
+        if (user && user.is_active) {
+           // Check role if specified
+           if (allowedRoles && !allowedRoles.includes(user.role)) {
+             return null;
+           }
+           return user;
+        }
+      }
+    }
+  } catch {
+    // Ignore errors
   }
 
-  const admin = await getAdminUser(session.adminId);
-  return admin;
+  return null;
 }
 
 export async function requireSuperAdmin(): Promise<AdminUser | null> {

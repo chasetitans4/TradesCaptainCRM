@@ -45,9 +45,11 @@ describe('app/api/booking/requests route', () => {
   it('GET returns 401 when user not authenticated', async () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
+      jest.doMock('@/lib/permissions/check-permission', () => ({
+        getServerSession: async () => null,
+      }));
       jest.doMock('@/lib/supabase/server', () => ({
         createClient: async () => ({
-          auth: { getUser: async () => ({ data: { user: null } }) },
           from: jest.fn(),
         }),
       }));
@@ -63,9 +65,11 @@ describe('app/api/booking/requests route', () => {
   it('GET returns 404 when no business found for user', async () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
+      jest.doMock('@/lib/permissions/check-permission', () => ({
+        getServerSession: async () => ({ user: { id: 'u1', role: 'user', businessId: null } }),
+      }));
       jest.doMock('@/lib/supabase/server', () => ({
         createClient: async () => ({
-          auth: { getUser: async () => ({ data: { user: { id: 'u1' } } }) },
           from: (_table: string) => ({
             select: () => ({
               eq: () => ({
@@ -87,9 +91,11 @@ describe('app/api/booking/requests route', () => {
   it('GET returns 400 for invalid date range', async () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
+      jest.doMock('@/lib/permissions/check-permission', () => ({
+        getServerSession: async () => ({ user: { id: 'u1', role: 'user', businessId: 'b1' } }),
+      }));
       jest.doMock('@/lib/supabase/server', () => ({
         createClient: async () => ({
-          auth: { getUser: async () => ({ data: { user: { id: 'u1' } } }) },
           from: (_table: string) => ({
             select: () => ({
               eq: () => ({
@@ -115,9 +121,11 @@ describe('app/api/booking/requests route', () => {
   it('GET returns results for valid query', async () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
+      jest.doMock('@/lib/permissions/check-permission', () => ({
+        getServerSession: async () => ({ user: { id: 'u1', role: 'user', businessId: 'b1' } }),
+      }));
       jest.doMock('@/lib/supabase/server', () => ({
         createClient: async () => ({
-          auth: { getUser: async () => ({ data: { user: { id: 'u1' } } }) },
           from: (_table: string) => ({
             select: () => ({
               eq: () => ({
@@ -150,7 +158,7 @@ describe('app/api/booking/requests route', () => {
         return {
           schemas: {
             email: z.string().email(),
-            date: z.string().refine((val) => !isNaN(Date.parse(val)), 'Invalid date'),
+            date: z.string().refine((val: string) => !isNaN(Date.parse(val)), 'Invalid date'),
           },
           validateRequest: (schema: any, data: any) => ({ success: true, data }),
           formatZodErrors: (err: any) => String(err),
@@ -186,7 +194,7 @@ describe('app/api/booking/requests route', () => {
         return {
           schemas: {
             email: z.string().email(),
-            date: z.string().refine((val) => !isNaN(Date.parse(val)), 'Invalid date'),
+            date: z.string().refine((val: string) => !isNaN(Date.parse(val)), 'Invalid date'),
           },
           validateRequest: (_schema: any, data: any) => ({ success: true, data }),
           formatZodErrors: (err: any) => String(err),
@@ -227,7 +235,7 @@ describe('app/api/booking/requests route', () => {
         return {
           schemas: {
             email: z.string().email(),
-            date: z.string().refine((val) => !isNaN(Date.parse(val)), 'Invalid date'),
+            date: z.string().refine((val: string) => !isNaN(Date.parse(val)), 'Invalid date'),
           },
           validateRequest: (_schema: any, _data: any) => ({ success: false, errors: ['bad'] }),
           formatZodErrors: (errs: any) => String(errs),
@@ -261,7 +269,7 @@ describe('app/api/booking/requests route', () => {
         return {
           schemas: {
             email: z.string().email(),
-            date: z.string().refine((val) => !isNaN(Date.parse(val)), 'Invalid date'),
+            date: z.string().refine((val: string) => !isNaN(Date.parse(val)), 'Invalid date'),
           },
           validateRequest: (_schema: any, data: any) => ({ success: true, data }),
           formatZodErrors: (errs: any) => String(errs),
@@ -294,7 +302,7 @@ describe('app/api/booking/requests route', () => {
         return {
           schemas: {
             email: z.string().email(),
-            date: z.string().refine((val) => !isNaN(Date.parse(val)), 'Invalid date'),
+            date: z.string().refine((val: string) => !isNaN(Date.parse(val)), 'Invalid date'),
           },
           validateRequest: (_schema: any, data: any) => ({ success: true, data }),
           formatZodErrors: (err: any) => String(err),

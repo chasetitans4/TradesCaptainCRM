@@ -16,3 +16,4 @@ tmp/
 temp/
 *.swp
 .k6/
+components/ui/nul

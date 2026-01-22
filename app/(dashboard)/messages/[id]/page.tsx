@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUserProfile, createClient } from '@/lib/supabase/client';
@@ -16,13 +16,15 @@ import {
   Phone,
   User,
   Bot,
+  Plus,
+  Briefcase,
   Check,
   CheckCheck,
   AlertCircle,
   Clock,
   Loader2,
-  MoreVertical,
 } from 'lucide-react';
+import { QuickReplyPicker, QuickReplyButton } from '@/components/messages/quick-reply-picker';
 
 interface ConversationData {
   id: string;
@@ -59,6 +61,7 @@ export default function ConversationPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [inputMessage, setInputMessage] = useState('');
+  const [quickReplyOpen, setQuickReplyOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -224,13 +227,74 @@ export default function ConversationPage() {
     groups[dateKey].push(message);
     return groups;
   }, {} as Record<string, MessageWithUser[]>);
+  const structuredSummary = useMemo(() => {
+    const acc: any = {};
+    for (const m of messages) {
+      const meta = m.metadata as any;
+      const s = meta && meta.structured;
+      if (s && typeof s === 'object') {
+        for (const k of ['name', 'address', 'issue', 'preferred_time', 'urgency', 'email', 'contact_method']) {
+          const v = s[k];
+          if (v !== undefined && v !== null && String(v).trim().length > 0) {
+            acc[k] = v;
+          }
+        }
+      }
+    }
+    const hasAny = Object.keys(acc).length > 0;
+    return hasAny ? acc : null;
+  }, [messages]);
+
+  const mapUrgency = (u?: string): string | undefined => {
+    if (!u) return undefined;
+    const val = u.toLowerCase();
+    if (val.includes('emergency')) return 'emergency';
+    if (val.includes('soon') || val.includes('urgent') || val.includes('high')) return 'high';
+    if (val.includes('flexible') || val.includes('low')) return 'low';
+    return 'normal';
+  };
+
+  const customerName = conversation?.customer?.name || 'Unknown';
+  const customerPhone = conversation?.phone || '';
+  const leadPrefillHref = useMemo(() => {
+    if (!structuredSummary) return null;
+    const params = new URLSearchParams();
+    if (structuredSummary.name || customerName) params.set('name', structuredSummary.name || customerName);
+    if (customerPhone) params.set('phone', customerPhone.replace(/\D/g, ''));
+    if (structuredSummary.email) params.set('email', structuredSummary.email);
+    if (structuredSummary.address) params.set('address', structuredSummary.address);
+    if (structuredSummary.issue) params.set('service_needed', structuredSummary.issue);
+    const noteParts: string[] = [];
+    if (structuredSummary.preferred_time) noteParts.push(`Preferred time: ${structuredSummary.preferred_time}`);
+    if (structuredSummary.contact_method) noteParts.push(`Preferred contact: ${structuredSummary.contact_method}`);
+    if (structuredSummary.urgency) noteParts.push(`Urgency: ${structuredSummary.urgency}`);
+    const notes = noteParts.join(' | ');
+    if (notes) params.set('notes', notes);
+    const mappedUrgency = mapUrgency(structuredSummary.urgency);
+    if (mappedUrgency) params.set('urgency', mappedUrgency);
+    if (conversation?.customer?.id) params.set('customer_id', conversation.customer.id);
+    return `/leads/new?${params.toString()}`;
+  }, [structuredSummary, conversation, customerName, customerPhone]);
+
+  const jobPrefillHref = useMemo(() => {
+    if (!structuredSummary) return null;
+    const params = new URLSearchParams();
+    if (structuredSummary.issue) params.set('title', structuredSummary.issue);
+    const noteParts: string[] = [];
+    if (structuredSummary.preferred_time) noteParts.push(`Preferred time: ${structuredSummary.preferred_time}`);
+    if (structuredSummary.contact_method) noteParts.push(`Preferred contact: ${structuredSummary.contact_method}`);
+    if (structuredSummary.urgency) noteParts.push(`Urgency: ${structuredSummary.urgency}`);
+    const desc = noteParts.join(' | ');
+    if (desc) params.set('description', desc);
+    if (conversation?.customer?.id) params.set('customer_id', conversation.customer.id);
+    return `/jobs/new?${params.toString()}`;
+  }, [structuredSummary, conversation]);
 
   if (loading || !user) {
     return <ConversationSkeleton />;
   }
 
-  const customerName = conversation?.customer?.name || 'Unknown';
-  const customerPhone = conversation?.phone || '';
+  
 
   return (
     <div className="flex flex-col h-screen bg-background">
@@ -277,6 +341,38 @@ export default function ConversationPage() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
+        {structuredSummary && (
+          <div className="mb-4 bg-muted rounded-lg p-3 text-sm text-text">
+            <div className="font-medium mb-2">Captured Details</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+              {structuredSummary.name && <div><span className="text-text-muted">Name: </span>{structuredSummary.name}</div>}
+              {structuredSummary.address && <div><span className="text-text-muted">Address: </span>{structuredSummary.address}</div>}
+              {structuredSummary.issue && <div><span className="text-text-muted">Issue: </span>{structuredSummary.issue}</div>}
+              {structuredSummary.preferred_time && <div><span className="text-text-muted">Preferred Time: </span>{structuredSummary.preferred_time}</div>}
+              {structuredSummary.urgency && <div><span className="text-text-muted">Urgency: </span>{structuredSummary.urgency}</div>}
+              {structuredSummary.email && <div><span className="text-text-muted">Email: </span>{structuredSummary.email}</div>}
+              {structuredSummary.contact_method && <div><span className="text-text-muted">Contact Method: </span>{structuredSummary.contact_method}</div>}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {leadPrefillHref && (
+                <Link href={leadPrefillHref}>
+                  <Button size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add to Lead
+                  </Button>
+                </Link>
+              )}
+              {jobPrefillHref && (
+                <Link href={jobPrefillHref}>
+                  <Button variant="outline" size="sm">
+                    <Briefcase className="h-4 w-4 mr-2" />
+                    Schedule Job
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
         {Object.entries(groupedMessages).map(([dateKey, dayMessages]) => (
           <div key={dateKey}>
             {/* Date divider */}
@@ -302,6 +398,7 @@ export default function ConversationPage() {
       {/* Input */}
       <div className="sticky bottom-0 bg-background border-t border-border px-4 py-3">
         <div className="flex items-center gap-2">
+          <QuickReplyButton onClick={() => setQuickReplyOpen(true)} />
           <Input
             ref={inputRef}
             type="text"
@@ -331,6 +428,17 @@ export default function ConversationPage() {
           )}
         </p>
       </div>
+
+      {/* Quick Reply Picker */}
+      <QuickReplyPicker
+        open={quickReplyOpen}
+        onOpenChange={setQuickReplyOpen}
+        onSelect={(message) => {
+          setInputMessage(message);
+          inputRef.current?.focus();
+        }}
+        customerName={conversation?.customer?.name}
+      />
     </div>
   );
 }
@@ -344,6 +452,7 @@ function ChatBubble({
 }) {
   const isOutbound = message.direction === 'outbound';
   const isAI = message.is_ai_response || message.sender === 'ai';
+  const structured = (message.metadata as any)?.structured;
 
   return (
     <div
@@ -370,6 +479,20 @@ function ChatBubble({
 
         {/* Message body */}
         <p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>
+        {structured && (
+          <div className={cn('mt-2 rounded bg-background/20 p-2', isOutbound ? 'text-white/90' : 'text-text')}>
+            <div className="text-xs font-medium mb-1">Extracted</div>
+            <div className="text-xs space-y-0.5">
+              {structured.name && <div>Name: {structured.name}</div>}
+              {structured.address && <div>Address: {structured.address}</div>}
+              {structured.issue && <div>Issue: {structured.issue}</div>}
+              {structured.preferred_time && <div>Preferred: {structured.preferred_time}</div>}
+              {structured.urgency && <div>Urgency: {structured.urgency}</div>}
+              {structured.email && <div>Email: {structured.email}</div>}
+              {structured.contact_method && <div>Contact Method: {structured.contact_method}</div>}
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div

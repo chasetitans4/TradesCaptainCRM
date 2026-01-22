@@ -6,20 +6,20 @@ import {
   isPasswordExpired,
 } from '@/lib/auth/password';
 import { apiLogger } from '@/lib/logger';
+import { getServerSession } from '@/lib/permissions/check-permission';
 
 // GET - Check if password is expired
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const expired = await isPasswordExpired(user.id);
+    // Only relevant for standard users who have passwords in Supabase Auth
+    // Admins might have different logic, but for now we assume this is for standard users
+    const expired = await isPasswordExpired(session.user.id);
 
     return NextResponse.json({ expired });
   } catch (error) {
@@ -31,12 +31,9 @@ export async function GET() {
 // POST - Change password or validate password strength
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -64,7 +61,15 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const result = await changePassword(user.id, currentPassword, newPassword, {
+        // Only allow standard users to change password this way
+        if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+           return NextResponse.json(
+            { error: 'Admins must change password via the Admin Portal.' },
+            { status: 403 }
+           );
+        }
+
+        const result = await changePassword(session.user.id, currentPassword, newPassword, {
           revokeOtherSessions: true,
         });
 

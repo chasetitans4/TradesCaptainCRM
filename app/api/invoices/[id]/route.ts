@@ -27,7 +27,7 @@ export async function GET(
       .from('invoices')
       .select(`
         *,
-        customer:customers (*),
+        customer:customers!customer_id (*),
         items:invoice_items (*),
         payments (*)
       `)

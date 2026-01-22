@@ -4,18 +4,16 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAgentOrHigher } from '@/lib/admin/auth';
+import { checkPermission, getServerSession } from '@/lib/permissions/check-permission';
 import { getOnboardingsInProgress } from '@/lib/admin/onboarding';
 import { apiLogger } from '@/lib/logger';
 
 export async function GET(_request: NextRequest) {
   try {
-    const auth = await requireAgentOrHigher();
-    if (!auth) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    await checkPermission('view_onboarding');
+    const session = await getServerSession();
 
-    const onboardings = await getOnboardingsInProgress(auth.id);
+    const onboardings = await getOnboardingsInProgress(session!.user.id);
 
     return NextResponse.json({ onboardings });
   } catch (error) {

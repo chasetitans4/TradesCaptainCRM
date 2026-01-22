@@ -7,26 +7,27 @@ jest.mock('@/lib/supabase/server', () => {
       from: (table: string) => {
         if (table === 'commissions') {
           return {
-            select: (fields?: string, opts?: any) => {
+            select: (fields?: string, _opts?: any) => {
               if (fields?.includes('status, commission_amount, paid_at')) {
                 return {
-                  eq: () => ({
+                  eq: () => Promise.resolve({
                     data: [
                       { status: 'pending', commission_amount: 10 },
                       { status: 'eligible', commission_amount: 20 },
                       { status: 'paid', commission_amount: 30, paid_at: new Date().toISOString() },
                       { status: 'paid', commission_amount: 40, paid_at: new Date(new Date().getFullYear() - 1, 1, 1).toISOString() },
                     ],
+                    error: null,
                   }),
                 };
               }
               return {
                 eq: () => ({
-                  order: () => ({ data: [{ id: 'c1' }, { id: 'c2' }], error: null }),
+                  order: () => Promise.resolve({ data: [{ id: 'c1' }, { id: 'c2' }], error: null }),
                 }),
               };
             },
-            order: () => ({ data: [{ id: 'c1' }, { id: 'c2' }], error: null }),
+            order: () => Promise.resolve({ data: [{ id: 'c1' }, { id: 'c2' }], error: null }),
           } as any;
         }
         return {} as any;
@@ -43,7 +44,9 @@ describe('admin commissions: summary and pending', () => {
     expect(res.length).toBe(2);
   });
  
-  it('getPendingCommissions throws when query returns error', async () => {
+  it('getPendingCommissions returns empty array when query errors', async () => {
+    // Note: getPendingCommissions handles errors gracefully and returns []
+    // instead of throwing, to support cases where the table might not exist
     const supabase = require('@/lib/supabase/server');
     const original = supabase.createAdminClient.getMockImplementation
       ? supabase.createAdminClient.getMockImplementation()
@@ -52,12 +55,13 @@ describe('admin commissions: summary and pending', () => {
       from: (_table: string) => ({
         select: (_fields?: string, _opts?: any) => ({
           eq: () => ({
-            order: () => ({ data: null, error: new Error('bad') }),
+            order: () => Promise.resolve({ data: null, error: new Error('bad') }),
           }),
         }),
       }),
     }));
-    await expect(getPendingCommissions()).rejects.toBeTruthy();
+    const result = await getPendingCommissions();
+    expect(result).toEqual([]);
     if (original) supabase.createAdminClient.mockImplementation(original);
   });
 

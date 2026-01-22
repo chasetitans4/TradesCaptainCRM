@@ -88,7 +88,7 @@ export async function getTechnicianJobsForDate(
       longitude,
       customer:customers(name)
     `)
-    .eq('assigned_to', technicianId)
+    .eq('assigned_user_id', technicianId)
     .gte('scheduled_start', dayStart)
     .lte('scheduled_start', dayEnd)
     .in('status', ['scheduled', 'in_progress'])

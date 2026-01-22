@@ -30,7 +30,7 @@ import type {
 import {
   FEATURE_CATEGORY_LABELS,
   FEATURE_STATUS_CONFIG,
-} from '@/lib/feature-requests';
+} from '@/lib/feature-requests/constants';
 
 const STATUS_ICONS: Record<FeatureRequestStatus, React.ElementType> = {
   submitted: Clock,
@@ -73,12 +73,13 @@ export default function FeatureRequestsPage() {
       if (searchQuery) params.set('search', searchQuery);
 
       const response = await fetch(`/api/feature-requests?${params}`);
-      if (response.ok) {
-        const data = await response.json();
-        setRequests(data.feature_requests || []);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch feature requests: ${response.status}`);
       }
+      const data = await response.json();
+      setRequests(data.feature_requests || []);
     } catch (error) {
-      console.error('Error fetching feature requests:', error);
+      console.error('Error fetching feature requests:', error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setLoading(false);
     }

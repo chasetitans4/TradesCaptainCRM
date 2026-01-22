@@ -74,7 +74,7 @@ export async function sendQuoteViaSms(quoteId: string): Promise<void> {
     .select(
       `
       *,
-      customer:customers (name, phone),
+      customer:customers!quotes_customer_id_fkey (name, phone),
       business:businesses (name, twilio_phone_number)
     `
     )

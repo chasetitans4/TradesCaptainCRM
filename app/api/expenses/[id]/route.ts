@@ -6,45 +6,44 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getServerSession } from '@/lib/permissions/check-permission';
 import { getExpense, updateExpense, deleteExpense } from '@/lib/expenses';
 import { parseISO } from 'date-fns';
 import { apiLogger } from '@/lib/logger';
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const session = await getServerSession();
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id, role')
-      .eq('auth_user_id', user.id)
-      .single();
+    const { searchParams } = new URL(request.url);
+    
+    // Determine business ID
+    let businessId = session.user.businessId;
+    const queryBusinessId = searchParams.get('businessId');
+    
+    if ((session.user.role === 'admin' || session.user.role === 'super_admin') && queryBusinessId) {
+      businessId = queryBusinessId;
+    }
 
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!businessId) {
+      return NextResponse.json({ error: 'Business ID not found' }, { status: 404 });
     }
 
     const expense = await getExpense(id);
 
-    if (!expense || expense.business_id !== profile.business_id) {
+    if (!expense || expense.business_id !== businessId) {
       return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
     }
 
     // Technicians can only view their own expenses
-    if (profile.role === 'technician' && expense.user_id !== profile.id) {
+    if (session.user.role === 'technician' && expense.user_id !== session.user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -64,35 +63,32 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const session = await getServerSession();
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id, role')
-      .eq('auth_user_id', user.id)
-      .single();
+    const body = await request.json();
+    
+    // Determine business ID
+    let businessId = session.user.businessId;
+    if ((session.user.role === 'admin' || session.user.role === 'super_admin') && body.businessId) {
+      businessId = body.businessId;
+    }
 
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!businessId) {
+      return NextResponse.json({ error: 'Business ID not found' }, { status: 404 });
     }
 
     const expense = await getExpense(id);
 
-    if (!expense || expense.business_id !== profile.business_id) {
+    if (!expense || expense.business_id !== businessId) {
       return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
     }
 
     // Technicians can only edit their own pending expenses
-    if (profile.role === 'technician') {
-      if (expense.user_id !== profile.id) {
+    if (session.user.role === 'technician') {
+      if (expense.user_id !== session.user.id) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
       if (expense.status !== 'pending' && expense.status !== 'rejected') {
@@ -103,7 +99,6 @@ export async function PUT(
       }
     }
 
-    const body = await request.json();
     const updates: Record<string, any> = {};
 
     if (body.category_id !== undefined) updates.categoryId = body.category_id;
@@ -135,40 +130,39 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const session = await getServerSession();
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id, role')
-      .eq('auth_user_id', user.id)
-      .single();
+    const { searchParams } = new URL(request.url);
+    
+    // Determine business ID
+    let businessId = session.user.businessId;
+    const queryBusinessId = searchParams.get('businessId');
+    
+    if ((session.user.role === 'admin' || session.user.role === 'super_admin') && queryBusinessId) {
+      businessId = queryBusinessId;
+    }
 
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (!businessId) {
+      return NextResponse.json({ error: 'Business ID not found' }, { status: 404 });
     }
 
     const expense = await getExpense(id);
 
-    if (!expense || expense.business_id !== profile.business_id) {
+    if (!expense || expense.business_id !== businessId) {
       return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
     }
 
     // Technicians can only delete their own pending expenses
-    if (profile.role === 'technician') {
-      if (expense.user_id !== profile.id) {
+    if (session.user.role === 'technician') {
+      if (expense.user_id !== session.user.id) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
       if (expense.status !== 'pending') {

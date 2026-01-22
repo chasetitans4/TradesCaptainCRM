@@ -5,10 +5,11 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { getJobExpenses, createExpense } from '@/lib/expenses';
 import { parseISO } from 'date-fns';
 import { apiLogger } from '@/lib/logger';
+import { getServerSession } from '@/lib/permissions/check-permission';
 
 export async function GET(
   request: NextRequest,
@@ -16,39 +17,50 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    // Determine correct Supabase client
+    let supabase;
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      supabase = createAdminClient();
+    } else {
+      supabase = await createClient();
     }
 
+    const businessId = session.user.businessId;
+
     // Verify job belongs to business
+    // Admins can see any job if they have businessId context, or we rely on the job query
+    // Since getJobExpenses uses the client, if we use admin client, it might bypass RLS.
+    // We should probably check if the job exists first.
+    
+    // Note: session.user.businessId for admins might be the overridden one if we set it correctly in getServerSession.
+    // But getServerSession returns the user's native businessId usually, unless we use checkPermission with override logic.
+    // However, in this route, we haven't implemented explicit businessId override via query param yet.
+    // Let's rely on RLS/Admin access for now.
+
     const { data: job } = await supabase
       .from('jobs')
-      .select('id, customer_id')
+      .select('id, customer_id, business_id')
       .eq('id', id)
-      .eq('business_id', profile.business_id)
       .single();
 
     if (!job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    const result = await getJobExpenses(id);
+    // Check business access
+    if (session.user.role !== 'admin' && session.user.role !== 'super_admin') {
+        if (job.business_id !== businessId) {
+             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+    }
+
+    const result = await getJobExpenses(id, supabase);
 
     return NextResponse.json(result);
   } catch (error) {
@@ -69,78 +81,72 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    // Determine correct Supabase client
+    let supabase;
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      supabase = createAdminClient();
+    } else {
+      supabase = await createClient();
     }
-
+    
     // Verify job belongs to business and get customer
     const { data: job } = await supabase
       .from('jobs')
-      .select('id, customer_id')
+      .select('id, customer_id, business_id')
       .eq('id', id)
-      .eq('business_id', profile.business_id)
       .single();
 
     if (!job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    const body = await request.json();
-    const {
-      category_id,
-      date,
-      vendor,
-      description,
-      amount,
-      tax_amount,
-      payment_method,
-      is_billable,
-      is_reimbursable,
-      notes,
-      receipt_url,
-    } = body;
+    // Check business access
+    if (session.user.role !== 'admin' && session.user.role !== 'super_admin') {
+        if (job.business_id !== session.user.businessId) {
+             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+    }
 
-    // Validate required fields
-    if (!category_id || !description || !amount) {
+    const body = await request.json();
+
+    // Required fields
+    if (!body.categoryId || !body.description || !body.amount) {
       return NextResponse.json(
-        { error: 'Category, description, and amount are required' },
+        { error: 'Missing required fields' },
         { status: 400 }
       );
     }
 
-    const expense = await createExpense(profile.business_id, profile.id, {
-      categoryId: category_id,
-      date: date ? parseISO(date) : new Date(),
-      vendor,
-      description,
-      amount,
-      taxAmount: tax_amount,
-      paymentMethod: payment_method,
-      jobId: id,
-      customerId: job.customer_id,
-      isBillable: is_billable,
-      isReimbursable: is_reimbursable,
-      notes,
-      receiptUrl: receipt_url,
-    });
+    const expense = await createExpense(
+      job.business_id, // Use job's business ID
+      session.user.id,
+      {
+        categoryId: body.categoryId,
+        date: body.date ? parseISO(body.date) : new Date(),
+        vendor: body.vendor,
+        description: body.description,
+        amount: parseFloat(body.amount),
+        taxAmount: body.taxAmount ? parseFloat(body.taxAmount) : 0,
+        paymentMethod: body.paymentMethod,
+        cardLastFour: body.cardLastFour,
+        jobId: id,
+        customerId: job.customer_id,
+        isBillable: body.isBillable,
+        isReimbursable: body.isReimbursable,
+        notes: body.notes,
+        receiptUrl: body.receiptUrl,
+        ocrData: body.ocrData,
+      },
+      supabase
+    );
 
-    return NextResponse.json({ expense }, { status: 201 });
+    return NextResponse.json({ expense });
   } catch (error) {
     apiLogger.error({
       message: 'Error in POST /api/jobs/[id]/expenses',
@@ -148,7 +154,7 @@ export async function POST(
     });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to create expense' },
-      { status: 400 }
+      { status: 500 }
     );
   }
 }

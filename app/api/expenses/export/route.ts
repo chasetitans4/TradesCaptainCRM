@@ -9,30 +9,19 @@ import { apiLogger } from '@/lib/logger';
 import { getExpenseExportData } from '@/lib/expenses';
 import { parseISO, startOfMonth, endOfMonth, format } from 'date-fns';
 
+import { getServerSession } from '@/lib/permissions/check-permission';
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id, role')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
     // Only admins/owners can export
-    if (profile.role === 'technician') {
+    if (session.user.role === 'technician') {
       return NextResponse.json(
         { error: 'Only administrators can export expenses' },
         { status: 403 }
@@ -48,6 +37,16 @@ export async function GET(request: NextRequest) {
     const categoryId = searchParams.get('category_id');
     const status = searchParams.get('status');
 
+    let businessId = session.user.businessId;
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      const queryBusinessId = searchParams.get('businessId');
+      if (queryBusinessId) businessId = queryBusinessId;
+    }
+
+    if (!businessId) {
+        return NextResponse.json({ error: 'Business ID required' }, { status: 400 });
+    }
+
     // Default to current month
     const start = startDate ? parseISO(startDate) : startOfMonth(new Date());
     const end = endDate ? parseISO(endDate) : endOfMonth(new Date());
@@ -58,7 +57,7 @@ export async function GET(request: NextRequest) {
     if (status) filters.status = status;
 
     const expenses = await getExpenseExportData(
-      profile.business_id,
+      businessId,
       start,
       end,
       filters

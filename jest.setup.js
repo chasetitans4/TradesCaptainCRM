@@ -8,8 +8,59 @@ require('openai/shims/node');
 require('@testing-library/jest-dom');
 
 global.Request = class {};
-global.Response = class {};
-global.Headers = class {};
+global.Response = class {
+  constructor(body, init) {
+    this.body = body;
+    this.status = init && init.status ? init.status : 200;
+    this.headers = new global.Headers(init && init.headers ? init.headers : {});
+  }
+  static json(data, init) {
+    const headers = Object.assign({ 'content-type': 'application/json' }, (init && init.headers) || {});
+    return new global.Response(JSON.stringify(data), { status: init && init.status ? init.status : 200, headers });
+  }
+};
+global.Headers = class {
+  constructor(init) {
+    this._map = new Map();
+    if (init && typeof init === 'object') {
+      if (init instanceof global.Headers) {
+        for (const [k, v] of init.entries()) this.set(k, v);
+      } else if (Array.isArray(init)) {
+        for (const [k, v] of init) this.set(k, v);
+      } else {
+        for (const k of Object.keys(init)) this.set(k, init[k]);
+      }
+    }
+  }
+  get(name) {
+    const v = this._map.get(String(name).toLowerCase());
+    if (Array.isArray(v)) return v[0];
+    return v;
+  }
+  set(name, value) {
+    this._map.set(String(name).toLowerCase(), String(value));
+  }
+  append(name, value) {
+    const key = String(name).toLowerCase();
+    const cur = this._map.get(key);
+    if (cur === undefined) {
+      this._map.set(key, String(value));
+    } else if (Array.isArray(cur)) {
+      cur.push(String(value));
+      this._map.set(key, cur);
+    } else {
+      this._map.set(key, [cur, String(value)]);
+    }
+  }
+  getSetCookie() {
+    const v = this._map.get('set-cookie');
+    if (!v) return [];
+    return Array.isArray(v) ? v : [v];
+  }
+  entries() {
+    return this._map.entries();
+  }
+};
 
 // Provide default secrets for tests
 process.env.JWT_SECRET = process.env.JWT_SECRET || '0123456789abcdef0123456789abcdef';

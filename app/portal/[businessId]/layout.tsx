@@ -5,21 +5,31 @@ import { useParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import {
-  LayoutDashboard,
+  Home,
   Calendar,
   FileText,
   Receipt,
-  Wrench,
   Settings,
   LogOut,
   Menu,
   Phone,
   Mail,
+  MessageCircle,
+  Wrench,
+  ShieldCheck,
+  Gift,
+  File,
+  AlertTriangle,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { NotificationBell } from '@/components/portal/notification-bell';
+import { MobileBottomNav } from '@/components/portal/mobile-bottom-nav';
+import { DemoModeBanner } from '@/components/portal/demo-mode-banner';
 import { logger } from '@/lib/logger';
+import { BusinessThemeProvider } from '@/lib/contexts/business-theme-context';
 const portalLogger = logger.child({ context: 'portal.layout' });
 
 interface BusinessInfo {
@@ -29,6 +39,7 @@ interface BusinessInfo {
   email?: string;
   logo_url?: string;
   primary_color?: string;
+  secondary_color?: string;
 }
 
 interface CustomerInfo {
@@ -37,13 +48,21 @@ interface CustomerInfo {
   email?: string;
 }
 
+// Customer portal navigation - only features relevant to end customers (homeowners)
+// Business management features belong in the business dashboard (/dashboard/*)
 const navItems = [
-  { href: '', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/appointments', icon: Calendar, label: 'Appointments' },
-  { href: '/invoices', icon: Receipt, label: 'Invoices & Payments' },
-  { href: '/quotes', icon: FileText, label: 'Quotes' },
+  { href: '/home', icon: Home, label: 'Home' },
+  { href: '/emergency', icon: AlertTriangle, label: 'Emergency', className: 'text-red-600 dark:text-red-400 font-bold' },
   { href: '/equipment', icon: Wrench, label: 'My Equipment' },
-  { href: '/settings', icon: Settings, label: 'Settings' },
+  { href: '/appointments', icon: Calendar, label: 'Appointments' },
+  { href: '/documents', icon: File, label: 'Documents' },
+  { href: '/invoices', icon: Receipt, label: 'Invoices' },
+  { href: '/quotes', icon: FileText, label: 'Estimates' },
+  { href: '/issues', icon: AlertCircle, label: 'Report Issue' },
+  { href: '/membership', icon: ShieldCheck, label: 'Membership' },
+  { href: '/referrals', icon: Gift, label: 'Referrals' },
+  { href: '/messages', icon: MessageCircle, label: 'Messages' },
+  { href: '/settings', icon: Settings, label: 'Profile' },
 ];
 
 export default function PortalLayout({
@@ -111,12 +130,17 @@ export default function PortalLayout({
     }
   };
 
+  // If on login page, render children directly without sidebar/auth checks
+  if (pathname?.endsWith('/login')) {
+    return <>{children}</>;
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="animate-pulse flex flex-col items-center">
-          <div className="w-12 h-12 bg-primary/20 rounded-lg mb-4" />
-          <div className="h-4 w-24 bg-gray-200 rounded" />
+          <div className="w-12 h-12 bg-gray-200 rounded-lg mb-4" />
+          <div className="h-4 w-32 bg-gray-200 rounded" />
         </div>
       </div>
     );
@@ -126,20 +150,27 @@ export default function PortalLayout({
     return null;
   }
 
-  const primaryColor = business.primary_color || '#2563eb';
+  const primaryColor = business.primary_color || '#1D4ED8';
+  const secondaryColor = business.secondary_color || '#0369A1';
 
   return (
+    <BusinessThemeProvider primaryColor={primaryColor} secondaryColor={secondaryColor}>
     <div className="min-h-screen bg-gray-50">
+      {/* Demo Mode Banner */}
+      <DemoModeBanner />
+
       {/* Desktop Sidebar */}
       <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex flex-col flex-grow bg-white border-r border-gray-200">
           {/* Logo */}
           <div className="flex items-center gap-3 h-16 px-6 border-b border-gray-200">
             {business.logo_url ? (
-              <img
+              <Image
                 src={business.logo_url}
                 alt={business.name}
-                className="h-8 object-contain"
+                width={96}
+                height={32}
+                className="h-8 w-auto object-contain"
               />
             ) : (
               <Image src="/bluehq-logo.svg" alt="BLUE HQ" width={96} height={32} />
@@ -159,10 +190,10 @@ export default function PortalLayout({
                   href={href}
                   className={cn(
                     'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                    'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    item.className || 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                   )}
                 >
-                  <item.icon className="h-5 w-5" />
+                  <item.icon className={cn("h-5 w-5", item.className && "text-current")} />
                   {item.label}
                 </Link>
               );
@@ -227,10 +258,12 @@ export default function PortalLayout({
         <div className="flex items-center justify-between h-14 px-4">
           <div className="flex items-center gap-2">
             {business.logo_url ? (
-              <img
+              <Image
                 src={business.logo_url}
                 alt={business.name}
-                className="h-8 object-contain"
+                width={96}
+                height={32}
+                className="h-8 w-auto object-contain"
               />
             ) : (
               <Image src="/bluehq-logo.svg" alt="BLUE HQ" width={96} height={32} />
@@ -238,13 +271,15 @@ export default function PortalLayout({
             <span className="font-semibold text-gray-900">{business.name}</span>
           </div>
 
-          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+          <div className="flex items-center gap-1">
+            <NotificationBell businessId={businessId} />
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon">
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-72">
+            <SheetContent side="right" className="w-72" accessibleTitle="Navigation Menu">
               <div className="flex flex-col h-full">
                 <div className="flex items-center gap-3 mb-6">
                   <div
@@ -271,10 +306,10 @@ export default function PortalLayout({
                         onClick={() => setMobileMenuOpen(false)}
                         className={cn(
                           'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                          'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                          item.className || 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                         )}
                       >
-                        <item.icon className="h-5 w-5" />
+                        <item.icon className={cn("h-5 w-5", item.className && "text-current")} />
                         {item.label}
                       </Link>
                     );
@@ -319,13 +354,22 @@ export default function PortalLayout({
               </div>
             </SheetContent>
           </Sheet>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="lg:pl-64">
+      <main className="lg:pl-64 pb-20 lg:pb-0">
         <div className="py-6 px-4 lg:px-8">{children}</div>
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav
+        businessId={businessId}
+        onMenuClick={() => setMobileMenuOpen(true)}
+        primaryColor={primaryColor}
+      />
     </div>
+    </BusinessThemeProvider>
   );
 }

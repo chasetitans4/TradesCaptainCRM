@@ -8,38 +8,38 @@ import { createClient } from '@/lib/supabase/server';
 import { startOfWeek, endOfWeek, parseISO, format } from 'date-fns';
 import { apiLogger } from '@/lib/logger';
 
+import { getServerSession } from '@/lib/permissions/check-permission';
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id, role')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
     // Only admins/owners can export
-    if (profile.role === 'technician') {
+    if (session.user.role === 'technician') {
       return NextResponse.json(
         { error: 'Only administrators can export timesheets' },
         { status: 403 }
       );
     }
 
+    const { searchParams } = new URL(request.url);
+    let businessId = session.user.businessId;
+
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      const queryBusinessId = searchParams.get('businessId');
+      if (queryBusinessId) businessId = queryBusinessId;
+    }
+
+    if (!businessId) {
+        return NextResponse.json({ error: 'Business ID required' }, { status: 400 });
+    }
+
     // Parse query params
-    const searchParams = request.nextUrl.searchParams;
     const exportFormat = searchParams.get('format') || 'csv';
     const startDate = searchParams.get('start_date');
     const endDate = searchParams.get('end_date');
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
         user:users!timesheets_user_id_fkey(id, first_name, last_name, email),
         job:jobs(id, service_type, customer:customers(name))
       `)
-      .eq('business_id', profile.business_id)
+      .eq('business_id', businessId)
       .gte('clock_in_time', format(rangeStart, 'yyyy-MM-dd'))
       .lte('clock_in_time', format(rangeEnd, 'yyyy-MM-dd'))
       .order('clock_in_time', { ascending: true });

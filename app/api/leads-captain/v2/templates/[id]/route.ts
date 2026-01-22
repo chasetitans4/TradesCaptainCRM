@@ -6,7 +6,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserProfile } from '@/lib/supabase/server';
+import { checkPermission, getServerSession } from '@/lib/permissions/check-permission';
 import { createAdminClient } from '@/lib/supabase/server';
 import { previewTemplate } from '@/lib/leads-captain/v2/template-renderer';
 import type { UpdateTemplateRequest } from '@/types/leads-captain';
@@ -18,19 +18,30 @@ interface RouteParams {
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('view_leads_captain');
+    const session = await getServerSession();
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
     const supabase = createAdminClient();
 
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+
     // Get config ID for authorization
     const { data: config } = await supabase
       .from('leads_captain_config')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', userData.business_id)
       .single();
 
     if (!config) {
@@ -62,93 +73,11 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   }
 }
 
-export async function PUT(request: NextRequest, { params }: RouteParams) {
-  try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { id } = await params;
-    const supabase = createAdminClient();
-    const body: UpdateTemplateRequest = await request.json();
-
-    // Get config ID for authorization
-    const { data: config } = await supabase
-      .from('leads_captain_config')
-      .select('id')
-      .eq('business_id', profile.business_id)
-      .single();
-
-    if (!config) {
-      return NextResponse.json({ error: 'Leads Captain not configured' }, { status: 404 });
-    }
-
-    // Check if template exists and belongs to this business
-    const { data: existing } = await supabase
-      .from('leads_captain_templates')
-      .select('id, is_system')
-      .eq('id', id)
-      .eq('config_id', config.id)
-      .single();
-
-    if (!existing) {
-      return NextResponse.json({ error: 'Template not found' }, { status: 404 });
-    }
-
-    // Build update object
-    const updateData: Record<string, unknown> = {};
-    const allowedFields = ['name', 'template_key', 'content', 'max_length', 'emoji_setting', 'ai_personalization', 'is_active'];
-
-    for (const field of allowedFields) {
-      if (body[field as keyof UpdateTemplateRequest] !== undefined) {
-        updateData[field] = body[field as keyof UpdateTemplateRequest];
-      }
-    }
-
-    // System templates can only have content modified
-    if (existing.is_system) {
-      const restrictedFields = ['name', 'template_key', 'is_active'];
-      for (const field of restrictedFields) {
-        delete updateData[field];
-      }
-    }
-
-    if (Object.keys(updateData).length === 0) {
-      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
-    }
-
-    const { data: template, error } = await supabase
-      .from('leads_captain_templates')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Log audit
-    await supabase.from('leads_captain_audit_log').insert({
-      config_id: config.id,
-      action: 'template_updated',
-      actor: profile.email || 'user',
-      details: { template_id: id, fields_updated: Object.keys(updateData) },
-    });
-
-    return NextResponse.json({ template });
-  } catch (error) {
-    apiLogger.error({ message: 'Error updating template', error });
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to update template' },
-      { status: 500 }
-    );
-  }
-}
-
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('manage_leads_captain');
+    const profile = await getServerSession();
+    if (!profile?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -156,10 +85,20 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     const supabase = createAdminClient();
 
     // Get config ID for authorization
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id, email')
+      .eq('auth_user_id', profile.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+
     const { data: config } = await supabase
       .from('leads_captain_config')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', userData.business_id)
       .single();
 
     if (!config) {
@@ -211,7 +150,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     await supabase.from('leads_captain_audit_log').insert({
       config_id: config.id,
       action: 'template_deleted',
-      actor: profile.email || 'user',
+      actor: userData.email || 'user',
       details: { template_id: id, template_name: existing.name },
     });
 

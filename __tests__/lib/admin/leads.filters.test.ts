@@ -71,7 +71,7 @@ jest.mock('@/lib/supabase/server', () => {
       },
       then: (resolve: any) => {
         const data = applyFilters(baseLeads);
-        return resolve({ data, error: null, count: baseLeads.filter(r => r.deleted_at == null).length });
+        return resolve({ data, error: null, count: baseLeads.length });
       },
       insert: (row: any) => {
         if (state.table === 'lead_activities') {

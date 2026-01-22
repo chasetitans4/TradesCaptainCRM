@@ -18,16 +18,18 @@ export interface UserPricingInfo {
   monthlyUserCharge: number;
 }
 
-// Pricing configuration - User Allocation v5.9.2
+// Pricing configuration - User Allocation v6.3
 export const USER_PRICING = {
   // Number of users included in base subscription
   includedInBase: {
-    starter: 1,     // Blue/Gold Starter
-    pro: 3,         // Blue/Gold Pro
-    enterprise: 10, // Blue/Gold Enterprise
+    starter: 1,     // Blue Starter (no extra users allowed)
+    pro: 5,         // Blue Pro (v6.3: increased from 3)
+    enterprise: 10, // Blue Enterprise
   },
-  // Price per additional user per month
+  // Price per additional user per month (Pro/Enterprise only)
   perAdditionalUser: 10, // $10/user/month
+  // Plans that allow extra users
+  allowsExtraUsers: ['pro', 'enterprise'], // v6.3: Starter cannot add extra users
 };
 
 /**
@@ -174,6 +176,7 @@ export async function reportUserUsageToStripe(businessId: string): Promise<boole
 
 /**
  * Check if business can add more users
+ * v6.3: Starter plan cannot add extra users
  */
 export async function canAddUser(businessId: string): Promise<{
   canAdd: boolean;
@@ -186,6 +189,15 @@ export async function canAddUser(businessId: string): Promise<{
     return {
       canAdd: false,
       reason: 'Unable to verify billing information',
+      wouldIncurCharge: false,
+    };
+  }
+
+  // v6.3: Starter plan cannot add extra users at all
+  if (pricingInfo.planTier === 'starter' && pricingInfo.billableUserCount >= pricingInfo.includedUsers) {
+    return {
+      canAdd: false,
+      reason: 'Starter plan is limited to 1 user. Upgrade to Pro to add more team members.',
       wouldIncurCharge: false,
     };
   }
@@ -218,9 +230,9 @@ export async function getBillingPreview(businessId: string): Promise<{
 
   const pricingInfo = await getUserPricingInfo(businessId);
 
-  // Get base subscription cost from plan
+  // Get base subscription cost from plan (v6.3 pricing)
   const basePrices: Record<string, number> = {
-    starter: 49,
+    starter: 39, // v6.3: reduced from $49
     pro: 99,
     enterprise: 199,
   };

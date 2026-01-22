@@ -16,7 +16,7 @@ import { apiLogger } from '@/lib/logger';
  * Get JWT secret key - throws if not configured
  */
 function getJwtSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+  const secret = process.env.JWT_SECRET;
   if (!secret) {
     throw new Error('JWT_SECRET environment variable must be configured');
   }
@@ -92,6 +92,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { email, password } = body;
 
+    console.log(`[Admin Login] Attempt for email: ${email}`);
+
     if (!email || !password) {
       return NextResponse.json(
         { error: 'Email and password are required' },
@@ -108,14 +110,31 @@ export async function POST(request: NextRequest) {
       .eq('email', email.toLowerCase())
       .single();
 
-    if (error || !user) {
+    if (error) {
+      console.error('[Admin Login] Database error or user not found:', error);
+      // Handle "Row not found" specifically
+      if (error.code === 'PGRST116') {
+        return NextResponse.json(
+          { error: 'User not found' }, // Debugging: explicit error
+          { status: 401 }
+        );
+      }
       return NextResponse.json(
-        { error: 'Invalid email or password' },
+        { error: `User lookup failed: ${error.message}` },
+        { status: 401 }
+      );
+    }
+
+    if (!user) {
+      console.error('[Admin Login] User not found (no error, but null data)');
+       return NextResponse.json(
+        { error: 'User not found' }, // Debugging: explicit error
         { status: 401 }
       );
     }
 
     if (user.status !== 'active') {
+      console.log(`[Admin Login] User ${email} is not active. Status: ${user.status}`);
       return NextResponse.json(
         { error: 'Account is not active' },
         { status: 401 }
@@ -123,10 +142,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify password
+    console.log(`[Admin Login] Verifying password for ${email}...`);
     const passwordValid = await verifyPassword(password, user.password_hash);
+    console.log(`[Admin Login] Password valid: ${passwordValid}`);
+    
     if (!passwordValid) {
       return NextResponse.json(
-        { error: 'Invalid email or password' },
+        { error: 'Password mismatch' }, // Temporary for debugging
         { status: 401 }
       );
     }
@@ -158,20 +180,23 @@ export async function POST(request: NextRequest) {
 
     // Set cookies
     const cookieStore = await cookies();
+    const isLocal = request.headers.get('host')?.includes('localhost');
+    const secureCookie = process.env.NODE_ENV === 'production' && !isLocal;
+
     cookieStore.set('admin_token', accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: secureCookie,
       sameSite: 'lax',
       maxAge: 15 * 60,
-      path: '/admin',
+      path: '/',
     });
 
     cookieStore.set('admin_refresh_token', refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: secureCookie,
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60,
-      path: '/admin',
+      path: '/',
     });
 
     // Return user (without sensitive fields)

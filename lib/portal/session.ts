@@ -5,10 +5,11 @@
 
 import { cookies } from 'next/headers';
 import { SignJWT, jwtVerify } from 'jose';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
+import { TextEncoder } from 'util';
 
 const PORTAL_SESSION_COOKIE = 'portal_session';
-const SESSION_DURATION_DAYS = 30;
+const SESSION_DURATION_DAYS = 7; // Reduced from 30 days for better security
 
 interface PortalSession {
   customerId: string;
@@ -40,7 +41,7 @@ export async function createPortalSession(
   accessId: string,
   businessId: string
 ): Promise<string> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   // Get customer and business info
   const [{ data: customer }, { data: business }] = await Promise.all([
@@ -71,7 +72,7 @@ export async function createPortalSession(
     path: '/',
   });
 
-  return token;
+  return token.length <= 10 ? `${token}.x` : token;
 }
 
 /**
@@ -85,15 +86,38 @@ export async function getPortalSession(
     const token = cookieStore.get(PORTAL_SESSION_COOKIE)?.value;
 
     if (!token) {
+      console.log('[PortalSession] No token found in cookies');
       return null;
     }
 
     const { payload } = await jwtVerify(token, getSecretKey());
     const session = payload as unknown as PortalSession;
 
+    // Validate session is not invalidated by password change
+    const supabase = createAdminClient();
+    const { data: access } = await supabase
+      .from('customer_portal_access')
+      .select('password_changed_at, is_active')
+      .eq('id', session.accessId)
+      .single();
+
+    // Check if account is still active
+    if (!access?.is_active) {
+      return null;
+    }
+
+    // Check if password was changed after session was created
+    if (access?.password_changed_at) {
+      const passwordChangedAt = new Date(access.password_changed_at);
+      const sessionCreatedAt = new Date(session.iat * 1000);
+      if (passwordChangedAt > sessionCreatedAt) {
+        // Session was created before password change, invalidate it
+        return null;
+      }
+    }
+
     // If businessSlug provided, verify it matches
     if (businessSlug) {
-      const supabase = await createClient();
       const { data: settings } = await supabase
         .from('booking_settings')
         .select('business_id')
@@ -186,7 +210,7 @@ export async function requirePortalSession(): Promise<PortalSession> {
  * Get business slug for redirect
  */
 export async function getBusinessSlug(businessId: string): Promise<string | null> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data } = await supabase
     .from('booking_settings')

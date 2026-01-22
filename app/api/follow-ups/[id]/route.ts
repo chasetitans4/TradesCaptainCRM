@@ -6,8 +6,9 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { apiLogger } from '@/lib/logger';
+import { getServerSession } from '@/lib/permissions/check-permission';
 
 export async function GET(
   _request: NextRequest,
@@ -15,14 +16,18 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Determine correct Supabase client
+    let supabase;
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      supabase = createAdminClient();
+    } else {
+      supabase = await createClient();
     }
 
     const { data: follow_up, error } = await supabase
@@ -38,6 +43,13 @@ export async function GET(
       return NextResponse.json({ error: 'Follow-up not found' }, { status: 404 });
     }
 
+    // Check business access if not admin
+    if (session.user.role !== 'admin' && session.user.role !== 'super_admin') {
+        if (follow_up.business_id && follow_up.business_id !== session.user.businessId) {
+             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+    }
+
     return NextResponse.json({ follow_up });
   } catch (error) {
     apiLogger.error({ message: 'Error in GET /api/follow-ups/:id', error });
@@ -51,15 +63,23 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Determine correct Supabase client
+    let supabase;
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      supabase = createAdminClient();
+    } else {
+      supabase = await createClient();
+    }
+
+    // If not admin, verify ownership first (optional, but good for security if RLS is loose)
+    // RLS usually handles this, but with createAdminClient we need manual checks if we wanted to restrict admins.
+    // But admins should have access.
 
     const body = await request.json();
 
@@ -97,17 +117,24 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { error } = await supabase.from('follow_ups').delete().eq('id', id);
+    // Determine correct Supabase client
+    let supabase;
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      supabase = createAdminClient();
+    } else {
+      supabase = await createClient();
+    }
+
+    const { error } = await supabase
+      .from('follow_ups')
+      .delete()
+      .eq('id', id);
 
     if (error) {
       apiLogger.error({ message: 'Error deleting follow-up', error });

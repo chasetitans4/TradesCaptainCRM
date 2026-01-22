@@ -49,20 +49,31 @@ jest.mock('@/lib/supabase/server', () => {
       }),
     };
   };
-  return { createClient: jest.fn(() => build()) };
+  return {
+    createClient: jest.fn(() => build()),
+    createAdminClient: jest.fn(() => build())
+  };
 });
 
 describe('admin index: errors and edge branches', () => {
   beforeEach(() => { (globalThis as any).__admErrMock = {}; });
 
-  it('getActivityLog throws when list query errors', async () => {
+  it('getActivityLog returns empty when list query errors', async () => {
+    // Note: getActivityLog handles errors gracefully and returns empty results
+    // instead of throwing, to support cases where the table might not exist
     (globalThis as any).__admErrMock = { listError: new Error('list fail'), listTable: 'admin_activity_log' };
-    await expect(getActivityLog({ adminId: 'u1' }, 1, 50)).rejects.toThrow();
+    const result = await getActivityLog({ adminId: 'u1' }, 1, 50);
+    expect(result.activities).toEqual([]);
+    expect(result.total).toBe(0);
   });
 
-  it('getAgentSubmissions throws when list query errors', async () => {
+  it('getAgentSubmissions returns empty when list query errors', async () => {
+    // Note: getAgentSubmissions handles errors gracefully and returns empty results
+    // instead of throwing, to support cases where the table might not exist
     (globalThis as any).__admErrMock = { listError: new Error('list fail'), listTable: 'agent_submissions' };
-    await expect(getAgentSubmissions({ status: 'pending' as any }, 1, 25)).rejects.toThrow();
+    const result = await getAgentSubmissions({ status: 'pending' as any }, 1, 25);
+    expect(result.submissions).toEqual([]);
+    expect(result.total).toBe(0);
   });
 
   it('markSubmissionRegistered throws when update fails', async () => {

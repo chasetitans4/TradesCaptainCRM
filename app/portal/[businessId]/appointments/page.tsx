@@ -2,12 +2,18 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Calendar, Clock, User, Phone, CheckCircle } from 'lucide-react';
+import Link from 'next/link';
+import { Calendar, Clock, User, Phone, CheckCircle, CalendarClock, Loader2, ChevronRight } from 'lucide-react';
+import { CompactJobTimeline } from '@/components/portal/job-timeline';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AddressLink } from '@/components/ui/address-link';
+import { BottomSheet } from '@/components/mobile/bottom-sheet';
 import { logger } from '@/lib/logger';
+import { useDemoMode, getDemoAppointments, mergeWithDemoData } from '@/lib/portal/demo-data/use-demo-data';
 const portalAppointmentsLogger = logger.child({ context: 'portal.appointments' });
 
 interface Appointment {
@@ -32,6 +38,8 @@ export default function AppointmentsPage() {
   const [upcoming, setUpcoming] = useState<Appointment[]>([]);
   const [history, setHistory] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [rescheduleAppointment, setRescheduleAppointment] = useState<Appointment | null>(null);
+  const demoMode = useDemoMode();
 
   useEffect(() => {
     async function loadAppointments() {
@@ -55,6 +63,11 @@ export default function AppointmentsPage() {
 
     loadAppointments();
   }, [businessId]);
+
+  // Merge demo data with real data when demo mode is active
+  const demoAppointments = getDemoAppointments();
+  const displayUpcoming = mergeWithDemoData(upcoming, demoAppointments.upcoming as Appointment[], demoMode);
+  const displayHistory = mergeWithDemoData(history, demoAppointments.history as Appointment[], demoMode);
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -81,6 +94,10 @@ export default function AppointmentsPage() {
     }
   };
 
+  const canReschedule = (status: string) => {
+    return ['scheduled', 'confirmed'].includes(status);
+  };
+
   if (loading) {
     return <AppointmentsSkeleton />;
   }
@@ -95,15 +112,15 @@ export default function AppointmentsPage() {
       <Tabs defaultValue="upcoming">
         <TabsList>
           <TabsTrigger value="upcoming">
-            Upcoming ({upcoming.length})
+            Upcoming ({displayUpcoming.length})
           </TabsTrigger>
           <TabsTrigger value="history">
-            History ({history.length})
+            History ({displayHistory.length})
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="upcoming" className="mt-4">
-          {upcoming.length === 0 ? (
+          {displayUpcoming.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -117,12 +134,15 @@ export default function AppointmentsPage() {
             </Card>
           ) : (
             <div className="space-y-4">
-              {upcoming.map((appointment) => (
+              {displayUpcoming.map((appointment) => (
                 <AppointmentCard
                   key={appointment.id}
                   appointment={appointment}
                   formatDate={formatDate}
                   getStatusColor={getStatusColor}
+                  canReschedule={canReschedule(appointment.status)}
+                  onReschedule={() => setRescheduleAppointment(appointment)}
+                  businessId={businessId}
                 />
               ))}
             </div>
@@ -130,7 +150,7 @@ export default function AppointmentsPage() {
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">
-          {history.length === 0 ? (
+          {displayHistory.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -144,18 +164,27 @@ export default function AppointmentsPage() {
             </Card>
           ) : (
             <div className="space-y-4">
-              {history.map((appointment) => (
+              {displayHistory.map((appointment) => (
                 <AppointmentCard
                   key={appointment.id}
                   appointment={appointment}
                   formatDate={formatDate}
                   getStatusColor={getStatusColor}
+                  canReschedule={false}
+                  businessId={businessId}
                 />
               ))}
             </div>
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Reschedule Sheet */}
+      <RescheduleSheet
+        appointment={rescheduleAppointment}
+        businessId={businessId}
+        onClose={() => setRescheduleAppointment(null)}
+      />
     </div>
   );
 }
@@ -164,13 +193,21 @@ function AppointmentCard({
   appointment,
   formatDate,
   getStatusColor,
+  canReschedule,
+  onReschedule,
+  businessId,
 }: {
   appointment: Appointment;
   formatDate: (date: string) => string;
   getStatusColor: (status: string) => string;
+  canReschedule: boolean;
+  onReschedule?: () => void;
+  businessId: string;
 }) {
+  const isActive = ['scheduled', 'confirmed', 'on_the_way', 'arrived', 'in_progress'].includes(appointment.status);
+
   return (
-    <Card>
+    <Card className={isActive ? 'border-blue-200' : ''}>
       <CardContent className="pt-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
@@ -180,6 +217,13 @@ function AppointmentCard({
                 {appointment.status.replace('_', ' ')}
               </Badge>
             </div>
+
+            {/* Compact Timeline for active appointments */}
+            {isActive && (
+              <div className="mb-3">
+                <CompactJobTimeline currentStatus={appointment.status} />
+              </div>
+            )}
 
             {appointment.description && (
               <p className="text-gray-600 text-sm mb-3">{appointment.description}</p>
@@ -226,10 +270,197 @@ function AppointmentCard({
                 </div>
               )}
             </div>
+
+            {/* Actions */}
+            <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2">
+              <Link href={`/portal/${businessId}/appointments/${appointment.id}`}>
+                <Button variant="outline" size="sm" className="gap-2">
+                  View Details
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </Link>
+              {canReschedule && onReschedule && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onReschedule}
+                  className="gap-2"
+                >
+                  <CalendarClock className="h-4 w-4" />
+                  Request Reschedule
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function RescheduleSheet({
+  appointment,
+  businessId,
+  onClose,
+}: {
+  appointment: Appointment | null;
+  businessId: string;
+  onClose: () => void;
+}) {
+  const [preferredDate, setPreferredDate] = useState('');
+  const [preferredTime, setPreferredTime] = useState('');
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Reset state when appointment changes
+  useEffect(() => {
+    if (appointment) {
+      setPreferredDate('');
+      setPreferredTime('');
+      setReason('');
+      setSuccess(false);
+      setError(null);
+    }
+  }, [appointment]);
+
+  const handleSubmit = async () => {
+    if (!appointment || !preferredDate) return;
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/portal/appointments/${appointment.id}/reschedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessId,
+          preferredDate,
+          preferredTime: preferredTime || undefined,
+          reason: reason || undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to submit reschedule request');
+      }
+
+      setSuccess(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Get minimum date (tomorrow)
+  const getMinDate = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  };
+
+  return (
+    <BottomSheet
+      open={!!appointment}
+      onOpenChange={(open) => !open && onClose()}
+      title="Request Reschedule"
+      description={appointment?.title}
+    >
+      {success ? (
+        <div className="py-6 text-center">
+          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="h-8 w-8 text-green-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            Request Submitted
+          </h3>
+          <p className="text-gray-500 mb-6">
+            We've received your reschedule request. The business will contact you to confirm the new date and time.
+          </p>
+          <Button onClick={onClose} className="w-full">
+            Done
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Preferred Date *
+            </label>
+            <Input
+              type="date"
+              value={preferredDate}
+              onChange={(e) => setPreferredDate(e.target.value)}
+              min={getMinDate()}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Preferred Time (optional)
+            </label>
+            <Input
+              type="time"
+              value={preferredTime}
+              onChange={(e) => setPreferredTime(e.target.value)}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              We'll do our best to accommodate your preference
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Reason (optional)
+            </label>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Let us know why you need to reschedule..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows={3}
+            />
+          </div>
+
+          {error && (
+            <div className="p-3 bg-red-50 text-red-700 text-sm rounded-lg">
+              {error}
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className="flex-1"
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              className="flex-1"
+              disabled={!preferredDate || submitting}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                'Submit Request'
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+    </BottomSheet>
   );
 }
 

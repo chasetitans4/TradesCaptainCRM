@@ -12,8 +12,8 @@ import {
   getApprovalRequest,
   approveRequest,
   denyRequest,
-  getOfferByCode,
-} from '@/lib/pricing/offers';
+} from '@/lib/pricing/offers-actions';
+import { getOfferByCode } from '@/lib/pricing/offers';
 import { getPlanById } from '@/lib/pricing/plans';
 import { apiLogger } from '@/lib/logger';
 

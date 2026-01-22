@@ -44,6 +44,8 @@ const FEATURE_ICONS: Record<string, React.ElementType> = {
   online_booking: Calendar,
   review_requests: Star,
   ai_sms: MessageSquare,
+  yes: Check,
+  no: Users,
 };
 
 export default function QuestionnairePage() {
@@ -185,6 +187,22 @@ export default function QuestionnairePage() {
             <p className="text-text-muted text-sm">{currentQuestion.description}</p>
           )}
         </div>
+
+        {/* AI Services Info Box - v6.3: Updated for addon model */}
+        {currentQuestion?.id === 'aiServices' && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <MessageSquare className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-medium text-blue-800">Leads Captain Add-on — $49/mo</p>
+                <p className="text-blue-700 mt-1">
+                  AI-powered missed call text-back and SMS automation. Available for <strong>any Blue CRM plan</strong>.
+                  You can add or remove this anytime in <strong>Settings &gt; AI Services</strong>.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Options */}
         <div className="space-y-3 flex-1">

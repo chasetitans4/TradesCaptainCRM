@@ -258,38 +258,63 @@ export async function changePlan(
     throw new Error('No active subscription');
   }
 
-  // Get current subscription
-  const subscription = await stripe.subscriptions.retrieve(
-    business.stripe_subscription_id
-  );
+    // Get current subscription
+    const subscription = await stripe.subscriptions.retrieve(
+      business.stripe_subscription_id
+    );
 
-  // Update subscription with new price
-  await stripe.subscriptions.update(business.stripe_subscription_id, {
-    items: [
-      {
-        id: subscription.items.data[0].id,
-        price: newPriceId,
-      },
-    ],
-    proration_behavior: 'create_prorations',
-  });
+    // Identify the base plan item
+    // We assume the base plan is the item that is NOT an add-on we know about
+    // Or we check if it matches a known plan price
+    const knownAddonPrices = [
+      process.env.STRIPE_PRICE_MULTI_LOCATION_ADDON,
+      process.env.STRIPE_PRICE_LEADS_CAPTAIN_ADDON_MONTHLY,
+      process.env.STRIPE_PRICE_LEADS_CAPTAIN_ADDON_ANNUAL,
+      process.env.STRIPE_PRICE_EXTRA_USER_MONTHLY,
+    ].filter(Boolean);
 
-  let planTier: 'starter' | 'pro' | 'enterprise' = 'enterprise';
-  let leadsLimit = 300;
-  if (newPriceId === process.env.STRIPE_PRICE_STARTER_MONTHLY) {
-    planTier = 'starter';
-    leadsLimit = 0;
-  } else if (newPriceId === process.env.STRIPE_PRICE_PRO_MONTHLY) {
-    planTier = 'pro';
-    leadsLimit = 300;
-  }
-  await supabase
-    .from('businesses')
-    .update({
-      plan_tier: planTier,
-      leads_limit: leadsLimit,
-    })
-    .eq('id', businessId);
+    const basePlanItem = subscription.items.data.find(
+      (item) => !knownAddonPrices.includes(item.price.id)
+    );
+
+    if (!basePlanItem) {
+      throw new Error('Could not identify base plan subscription item');
+    }
+
+    // Update subscription with new price
+    await stripe.subscriptions.update(business.stripe_subscription_id, {
+      items: [
+        {
+          id: basePlanItem.id,
+          price: newPriceId,
+        },
+      ],
+      proration_behavior: 'create_prorations',
+    });
+
+    let planTier: 'starter' | 'pro' | 'enterprise' = 'enterprise';
+    let leadsLimit = 300;
+    // Check against Blue prices
+    if (newPriceId === process.env.STRIPE_PRICE_BLUE_STARTER_MONTHLY || 
+        newPriceId === process.env.STRIPE_PRICE_STARTER_MONTHLY || 
+        newPriceId === process.env.STRIPE_PRICE_WEB_STARTER_MONTHLY) {
+      planTier = 'starter';
+      leadsLimit = 0;
+    } else if (newPriceId === process.env.STRIPE_PRICE_BLUE_PRO_MONTHLY || 
+               newPriceId === process.env.STRIPE_PRICE_PRO_MONTHLY || 
+               newPriceId === process.env.STRIPE_PRICE_WEB_PRO_MONTHLY) {
+      planTier = 'pro';
+      leadsLimit = 200; // Blue Pro has 200 leads (checked page.tsx)
+    }
+    // Enterprise defaults (300 leads)
+
+    await supabase
+      .from('businesses')
+      .update({
+        plan_tier: planTier,
+        leads_limit: leadsLimit,
+      })
+      .eq('id', businessId);
 }
 
 /**
@@ -398,8 +423,14 @@ export function getPriceIds() {
   };
 }
 
+/**
+ * Get price catalog for v6.0 products
+ * Active products: blue, web, seo_aeo
+ * Legacy products: silver, gold, leads_captain (for existing subscriptions)
+ */
 export function getPriceCatalog() {
   return {
+    // === ACTIVE PRODUCTS (v6.0) ===
     crm: {
       starter: process.env.STRIPE_PRICE_STARTER_MONTHLY,
       pro: process.env.STRIPE_PRICE_PRO_MONTHLY,
@@ -410,27 +441,42 @@ export function getPriceCatalog() {
       starter: process.env.STRIPE_PRICE_BLUE_STARTER_MONTHLY,
       pro: process.env.STRIPE_PRICE_BLUE_PRO_MONTHLY,
       enterprise: process.env.STRIPE_PRICE_BLUE_ENTERPRISE_MONTHLY,
-      multiLocation: process.env.STRIPE_PRICE_MULTI_LOCATION_ADDON,
+      extraUser: process.env.STRIPE_PRICE_EXTRA_USER_MONTHLY,
     },
     web: {
       starter: process.env.STRIPE_PRICE_WEB_STARTER_MONTHLY,
       pro: process.env.STRIPE_PRICE_WEB_PRO_MONTHLY,
       enterprise: process.env.STRIPE_PRICE_WEB_ENTERPRISE_MONTHLY,
     },
-    silver: {
-      starter: process.env.STRIPE_PRICE_SILVER_STARTER_MONTHLY,
-      pro: process.env.STRIPE_PRICE_SILVER_PRO_MONTHLY,
-      enterprise: process.env.STRIPE_PRICE_SILVER_ENTERPRISE_MONTHLY,
+    seo_aeo: {
+      starter: process.env.STRIPE_PRICE_SEO_AEO_STARTER_MONTHLY,
+      pro: process.env.STRIPE_PRICE_SEO_AEO_PRO_MONTHLY,
+      enterprise: process.env.STRIPE_PRICE_SEO_AEO_ENTERPRISE_MONTHLY,
     },
-    gold: {
-      starter: process.env.STRIPE_PRICE_GOLD_STARTER_MONTHLY,
-      pro: process.env.STRIPE_PRICE_GOLD_PRO_MONTHLY,
-      enterprise: process.env.STRIPE_PRICE_GOLD_ENTERPRISE_MONTHLY,
+    // Add-ons
+    addons: {
+      extraUser: process.env.STRIPE_PRICE_EXTRA_USER_MONTHLY,
+      multiLocation: process.env.STRIPE_PRICE_MULTI_LOCATION_ADDON,
     },
-    seoaeo: {
-      starter: process.env.STRIPE_PRICE_SEOAEO_STARTER_MONTHLY,
-      pro: process.env.STRIPE_PRICE_SEOAEO_PRO_MONTHLY,
-      enterprise: process.env.STRIPE_PRICE_SEOAEO_ENTERPRISE_MONTHLY,
+    // === LEGACY PRODUCTS (discontinued - for existing subscriptions) ===
+    legacy: {
+      silver: {
+        starter: process.env.STRIPE_PRICE_SILVER_STARTER_MONTHLY,
+        pro: process.env.STRIPE_PRICE_SILVER_PRO_MONTHLY,
+        enterprise: process.env.STRIPE_PRICE_SILVER_ENTERPRISE_MONTHLY,
+      },
+      gold: {
+        starter: process.env.STRIPE_PRICE_GOLD_STARTER_MONTHLY,
+        pro: process.env.STRIPE_PRICE_GOLD_PRO_MONTHLY,
+        enterprise: process.env.STRIPE_PRICE_GOLD_ENTERPRISE_MONTHLY,
+      },
+      leads_captain: process.env.STRIPE_PRICE_LEADS_CAPTAIN_MONTHLY,
+      // Legacy SEO keys (redirect to seo_aeo)
+      seoaeo: {
+        starter: process.env.STRIPE_PRICE_SEO_AEO_STARTER_MONTHLY,
+        pro: process.env.STRIPE_PRICE_SEO_AEO_PRO_MONTHLY,
+        enterprise: process.env.STRIPE_PRICE_SEO_AEO_ENTERPRISE_MONTHLY,
+      },
     },
   };
 }

@@ -11,29 +11,33 @@ import { schemas, validateRequest, formatZodErrors, sanitizeEmail, sanitizePhone
 import { logApiError } from '@/lib/logger';
 import { formatPhoneE164 } from '@/lib/twilio/sms';
 
+import { getServerSession } from '@/lib/permissions/check-permission';
+
 // GET /api/booking/requests - Get booking requests (authenticated)
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const session = await getServerSession();
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: userData } = await supabase
-      .from('users')
-      .select('business_id')
-      .eq('id', user.id)
-      .single();
+    const { searchParams } = new URL(request.url);
+    let businessId = session.user.businessId;
 
-    if (!userData?.business_id) {
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      const queryBusinessId = searchParams.get('businessId');
+      if (queryBusinessId) businessId = queryBusinessId;
+    }
+
+    if (!businessId) {
+      if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+         return NextResponse.json({ requests: [], total: 0 });
+      }
       return NextResponse.json({ error: 'No business found' }, { status: 404 });
     }
 
-    const { searchParams } = new URL(request.url);
     const raw = {
       status: searchParams.get('status'),
       startDate: searchParams.get('startDate'),
@@ -62,7 +66,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: formatZodErrors(parsed.error) }, { status: 400 });
     }
 
-    const result = await getBookingRequests(userData.business_id, {
+    const result = await getBookingRequests(businessId, {
       status: parsed.data.status,
       startDate: parsed.data.startDate,
       endDate: parsed.data.endDate,

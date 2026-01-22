@@ -15,26 +15,14 @@ import {
 } from '@/lib/favorites';
 import { apiLogger } from '@/lib/logger';
 
+import { getServerSession } from '@/lib/permissions/check-permission';
+
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -42,7 +30,7 @@ export async function GET(request: NextRequest) {
     const entityType = searchParams.get('type') as EntityType | null;
 
     const items = await getRecentlyViewed(
-      profile.id,
+      session.user.id,
       limit,
       entityType || undefined
     );
@@ -59,24 +47,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     const body = await request.json();
@@ -89,7 +63,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await recordView(profile.id, entityType, entityId);
+    await recordView(session.user.id, entityType, entityId);
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -103,27 +77,13 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(_request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    await clearRecentlyViewed(profile.id);
+    await clearRecentlyViewed(session.user.id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

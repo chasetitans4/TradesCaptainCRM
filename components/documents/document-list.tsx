@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   FileText,
   Download,
@@ -69,7 +69,7 @@ interface Document {
 }
 
 interface DocumentListProps {
-  entityType: 'customer' | 'job' | 'equipment' | 'business';
+  entityType: 'customer' | 'job' | 'equipment' | 'business' | 'business_inventory';
   entityId: string;
   initialDocuments?: Document[];
   readOnly?: boolean;
@@ -121,6 +121,26 @@ export function DocumentList({
     tags: '',
   });
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (initialDocuments && initialDocuments.length > 0) return;
+
+    const fetchDocuments = async () => {
+      try {
+        const res = await fetch(`/api/documents?entityType=${entityType}&entityId=${entityId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setDocuments(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch documents', error);
+      }
+    };
+
+    if (entityId && entityType) {
+      fetchDocuments();
+    }
+  }, [entityType, entityId, initialDocuments]);
 
   const handleUpload = async () => {
     if (!uploadData.file) {

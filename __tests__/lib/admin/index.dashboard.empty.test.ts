@@ -7,7 +7,6 @@ jest.mock('@/lib/supabase/server', () => {
       switch (table) {
         case 'crm_accounts': return m.crm_accounts || [];
         case 'agent_submissions': return m.agent_submissions || [];
-        case 'founders_program': return m.founders_program || [];
         default: return [];
       }
     };
@@ -26,10 +25,6 @@ jest.mock('@/lib/supabase/server', () => {
         in: (col: string, vals: any[]) => { state.filters.push({ type: 'in', col, vals }); return api; },
         single: () => {
           const base = resolveBase(state.table);
-          // Simulate missing founders_program with PGRST116
-          if (state.table === 'founders_program' && base.length === 0) {
-            return { data: null, error: { code: 'PGRST116' } };
-          }
           const first = apply(base)[0] || null;
           return { data: first, error: null };
         },
@@ -63,11 +58,14 @@ jest.mock('@/lib/supabase/server', () => {
       }),
     };
   };
-  return { createClient: jest.fn(() => buildClient()) };
+  return {
+    createClient: jest.fn(() => buildClient()),
+    createAdminClient: jest.fn(() => buildClient())
+  };
 });
 
 describe('admin index: dashboard stats empty', () => {
-  beforeEach(() => { (globalThis as any).__admIndexEmptyMock = { crm_accounts: [], agent_submissions: [], founders_program: [] }; });
+  beforeEach(() => { (globalThis as any).__admIndexEmptyMock = { crm_accounts: [], agent_submissions: [] }; });
 
   it('returns zeros and defaults when no data', async () => {
     const stats = await getDashboardStats();

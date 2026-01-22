@@ -8,30 +8,19 @@ import { createClient } from '@/lib/supabase/server';
 import { bulkApproveTimeEntries } from '@/lib/timesheets';
 import { apiLogger } from '@/lib/logger';
 
+import { getServerSession } from '@/lib/permissions/check-permission';
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
+    const session = await getServerSession();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('id, business_id, role')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
     // Only admins/owners can bulk approve
-    if (profile.role === 'technician') {
+    if (session.user.role === 'technician') {
       return NextResponse.json(
         { error: 'Only administrators can approve time entries' },
         { status: 403 }
@@ -40,6 +29,16 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { entry_ids } = body;
+
+    // Use admin provided businessId if available, otherwise session businessId
+    let businessId = session.user.businessId;
+    if (session.user.role === 'admin' || session.user.role === 'super_admin') {
+      if (body.businessId) businessId = body.businessId;
+    }
+
+    if (!businessId) {
+        return NextResponse.json({ error: 'Business ID required' }, { status: 400 });
+    }
 
     if (!entry_ids || !Array.isArray(entry_ids) || entry_ids.length === 0) {
       return NextResponse.json(
@@ -52,7 +51,7 @@ export async function POST(request: NextRequest) {
     const { data: entries } = await supabase
       .from('timesheets')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', businessId)
       .in('id', entry_ids);
 
     if (!entries || entries.length !== entry_ids.length) {
@@ -62,7 +61,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await bulkApproveTimeEntries(entry_ids, profile.id);
+    const result = await bulkApproveTimeEntries(entry_ids, session.user.id);
 
     return NextResponse.json({
       success: true,

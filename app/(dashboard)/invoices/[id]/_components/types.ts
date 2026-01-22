@@ -18,6 +18,28 @@ export interface Payment {
   paid_at: string;
 }
 
+export interface PaymentPlanInstallment {
+  id: string;
+  installment_number: number;
+  amount: number;
+  due_date: string;
+  status: 'pending' | 'paid' | 'overdue' | string;
+  paid_at?: string;
+}
+
+export interface PaymentPlan {
+  id: string;
+  invoice_id?: string;
+  total_amount: number;
+  down_payment?: number;
+  number_of_installments: number;
+  frequency: 'weekly' | 'biweekly' | 'monthly' | string;
+  start_date: string;
+  status: 'active' | 'completed' | 'cancelled' | string;
+  installments: PaymentPlanInstallment[];
+  created_at?: string;
+}
+
 export interface Invoice {
   id: string;
   invoice_number: string;

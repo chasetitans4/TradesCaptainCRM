@@ -66,7 +66,7 @@ export function PromotionFormDialog({
               id="name"
               value={formData.name}
               onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-              placeholder="e.g., Summer Sale 2024"
+              placeholder="e.g., Summer Sale 2026"
             />
           </div>
 

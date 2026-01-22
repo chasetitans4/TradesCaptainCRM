@@ -634,8 +634,8 @@ export function AIAssistantWidget() {
                         className={cn(
                           'max-w-[80%] rounded-2xl px-3 py-2',
                           message.role === 'user'
-                            ? 'bg-primary text-white rounded-tr-sm'
-                            : 'bg-white text-gray-800 rounded-tl-sm shadow-sm'
+                            ? 'bg-primary text-primary-foreground rounded-tr-sm'
+                            : 'bg-muted text-foreground rounded-tl-sm shadow-sm'
                         )}
                       >
                         <p className="text-sm whitespace-pre-wrap">{message.content}</p>
@@ -652,7 +652,7 @@ export function AIAssistantWidget() {
                                   'px-2 py-1 rounded-lg transition-colors',
                                   message.role === 'user'
                                     ? 'bg-white/20 hover:bg-white/30 text-white'
-                                    : 'bg-primary/10 hover:bg-primary/20 text-primary'
+                                    : 'bg-primary/10 hover:bg-primary/20 text-primary dark:text-primary-foreground'
                                 )}
                               >
                                 <ExternalLink className="h-3 w-3" />

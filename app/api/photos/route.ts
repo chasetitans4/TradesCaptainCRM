@@ -5,14 +5,18 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserProfile } from '@/lib/supabase/server';
-import { uploadJobPhoto, getJobPhotos } from '@/lib/photos';
+import { getServerUserProfile, createClient } from '@/lib/supabase/server';
+import { getJobPhotos } from '@/lib/photos';
 import { checkUploadRateLimit } from '@/lib/rate-limit';
 import { apiLogger } from '@/lib/logger';
+import { processImage } from '@/lib/images/processor';
+import { v4 as uuidv4 } from 'uuid';
 
 // Allowed image types
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+type PhotoType = 'before' | 'during' | 'after' | 'issue' | 'general';
 
 export async function GET(request: NextRequest) {
   try {
@@ -95,16 +99,112 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const photoId = await uploadJobPhoto({
-      businessId: profile.business_id,
-      jobId,
-      file,
-      photoType,
-      caption: caption || undefined,
-      userId: profile.id,
-    });
+    // Convert file to buffer and compress
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
-    return NextResponse.json({ id: photoId, success: true });
+    const supabase = await createClient();
+    const fileName = `${uuidv4()}.webp`;
+    const storagePath = `${profile.business_id}/${jobId}/${fileName}`;
+    const thumbPath = `${profile.business_id}/${jobId}/${uuidv4()}_thumb.webp`;
+
+    let uploadBuffer: Buffer = buffer;
+    let uploadContentType = file.type;
+    let thumbnailBuffer: Buffer | null = null;
+    let compressionRatio: number | undefined;
+
+    try {
+      // Process and compress image
+      const processed = await processImage(buffer, {
+        outputFormat: 'webp',
+        quality: 85,
+        generatePreview: true,
+      });
+
+      uploadBuffer = Buffer.from(processed.compressed.buffer);
+      uploadContentType = 'image/webp';
+      thumbnailBuffer = Buffer.from(processed.thumbnail.buffer);
+      compressionRatio = processed.metadata.compressionRatio;
+
+      apiLogger.info({
+        msg: 'Job photo compressed',
+        originalSize: processed.metadata.originalSize,
+        compressedSize: processed.metadata.compressedSize,
+        ratio: compressionRatio?.toFixed(2),
+      });
+    } catch (compressionError) {
+      apiLogger.warn({
+        msg: 'Photo compression failed, using original',
+        error: compressionError instanceof Error ? compressionError.message : 'Unknown error',
+      });
+    }
+
+    // Upload main image
+    const { error: uploadError } = await supabase.storage
+      .from('job-photos')
+      .upload(storagePath, uploadBuffer, {
+        contentType: uploadContentType,
+        cacheControl: '31536000',
+        upsert: false,
+      });
+
+    if (uploadError) throw uploadError;
+
+    // Upload thumbnail if compression succeeded
+    let thumbnailUrl: string | undefined;
+    if (thumbnailBuffer) {
+      const { error: thumbError } = await supabase.storage
+        .from('job-photos')
+        .upload(thumbPath, thumbnailBuffer, {
+          contentType: 'image/webp',
+          cacheControl: '31536000',
+          upsert: false,
+        });
+
+      if (!thumbError) {
+        const { data: { publicUrl: thumbPublicUrl } } = supabase.storage
+          .from('job-photos')
+          .getPublicUrl(thumbPath);
+        thumbnailUrl = thumbPublicUrl;
+      }
+    }
+
+    // Get public URL for main image
+    const { data: { publicUrl } } = supabase.storage
+      .from('job-photos')
+      .getPublicUrl(storagePath);
+
+    // Fallback thumbnail using Supabase transformation
+    if (!thumbnailUrl) {
+      thumbnailUrl = `${publicUrl}?width=200&height=200&resize=cover`;
+    }
+
+    // Save to database
+    const { data: photoData, error: dbError } = await supabase
+      .from('job_photos')
+      .insert({
+        business_id: profile.business_id,
+        job_id: jobId,
+        photo_url: publicUrl,
+        storage_path: storagePath,
+        thumbnail_url: thumbnailUrl,
+        photo_type: photoType,
+        caption: caption || null,
+        uploaded_by: profile.id,
+        taken_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (dbError) throw dbError;
+
+    return NextResponse.json({
+      id: photoData.id,
+      success: true,
+      url: publicUrl,
+      thumbnailUrl,
+      compressionRatio,
+    });
   } catch (error) {
     apiLogger.error({ error, context: 'Error uploading photo' });
     return NextResponse.json(

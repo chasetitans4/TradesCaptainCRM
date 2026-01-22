@@ -12,9 +12,6 @@ import {
   reactivateAccount,
   extendTrial,
   convertTrialToPaid,
-  getFoundersStatus,
-  claimFoundersSlot,
-  closeFoundersProgram,
   getDashboardStats,
   validateWebInvoice,
   createImpersonationToken,
@@ -39,7 +36,6 @@ jest.mock('@/lib/supabase/server', () => {
         case 'admin_users': return m.admin_users || [];
         case 'crm_accounts': return m.crm_accounts || [];
         case 'agent_submissions': return m.agent_submissions || [];
-        case 'founders_program': return m.founders_program || [];
         case 'admin_activity_log': return m.admin_activity_log || [];
         case 'crm_email_log': return m.crm_email_log || [];
         default: return [];
@@ -124,14 +120,16 @@ jest.mock('@/lib/supabase/server', () => {
       }
     };
     return {
-      from: (table: string) => ({
-        select: (fields?: string, opts?: any) => makeChain(table).select(fields, opts),
-        eq: (col: string, val: any) => makeChain(table).eq(col, val),
-        in: (col: string, val: any[]) => makeChain(table).in(col, val),
-        order: (key: string, opts?: any) => makeChain(table).order(key, opts),
-        range: (start: number, end: number) => makeChain(table).range(start, end),
-        single: () => makeChain(table).single(),
-        then: (resolve: any) => makeChain(table).then(resolve),
+      from: (table: string) => {
+        const chain = makeChain(table);
+        return {
+        select: (fields?: string, opts?: any) => chain.select(fields, opts),
+        eq: (col: string, val: any) => chain.eq(col, val),
+        in: (col: string, val: any[]) => chain.in(col, val),
+        order: (key: string, opts?: any) => chain.order(key, opts),
+        range: (start: number, end: number) => chain.range(start, end),
+        single: () => chain.single(),
+        then: (resolve: any) => chain.then(resolve),
         insert: (row: any) => {
           applyInsert(table, Array.isArray(row) ? row : { ...row, id: `${table}_id_${Date.now()}` });
           return {
@@ -164,21 +162,23 @@ jest.mock('@/lib/supabase/server', () => {
             };
           },
         }),
-      }),
+        };
+      },
     };
   };
-  return { createClient: jest.fn(() => buildClient()) };
+  return {
+    createClient: jest.fn(async () => buildClient()),
+    createAdminClient: jest.fn(() => buildClient())
+  };
 });
 
 describe('admin index: users and impersonation', () => {
   beforeEach(() => { (globalThis as any).__admIndexMock = {}; });
 
-  it('gets and creates admin user', async () => {
+  it('creates admin user and updates last login', async () => {
     (globalThis as any).__admIndexMock = {
-      admin_users: [{ id: 'u1', email: 'ADMIN@EXAMPLE.COM', name: 'Ada', role: 'admin', is_active: true }],
+      admin_users: [{ id: 'u1', email: 'admin@example.com', full_name: 'Ada', role: 'admin', status: 'active' }],
     };
-    const user = await getAdminUser('u1');
-    expect(user?.name).toBe('Ada');
     const created = await createAdminUser({ email: 'New@Example.com', name: 'New User', role: 'agent' as any, password: 'pw' });
     expect(created.email).toBe('new@example.com');
     expect(created.role).toBe('agent');
@@ -190,7 +190,7 @@ describe('admin index: users and impersonation', () => {
 
   it('getAdminUser returns null on error and getAdminByEmail returns null on error', async () => {
     (globalThis as any).__admIndexMock = {
-      admin_users: [{ id: 'u1', email: 'ADMIN@EXAMPLE.COM', name: 'Ada', role: 'admin', is_active: true }],
+      admin_users: [{ id: 'u1', email: 'admin@example.com', full_name: 'Ada', role: 'admin', status: 'active' }],
       singleError: { message: 'db' },
       singleTable: 'admin_users',
     };
@@ -202,7 +202,7 @@ describe('admin index: users and impersonation', () => {
 
   it('getAdminUsers throws when list query errors', async () => {
     (globalThis as any).__admIndexMock = {
-      admin_users: [{ id: 'u1', email: 'ADMIN@EXAMPLE.COM', name: 'Ada', role: 'admin', is_active: true }],
+      admin_users: [{ id: 'u1', email: 'admin@example.com', full_name: 'Ada', role: 'admin', status: 'active' }],
       listError: new Error('db'),
       listTable: 'admin_users',
     };
@@ -232,7 +232,7 @@ describe('admin index: users and impersonation', () => {
 describe('admin index: CRM accounts and submissions', () => {
   beforeEach(() => { (globalThis as any).__admIndexMock = {}; });
 
-  it('creates CRM account for trial and founders, updates and filters listing', async () => {
+  it('creates CRM account for trial, updates and filters listing', async () => {
     (globalThis as any).__admIndexMock = { crm_accounts: [], admin_users: [{ id: 'agent-1', name: 'Agent', email: 'a@e.com' }] };
     const trial = await createCRMAccount({
       businessName: 'Trial Co',
@@ -240,29 +240,25 @@ describe('admin index: CRM accounts and submissions', () => {
       ownerName: 'Owner',
       planType: 'blue_pro' as any,
       isTrial: true,
-      isFounders: false,
       agentId: 'agent-1',
     });
     expect(trial.plan_status).toBe('trial');
     expect(trial.monthly_price).toBe(0);
-    const founders = await createCRMAccount({
-      businessName: 'Founders Co',
-      ownerEmail: 'F@E.com',
-      ownerName: 'F',
+    const active = await createCRMAccount({
+      businessName: 'Active Co',
+      ownerEmail: 'A@E.com',
+      ownerName: 'A',
       planType: 'blue_starter' as any,
       isTrial: false,
-      isFounders: true,
-      foundersSlotNumber: 7,
-    } as any);
-    expect(founders.plan_status).toBe('founders');
-    expect(founders.founders_end_date).toMatch(/\d{4}-\d{2}-\d{2}/);
-    const changed = await changePlan(founders.id, 'blue_enterprise' as any);
+    });
+    expect(active.plan_status).toBe('active');
+    const changed = await changePlan(active.id, 'blue_enterprise' as any);
     expect(changed.monthly_price).toBe(149);
     const suspended = await suspendAccount(trial.id);
     expect(suspended.plan_status).toBe('suspended');
     const reactivated = await reactivateAccount(trial.id);
     expect(reactivated.plan_status).toBe('active');
-    const cancelled = await cancelAccount(founders.id);
+    const cancelled = await cancelAccount(active.id);
     expect(cancelled.plan_status).toBe('cancelled');
     const list = await getCRMAccounts({ status: 'active' as any, agentId: 'agent-1' }, 1, 25);
     expect(Array.isArray(list.accounts)).toBe(true);
@@ -325,10 +321,10 @@ describe('admin index: CRM accounts and submissions', () => {
     (globalThis as any).__admIndexMock = {
       agent_submissions: [
         { id: 's1', submission_type: 'trial', created_at: 't1' },
-        { id: 's2', submission_type: 'founders', created_at: 't2' },
+        { id: 's2', submission_type: 'trial', created_at: 't2' },
       ],
     };
-    const res = await getAgentSubmissions({ type: 'founders' as any }, 1, 10);
+    const res = await getAgentSubmissions({ type: 'trial' as any }, 1, 10);
     expect(res.total).toBeGreaterThanOrEqual(0);
   });
 
@@ -353,45 +349,8 @@ describe('admin index: CRM accounts and submissions', () => {
   });
 });
 
-describe('admin index: founders and dashboard stats', () => {
+describe('admin index: dashboard stats', () => {
   beforeEach(() => { (globalThis as any).__admIndexMock = {}; });
-
-  it('claims founders slot and closes program when full', async () => {
-    (globalThis as any).__admIndexMock = {
-      founders_program: [{ id: 'fp1', total_slots: 1, slots_used: 0, is_open: true }],
-    };
-    const status = await getFoundersStatus();
-    expect(status.is_open).toBe(true);
-    const slot = await claimFoundersSlot();
-    expect(slot).toBe(1);
-    await closeFoundersProgram();
-    const state = (globalThis as any).__admIndexMock.__state;
-    expect(state.updates.founders_program?.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('initializes founders program when missing', async () => {
-    (globalThis as any).__admIndexMock = {
-      founders_program: [],
-      singleError: { code: 'PGRST116', message: 'not found' },
-      singleTable: 'founders_program',
-    };
-    const status = await getFoundersStatus();
-    expect(status.slots_used).toBe(0);
-    expect(status.is_open).toBe(true);
-  });
-  it('claimFoundersSlot throws when program is closed', async () => {
-    (globalThis as any).__admIndexMock = {
-      founders_program: [{ id: 'fp1', total_slots: 10, slots_used: 5, is_open: false }],
-    };
-    await expect(claimFoundersSlot()).rejects.toThrow(/closed/i);
-  });
-
-  it('claimFoundersSlot throws when no slots remaining', async () => {
-    (globalThis as any).__admIndexMock = {
-      founders_program: [{ id: 'fp1', total_slots: 1, slots_used: 1, is_open: true }],
-    };
-    await expect(claimFoundersSlot()).rejects.toThrow(/No founders slots remaining/i);
-  });
 
   it('computes dashboard stats with trials, churn, and pending submissions', async () => {
     const now = new Date();
@@ -403,7 +362,6 @@ describe('admin index: founders and dashboard stats', () => {
         { id: 'a3', plan_status: 'trial', is_trial: true, trial_end_date: sevenDaysOut, trial_converted: false },
         { id: 'a4', plan_status: 'cancelled', is_trial: false, trial_converted: false },
       ],
-      founders_program: [{ id: 'fp1', total_slots: 100, slots_used: 10, is_open: true }],
       agent_submissions: [
         { id: 's1', status: 'pending' },
         { id: 's2', status: 'sent' },
@@ -414,7 +372,6 @@ describe('admin index: founders and dashboard stats', () => {
     expect(stats.totalAccounts).toBe(4);
     expect(stats.activePaying).toBe(2);
     expect(stats.trialsEndingSoon).toBe(1);
-    expect(stats.foundersRemaining).toBe(90);
     expect(stats.mrr).toBe(148);
     expect(stats.trialConversionRate).toBe(Math.round((1 / 2) * 100));
     expect(stats.churnRate).toBeCloseTo((1 / 4) * 100, 1);

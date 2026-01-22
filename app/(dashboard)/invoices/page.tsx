@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { createClient, getCurrentUserProfile } from '@/lib/supabase/client';
 import { cn, formatRelativeDate } from '@/lib/utils';
+import { showError } from '@/lib/toast';
 import type { UserWithBusiness } from '@/types';
 
 interface Invoice {
@@ -89,6 +90,7 @@ export default function InvoicesPage() {
 
   const loadInvoices = async (businessId: string) => {
     const supabase = createClient();
+    // Limit to recent invoices for performance
     const { data, error } = await supabase
       .from('invoices')
       .select(`
@@ -104,70 +106,77 @@ export default function InvoicesPage() {
         customer:customers (id, name)
       `)
       .eq('business_id', businessId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(200);
 
-    if (!error) {
-      // Check for overdue invoices
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const processedInvoices = (data || []).map((invoice) => {
-        // Mark as overdue if past due date and not paid
-        if (
-          invoice.due_date &&
-          new Date(invoice.due_date) < today &&
-          invoice.amount_due > 0 &&
-          !['paid', 'void', 'overdue'].includes(invoice.status)
-        ) {
-          return { ...invoice, status: 'overdue' };
-        }
-        return invoice;
-      });
-
-      setInvoices(processedInvoices);
+    if (error) {
+      console.error('Error loading invoices:', error);
+      showError('Failed to load invoices');
+      setLoading(false);
+      return;
     }
+
+    // Check for overdue invoices
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const processedInvoices = (data || []).map((invoice) => {
+      // Mark as overdue if past due date and not paid
+      if (
+        invoice.due_date &&
+        new Date(invoice.due_date) < today &&
+        invoice.amount_due > 0 &&
+        !['paid', 'void', 'overdue'].includes(invoice.status)
+      ) {
+        return { ...invoice, status: 'overdue' };
+      }
+      return invoice;
+    });
+
+    setInvoices(processedInvoices);
     setLoading(false);
   };
 
-  // Filter invoices
-  const filteredInvoices = invoices.filter((invoice) => {
-    // Status filter
-    if (activeFilter !== 'all' && invoice.status !== activeFilter) {
-      return false;
-    }
-
-    // Search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      const matchesNumber = invoice.invoice_number?.toLowerCase().includes(query);
-      const matchesCustomer = getCustomerName(invoice.customer)?.toLowerCase().includes(query);
-      if (!matchesNumber && !matchesCustomer) {
+  // Filter invoices - memoized to prevent unnecessary recalculations
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter((invoice) => {
+      // Status filter
+      if (activeFilter !== 'all' && invoice.status !== activeFilter) {
         return false;
       }
-    }
 
-    return true;
-  });
+      // Search filter
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const matchesNumber = invoice.invoice_number?.toLowerCase().includes(query);
+        const matchesCustomer = getCustomerName(invoice.customer)?.toLowerCase().includes(query);
+        if (!matchesNumber && !matchesCustomer) {
+          return false;
+        }
+      }
 
-  // Get counts for tabs
-  const getCounts = () => {
-    const counts: Record<string, number> = { all: invoices.length };
-    invoices.forEach((inv) => {
-      counts[inv.status] = (counts[inv.status] || 0) + 1;
+      return true;
     });
-    return counts;
-  };
-  const counts = getCounts();
+  }, [invoices, activeFilter, searchQuery]);
 
-  // Calculate totals
-  const totals = {
+  // Get counts for tabs - memoized
+  const counts = useMemo(() => {
+    const result: Record<string, number> = { all: invoices.length };
+    invoices.forEach((inv) => {
+      result[inv.status] = (result[inv.status] || 0) + 1;
+    });
+    return result;
+  }, [invoices]);
+
+  // Calculate totals - memoized
+  const totals = useMemo(() => ({
     outstanding: invoices
       .filter((inv) => !['paid', 'void', 'draft'].includes(inv.status))
       .reduce((sum, inv) => sum + (inv.amount_due || 0), 0),
     overdue: invoices
       .filter((inv) => inv.status === 'overdue')
       .reduce((sum, inv) => sum + (inv.amount_due || 0), 0),
-  };
+  }), [invoices]);
 
   if (loading || !user) {
     return <InvoicesSkeleton />;

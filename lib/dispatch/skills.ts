@@ -429,9 +429,10 @@ export async function getExpiringCertifications(
     .select(`
       user_id,
       certification_expires_at,
-      user:users(name, business_id),
+      user:users!inner(name, business_id),
       skill:skill_definitions(name)
     `)
+    .eq('user.business_id', businessId)
     .not('certification_expires_at', 'is', null)
     .lte('certification_expires_at', expiryDate.toISOString())
     .gte('certification_expires_at', new Date().toISOString());
@@ -445,18 +446,16 @@ export async function getExpiringCertifications(
   }> = [];
 
   for (const item of data || []) {
-    if ((item.user as any)?.business_id === businessId) {
-      const expiresAt = new Date(item.certification_expires_at);
-      const daysRemaining = Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    const expiresAt = new Date(item.certification_expires_at);
+    const daysRemaining = Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 
-      results.push({
-        userId: item.user_id,
-        userName: (item.user as any)?.name || '',
-        skillName: (item.skill as any)?.name || '',
-        expiresAt: item.certification_expires_at,
-        daysRemaining,
-      });
-    }
+    results.push({
+      userId: item.user_id,
+      userName: (item.user as any)?.name || '',
+      skillName: (item.skill as any)?.name || '',
+      expiresAt: item.certification_expires_at,
+      daysRemaining,
+    });
   }
 
   return results.sort((a, b) => a.daysRemaining - b.daysRemaining);

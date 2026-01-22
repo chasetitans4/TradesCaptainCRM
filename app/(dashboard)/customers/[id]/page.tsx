@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { DocumentList } from '@/components/documents/document-list';
 import type { UserWithBusiness, Customer, Lead, Job, Quote, Invoice } from '@/types';
 import {
   ArrowLeft,
@@ -36,7 +37,11 @@ import {
   Calendar,
   Clock,
   Plus,
+  Trash2,
+  Loader2,
 } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface CustomerWithStats extends Omit<Customer, 'total_jobs' | 'total_revenue'> {
   total_jobs?: number;
@@ -47,6 +52,7 @@ export default function CustomerDetailPage() {
   const router = useRouter();
   const params = useParams();
   const customerId = params.id as string;
+  const { toast } = useToast();
 
   const [user, setUser] = useState<UserWithBusiness | null>(null);
   const [customer, setCustomer] = useState<CustomerWithStats | null>(null);
@@ -55,8 +61,36 @@ export default function CustomerDetailPage() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'jobs' | 'leads' | 'quotes' | 'invoices'>('jobs');
+  const [activeTab, setActiveTab] = useState<'jobs' | 'leads' | 'quotes' | 'invoices' | 'documents'>('jobs');
   const [showActionsSheet, setShowActionsSheet] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Delete customer handler
+  const handleDeleteCustomer = async () => {
+    try {
+      const response = await fetch(`/api/customers/${customerId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete customer');
+      }
+
+      toast({
+        title: 'Customer deleted',
+        description: 'The customer has been permanently deleted.',
+      });
+
+      router.push('/customers');
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to delete customer',
+        variant: 'destructive',
+      });
+    }
+  };
 
   // Load user
   useEffect(() => {
@@ -150,6 +184,7 @@ export default function CustomerDetailPage() {
     { id: 'leads', label: 'Leads', count: leads.length, icon: Users },
     { id: 'quotes', label: 'Quotes', count: quotes.length, icon: FileText },
     { id: 'invoices', label: 'Invoices', count: invoices.length, icon: DollarSign },
+    { id: 'documents', label: 'Documents', count: 0, icon: FileText },
   ];
 
   return (
@@ -212,11 +247,39 @@ export default function CustomerDetailPage() {
                     New Quote
                   </Button>
                 </Link>
+                {hasPermission(user.role, 'manage_customers') && (
+                  <>
+                    <div className="border-t border-border my-2" />
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start gap-3 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => {
+                        setShowActionsSheet(false);
+                        setShowDeleteConfirm(true);
+                      }}
+                    >
+                      <Trash2 className="h-5 w-5" />
+                      Delete Customer
+                    </Button>
+                  </>
+                )}
               </div>
             </SheetContent>
           </Sheet>
         </div>
       </header>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete Customer?"
+        description={`Are you sure you want to delete "${customer.name}"? This action cannot be undone.`}
+        confirmLabel="Delete Permanently"
+        variant="destructive"
+        icon={Trash2}
+        onConfirm={handleDeleteCustomer}
+      />
 
       {/* Main Content */}
       <div className="px-4 py-4 space-y-4">
@@ -468,6 +531,16 @@ export default function CustomerDetailPage() {
                 ))
               )}
             </>
+          )}
+
+          {activeTab === 'documents' && (
+            <div className="card p-3">
+              <DocumentList
+                entityType="customer"
+                entityId={customerId}
+                readOnly={!hasPermission(user.role, 'manage_customers')}
+              />
+            </div>
           )}
         </div>
       </div>

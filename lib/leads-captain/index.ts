@@ -421,12 +421,12 @@ async function checkSoftCaps(businessId: string): Promise<void> {
 }
 
 // =====================================================
-// PLAN FEATURE CHECKING (v5.9 - Uses plan_leads_captain_features table)
+// PLAN FEATURE CHECKING (v6.3 - Leads Captain is now an add-on)
 // =====================================================
 
 interface PlanFeatures {
-  includes_leads_captain: boolean;
-  sms_included: number;
+  includes_leads_captain: boolean; // v6.3: Now always false, LC is an add-on
+  sms_included: number; // SMS limit when LC addon is active
   can_book_calendar: boolean;
   includes_crm: boolean;
   includes_calendar: boolean;
@@ -448,25 +448,69 @@ export async function getPlanFeatures(planType: string): Promise<PlanFeatures | 
 }
 
 /**
+ * Check if business has the Leads Captain add-on
+ * v6.3: LC is now a $49/mo add-on, not included in any plan
+ */
+export async function hasLeadsCaptainAddon(businessId: string): Promise<boolean> {
+  const supabase = createAdminClient();
+
+  const { data: business } = await supabase
+    .from('businesses')
+    .select('has_leads_captain_addon')
+    .eq('id', businessId)
+    .single();
+
+  return business?.has_leads_captain_addon ?? false;
+}
+
+/**
+ * Check if business is eligible for AI services
+ * v6.3: Any Blue CRM plan can purchase the LC add-on
+ */
+export async function isPlanEligibleForAI(businessId: string): Promise<boolean> {
+  const supabase = createAdminClient();
+
+  const { data: business } = await supabase
+    .from('businesses')
+    .select('plan_type, has_leads_captain_addon')
+    .eq('id', businessId)
+    .single();
+
+  if (!business) return false;
+
+  // v6.3: If they have the addon, they have access (any plan)
+  if (business.has_leads_captain_addon) {
+    return true;
+  }
+
+  // v6.3: Check if they can potentially purchase the addon
+  // Any Blue CRM plan is eligible to purchase
+  const planType = business.plan_type || '';
+  return planType.startsWith('blue_');
+}
+
+/**
  * Check if business has Leads Captain AI SMS enabled
- * Uses plan_leads_captain_features table as single source of truth
+ * v6.3: Requires the LC add-on AND user opted in
  */
 export async function hasLeadsCaptainAccess(businessId: string): Promise<boolean> {
   const supabase = createAdminClient();
 
   const { data: business } = await supabase
     .from('businesses')
-    .select('plan_type, ai_sms_enabled')
+    .select('plan_type, ai_sms_enabled, has_leads_captain_addon')
     .eq('id', businessId)
     .single();
 
   if (!business) return false;
 
-  // Check plan_leads_captain_features table (single source of truth)
-  const features = await getPlanFeatures(business.plan_type || '');
+  // v6.3: Must have the LC add-on
+  if (!business.has_leads_captain_addon) return false;
 
-  // Must have Leads Captain in plan AND ai_sms_enabled flag
-  return (features?.includes_leads_captain ?? false) && business.ai_sms_enabled;
+  // User must have opted in to AI services
+  if (!business.ai_sms_enabled) return false;
+
+  return true;
 }
 
 // Backward compatibility alias
@@ -474,39 +518,47 @@ export const hasNeverMissAccess = hasLeadsCaptainAccess;
 
 /**
  * Check if business can book calendar via Leads Captain
- * Uses plan_leads_captain_features table as single source of truth
+ * v6.3: Requires LC addon + can_book_calendar feature
  */
 export async function canBookCalendar(businessId: string): Promise<boolean> {
   const supabase = createAdminClient();
 
   const { data: business } = await supabase
     .from('businesses')
-    .select('plan_type')
+    .select('plan_type, has_leads_captain_addon')
     .eq('id', businessId)
     .single();
 
   if (!business) return false;
 
-  // Check plan_leads_captain_features table
+  // v6.3: Must have LC addon
+  if (!business.has_leads_captain_addon) return false;
+
+  // Check plan_leads_captain_features table for calendar booking
   const features = await getPlanFeatures(business.plan_type || '');
 
   return features?.can_book_calendar ?? false;
 }
 
 /**
- * Get SMS limit for business based on plan
+ * Get SMS limit for business based on plan + addon
+ * v6.3: Returns 0 if no LC addon, or tier-based limit if addon active
  */
 export async function getSMSLimit(businessId: string): Promise<number> {
   const supabase = createAdminClient();
 
   const { data: business } = await supabase
     .from('businesses')
-    .select('plan_type')
+    .select('plan_type, has_leads_captain_addon')
     .eq('id', businessId)
     .single();
 
   if (!business) return 0;
 
+  // v6.3: No SMS without LC addon
+  if (!business.has_leads_captain_addon) return 0;
+
+  // Get SMS limit from plan features (Starter=1000, Pro=2000, Enterprise=3000)
   const features = await getPlanFeatures(business.plan_type || '');
 
   return features?.sms_included ?? 0;

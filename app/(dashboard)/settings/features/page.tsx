@@ -23,6 +23,7 @@ import {
   Check,
   Star,
   Route,
+  MapPin,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -32,6 +33,7 @@ interface FeatureSettings {
   auto_review_requests: boolean;
   online_booking_enabled: boolean;
   route_optimization_enabled: boolean;
+  send_arrival_sms: boolean;
   timesheets_enabled: boolean;
   receipts_enabled: boolean;
   quotes_enabled: boolean;
@@ -75,6 +77,12 @@ const SCHEDULING_FEATURES: FeatureToggle[] = [
     label: 'Route Optimization',
     description: 'Optimize daily routes for technicians',
     icon: Route,
+  },
+  {
+    key: 'send_arrival_sms',
+    label: 'Arrival SMS',
+    description: 'Text customers when technician arrives',
+    icon: MapPin,
   },
   {
     key: 'online_booking_enabled',

@@ -376,7 +376,7 @@ export async function convertToJob(
       job_address_city: request.city,
       job_address_state: request.state,
       job_address_zip: request.zip,
-      assigned_to: additionalData?.assignedTo || null,
+      assigned_user_id: additionalData?.assignedTo || null,
       notes: additionalData?.notes || null,
       created_by: userId,
     })

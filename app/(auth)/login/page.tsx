@@ -209,11 +209,17 @@ export default function LoginPage() {
         </form>
       )}
 
-      <div className="mt-8 text-center">
-        <p className="text-text-muted">
+      <div className="mt-6 text-center">
+        <p className="text-sm text-text-muted">
           Don&apos;t have an account?{' '}
-          <Link href="/signup" className="text-primary font-medium hover:underline">
+          <Link href="/signup" className="text-primary hover:underline font-medium">
             Sign up
+          </Link>
+        </p>
+        <p className="text-sm text-text-muted mt-2">
+          Admin access?{' '}
+          <Link href="/admin/login" className="text-primary hover:underline font-medium">
+            Enter Admin Portal
           </Link>
         </p>
       </div>

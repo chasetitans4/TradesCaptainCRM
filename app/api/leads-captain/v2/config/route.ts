@@ -6,24 +6,38 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserProfile } from '@/lib/supabase/server';
+import { checkPermission, getServerSession } from '@/lib/permissions/check-permission';
 import { createAdminClient } from '@/lib/supabase/server';
 import { apiLogger } from '@/lib/logger';
 import type { UpdateConfigRequest, LeadsCaptainConfig } from '@/types/leads-captain';
 
 export async function GET() {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('view_leads_captain');
+    const session = await getServerSession();
+    
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const supabase = createAdminClient();
 
+    // Get business_id
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+    const businessId = userData.business_id;
+
     const { data: config, error } = await supabase
       .from('leads_captain_config')
       .select('*')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', businessId)
       .single();
 
     if (error && error.code !== 'PGRST116') {
@@ -50,19 +64,33 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('manage_leads_captain');
+    const session = await getServerSession();
+    
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const supabase = createAdminClient();
     const body = await request.json();
 
+    // Get business_id
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+    const businessId = userData.business_id;
+
     // Check if config already exists
     const { data: existing } = await supabase
       .from('leads_captain_config')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', businessId)
       .single();
 
     if (existing) {
@@ -76,14 +104,14 @@ export async function POST(request: NextRequest) {
     const { data: business } = await supabase
       .from('businesses')
       .select('name')
-      .eq('id', profile.business_id)
+      .eq('id', businessId)
       .single();
 
     // Create new config
     const { data: config, error } = await supabase
       .from('leads_captain_config')
       .insert({
-        business_id: profile.business_id,
+        business_id: businessId,
         business_name: body.business_name || business?.name || 'My Business',
         business_type: body.business_type || null,
         service_area: body.service_area || null,
@@ -114,7 +142,7 @@ export async function POST(request: NextRequest) {
     await supabase.from('leads_captain_audit_log').insert({
       config_id: config.id,
       action: 'config_changed',
-      actor: profile.email || 'user',
+      actor: session.user.email || 'user',
       details: { action: 'created' },
     });
 
@@ -133,19 +161,33 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const profile = await getServerUserProfile();
-    if (!profile) {
+    await checkPermission('manage_leads_captain');
+    const session = await getServerSession();
+    
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const supabase = createAdminClient();
     const body: UpdateConfigRequest = await request.json();
 
+    // Get business_id
+    const { data: userData } = await supabase
+      .from('users')
+      .select('business_id')
+      .eq('auth_user_id', session.user.id)
+      .single();
+
+    if (!userData?.business_id) {
+      return NextResponse.json({ error: 'Business not found' }, { status: 404 });
+    }
+    const businessId = userData.business_id;
+
     // Get existing config
     const { data: existing } = await supabase
       .from('leads_captain_config')
       .select('id')
-      .eq('business_id', profile.business_id)
+      .eq('business_id', businessId)
       .single();
 
     if (!existing) {
@@ -185,7 +227,7 @@ export async function PUT(request: NextRequest) {
     await supabase.from('leads_captain_audit_log').insert({
       config_id: existing.id,
       action: 'config_changed',
-      actor: profile.email || 'user',
+      actor: session.user.email || 'user',
       details: { fields_updated: Object.keys(updateData) },
     });
 

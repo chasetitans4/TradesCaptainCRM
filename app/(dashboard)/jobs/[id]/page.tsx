@@ -50,6 +50,8 @@ import { MobileDetailHeader } from '@/components/ui/mobile-breadcrumb';
 import { BottomActionBar, BottomActionBarSpacer } from '@/components/mobile/bottom-action-bar';
 import { QuickContactBar } from '@/components/mobile/quick-contact-bar';
 
+import { DocumentList } from '@/components/documents/document-list';
+
 interface JobWithDetails extends Job {
   customer: Customer;
   assigned_user?: User | null;
@@ -117,45 +119,77 @@ export default function JobDetailPage() {
         .from('jobs')
         .select(`
           *,
-          customer:customers (*),
-          assigned_user:users!jobs_assigned_user_id_fkey (*)
+          customer:customers!jobs_customer_id_fkey (*),
+          assigned_user:users!jobs_assigned_user_id_fkey (
+            id,
+            first_name,
+            last_name,
+            email,
+            phone,
+            avatar_url
+          )
         `)
         .eq('id', jobId)
         .single();
 
       if (jobError) throw jobError;
 
+      // Transform job data
+      const formattedJob = {
+        ...jobData,
+        assigned_user: jobData.assigned_user ? {
+          ...jobData.assigned_user,
+          name: `${jobData.assigned_user.first_name} ${jobData.assigned_user.last_name}`.trim()
+        } : null
+      };
+
       // Check access for technicians
-      if (user.role === 'technician' && jobData.assigned_user_id !== user.id) {
+      if (user.role === 'technician' && formattedJob.assigned_to !== user.id) {
         router.push('/jobs');
         return;
       }
 
-      setJob(jobData as JobWithDetails);
+      setJob(formattedJob as JobWithDetails);
 
       // Load notes
       const { data: notesData } = await supabase
         .from('job_notes')
         .select(`
           *,
-          user:users!job_notes_user_id_fkey (id, name)
+          user:users!job_notes_user_id_fkey (id, first_name, last_name)
         `)
         .eq('job_id', jobId)
         .order('created_at', { ascending: false });
 
-      setNotes(notesData || []);
+      const formattedNotes = (notesData || []).map((note: any) => ({
+        ...note,
+        user: note.user ? {
+          id: note.user.id,
+          name: `${note.user.first_name} ${note.user.last_name}`.trim()
+        } : null
+      }));
+
+      setNotes(formattedNotes);
 
       // Load photos
       const { data: photosData } = await supabase
         .from('job_photos')
         .select(`
           *,
-          user:users!job_photos_user_id_fkey (id, name)
+          user:users!job_photos_user_id_fkey (id, first_name, last_name)
         `)
         .eq('job_id', jobId)
         .order('created_at', { ascending: false });
 
-      setPhotos(photosData || []);
+      const formattedPhotos = (photosData || []).map((photo: any) => ({
+        ...photo,
+        user: photo.user ? {
+          id: photo.user.id,
+          name: `${photo.user.first_name} ${photo.user.last_name}`.trim()
+        } : null
+      }));
+
+      setPhotos(formattedPhotos);
     } catch (error) {
       console.error('Error loading job:', error);
       router.push('/jobs');
@@ -540,6 +574,15 @@ export default function JobDetailPage() {
             </div>
           </section>
         )}
+
+        {/* Documents */}
+        <section className="card p-4">
+          <DocumentList
+            entityType="job"
+            entityId={job.id}
+            readOnly={!hasPermission(user.role, 'manage_jobs')}
+          />
+        </section>
 
         {/* Photos */}
         <section className="card p-4">

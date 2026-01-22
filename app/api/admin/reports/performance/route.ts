@@ -4,14 +4,17 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAgentOrHigher } from '@/lib/admin/auth';
+import { checkPermission, hasServerPermission, getServerSession } from '@/lib/permissions/check-permission';
 import { getPerformanceReport } from '@/lib/admin/reports';
 import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
-    const admin = await requireAgentOrHigher();
-    if (!admin) {
+    // Check permission - agents can view reports (their own), admins can view all
+    const hasPermission = await hasServerPermission('view_reports');
+    const session = await getServerSession();
+
+    if (!hasPermission || !session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -21,8 +24,20 @@ export async function GET(request: NextRequest) {
       | 'last_month'
       | 'this_quarter'
       | 'this_year';
+    
+    const requestedAgentId = searchParams.get('agentId');
 
-    const report = await getPerformanceReport(admin.id, period);
+    // Role-based data access
+    const userRole = session.user.role;
+    const canViewOthers = ['super_admin', 'admin', 'finance', 'manager'].includes(userRole);
+    
+    // If user can view others and requested an agent ID, use it.
+    // Otherwise, force their own ID.
+    const effectiveAgentId = (canViewOthers && requestedAgentId) 
+      ? requestedAgentId 
+      : session.user.id;
+
+    const report = await getPerformanceReport(effectiveAgentId, period);
 
     return NextResponse.json(report);
   } catch (error) {

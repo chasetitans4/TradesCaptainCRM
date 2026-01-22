@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAgentOrHigher, requireAdminOrHigher } from '@/lib/admin/auth';
 import { getCRMAccount, updateCRMAccount, logAdminActivity } from '@/lib/admin';
+import { createAdminClient } from '@/lib/supabase/server';
 import { apiLogger } from '@/lib/logger';
 
 export async function GET(
@@ -21,18 +22,85 @@ export async function GET(
     }
 
     const { id } = await params;
-    const account = await getCRMAccount(id);
 
-    if (!account) {
+    // Try to get from crm_accounts first (for admin-created accounts)
+    const crmAccount = await getCRMAccount(id);
+
+    // Also try to get from businesses table (for self-registered businesses)
+    const supabase = createAdminClient();
+    const { data: business } = await supabase
+      .from('businesses')
+      .select(`
+        *,
+        users!users_business_id_fkey(id, name, email, role)
+      `)
+      .eq('id', id)
+      .single();
+
+    // If neither exists, return 404
+    if (!crmAccount && !business) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
-    // Agents can only see their own accounts
-    if (admin.role === 'agent' && account.created_by_agent_id !== admin.id) {
+    // Agents can only see their own accounts (for crm_accounts)
+    if (crmAccount && admin.role === 'agent' && crmAccount.created_by_agent_id !== admin.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    return NextResponse.json({ account });
+    // Get stats for the business
+    let userCount = 0;
+    let customerCount = 0;
+    let jobCount = 0;
+
+    if (business) {
+      // Count users
+      userCount = business.users?.length || 0;
+
+      // Count customers
+      const { count: custCount } = await supabase
+        .from('customers')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', id);
+      customerCount = custCount || 0;
+
+      // Count jobs
+      const { count: jCount } = await supabase
+        .from('jobs')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', id);
+      jobCount = jCount || 0;
+    }
+
+    // Merge data from both sources, preferring business data if available
+    const owner = business?.users?.find((u: any) => u.role === 'owner') || business?.users?.[0];
+    const account = {
+      id,
+      business_name: business?.name || crmAccount?.business_name,
+      owner_name: owner?.name || crmAccount?.owner_name,
+      owner_email: owner?.email || crmAccount?.owner_email,
+      phone: business?.phone || crmAccount?.phone,
+      email: business?.email,
+      website: business?.website,
+      address: business?.address,
+      city: business?.city,
+      state: business?.state,
+      zip: business?.zip,
+      logo_url: business?.logo_url,
+      primary_color: business?.primary_color,
+      plan_type: business?.plan_tier || crmAccount?.plan_type,
+      plan_status: business?.subscription_status || crmAccount?.plan_status || 'active',
+      trial_start_date: crmAccount?.trial_start_date,
+      trial_end_date: crmAccount?.trial_end_date,
+      founders_start_date: crmAccount?.founders_start_date,
+      founders_end_date: crmAccount?.founders_end_date,
+      cancelled_at: crmAccount?.cancelled_at,
+      created_at: business?.created_at || crmAccount?.created_at,
+      user_count: userCount,
+      customer_count: customerCount,
+      job_count: jobCount,
+    };
+
+    return NextResponse.json(account);
   } catch (error) {
     apiLogger.error({
       msg: 'Error fetching account',

@@ -1,12 +1,15 @@
 import 'openai/shims/node';
 // =====================================================
-// AI SMS AUTO-RESPONDER (OpenAI GPT-4)
+// AI SMS AUTO-RESPONDER (OpenAI GPT-4o-mini)
+// Simplified: OpenAI only, no Anthropic fallback needed
 // =====================================================
 
 import OpenAI from 'openai';
 import { createAdminClient } from '@/lib/supabase/server';
 import { sendSMS, flagForHumanAttention, formatPhoneDisplay } from './sms';
 import { aiLogger } from '@/lib/logger';
+import { sendPushNotification } from '@/lib/notifications/push';
+import { businessCache } from '@/lib/cache';
 
 let _openai: OpenAI | null = null;
 
@@ -66,7 +69,27 @@ export function isHumanHandoffRequest(message: string): boolean {
 }
 
 /**
- * Check if AI should respond based on quiet hours
+ * Check if customer has paused AI responses via portal
+ */
+async function isCustomerAIPaused(
+  customerId: string | null,
+  businessId: string
+): Promise<boolean> {
+  if (!customerId) return false;
+
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from('customer_portal_access')
+    .select('ai_paused')
+    .eq('business_id', businessId)
+    .eq('customer_id', customerId)
+    .single();
+
+  return data?.ai_paused ?? false;
+}
+
+/**
+ * Check if AI should respond based on quiet hours and customer preferences
  */
 export async function shouldAutoRespond(
   businessId: string,
@@ -74,12 +97,19 @@ export async function shouldAutoRespond(
 ): Promise<{ canRespond: boolean; reason?: string }> {
   const supabase = createAdminClient();
 
-  // Get business settings
-  const { data: business } = await supabase
-    .from('businesses')
-    .select('ai_sms_enabled, ai_sms_quiet_start, ai_sms_quiet_end, timezone')
-    .eq('id', businessId)
-    .single();
+  // Get business settings (use cache to reduce DB calls)
+  const business = await businessCache.getOrSet(
+    `ai_settings:${businessId}`,
+    async () => {
+      const { data } = await supabase
+        .from('businesses')
+        .select('ai_sms_enabled, ai_sms_quiet_start, ai_sms_quiet_end, timezone')
+        .eq('id', businessId)
+        .single();
+      return data;
+    },
+    300 // 5 minutes TTL
+  );
 
   if (!business) {
     return { canRespond: false, reason: 'Business not found' };
@@ -88,6 +118,27 @@ export async function shouldAutoRespond(
   // Check if AI SMS is enabled
   if (!business.ai_sms_enabled) {
     return { canRespond: false, reason: 'AI SMS disabled' };
+  }
+
+  // Get conversation data ONCE (previously queried twice)
+  const { data: conversation } = await supabase
+    .from('sms_conversations')
+    .select('customer_id, last_customer_message_at, is_customer_initiated')
+    .eq('id', conversationId)
+    .single();
+
+  // Check if customer has paused AI via portal
+  if (conversation?.customer_id) {
+    const isPaused = await isCustomerAIPaused(conversation.customer_id, businessId);
+    if (isPaused) {
+      // Flag for human attention since customer wants manual responses
+      await supabase
+        .from('sms_conversations')
+        .update({ needs_human_attention: true })
+        .eq('id', conversationId);
+
+      return { canRespond: false, reason: 'customer_paused_ai' };
+    }
   }
 
   // Check quiet hours
@@ -114,13 +165,7 @@ export async function shouldAutoRespond(
   }
 
   if (inQuietHours) {
-    // Check if customer initiated recently (2-hour exception)
-    const { data: conversation } = await supabase
-      .from('sms_conversations')
-      .select('last_customer_message_at, is_customer_initiated')
-      .eq('id', conversationId)
-      .single();
-
+    // Use already-fetched conversation data (removed duplicate query)
     if (conversation?.is_customer_initiated) {
       const lastMessage = new Date(conversation.last_customer_message_at);
       const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
@@ -138,29 +183,36 @@ export async function shouldAutoRespond(
 }
 
 /**
- * Get business context for AI response
+ * Get business context for AI response (cached for 5 minutes)
  */
 async function getBusinessContext(businessId: string): Promise<BusinessContext | null> {
-  const supabase = createAdminClient();
+  // Use cache to reduce database queries - business settings rarely change
+  return businessCache.getOrSet(
+    `ai_context:${businessId}`,
+    async () => {
+      const supabase = createAdminClient();
 
-  const { data: business } = await supabase
-    .from('businesses')
-    .select(`
-      id,
-      name,
-      owner_name,
-      trade_type,
-      phone,
-      twilio_phone_number,
-      business_hours,
-      ai_sms_knowledge_base,
-      ai_sms_tone,
-      timezone
-    `)
-    .eq('id', businessId)
-    .single();
+      const { data: business } = await supabase
+        .from('businesses')
+        .select(`
+          id,
+          name,
+          owner_name,
+          trade_type,
+          phone,
+          twilio_phone_number,
+          business_hours,
+          ai_sms_knowledge_base,
+          ai_sms_tone,
+          timezone
+        `)
+        .eq('id', businessId)
+        .single();
 
-  return business;
+      return business;
+    },
+    300 // 5 minutes TTL
+  );
 }
 
 /**
@@ -224,18 +276,57 @@ Guidelines:
 
 Current time: ${new Date().toLocaleString('en-US', { timeZone: business.timezone || 'America/Chicago' })}`;
 
+  try {
+    // Using gpt-4o-mini for cost efficiency (~95% cheaper than gpt-4o)
+    // SMS responses don't require the full capability of gpt-4o
+    const response = await getOpenAI().chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...history,
+        { role: 'user', content: message },
+      ],
+      max_tokens: 300,
+      temperature: 0.7,
+    });
+    const content = response.choices[0]?.message?.content;
+    if (content && content.trim().length > 0) return content;
+  } catch (error) {
+    aiLogger.error({
+      msg: 'OpenAI error in AI responder',
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : { message: 'Unknown error' },
+      conversationId,
+      businessId: business.id,
+    });
+  }
+
+  // Fallback message when OpenAI fails
+  return "I'm sorry, I couldn't process your message. Please call us directly.";
+}
+
+async function extractStructuredData(
+  message: string,
+  conversationId: string,
+  business: BusinessContext
+): Promise<Record<string, any> | null> {
+  const history = await getConversationHistory(conversationId, 6);
+  const systemPrompt = `Extract fields from the customer message about ${business.name}. Return a JSON object with keys: name, address, issue, preferred_time, urgency, email, contact_method. Use null for missing values. Do not include explanations.`;
   const response = await getOpenAI().chat.completions.create({
-    model: 'gpt-4-turbo-preview',
+    model: 'gpt-4o',
     messages: [
       { role: 'system', content: systemPrompt },
       ...history,
       { role: 'user', content: message },
     ],
-    max_tokens: 300,
-    temperature: 0.7,
+    max_tokens: 200,
+    temperature: 0,
   });
-
-  return response.choices[0]?.message?.content || "I'm sorry, I couldn't process your message. Please call us directly.";
+  const content = response.choices[0]?.message?.content || '';
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed === 'object') return parsed;
+  } catch {}
+  return null;
 }
 
 function formatBusinessHours(hours: any): string {
@@ -297,6 +388,7 @@ export async function handleIncomingWithAI(
   // Generate and send AI response
   try {
     const response = await generateAIResponse(message, conversationId, business);
+    const extracted = await extractStructuredData(message, conversationId, business);
 
     await sendSMS({
       to: customerPhone,
@@ -304,6 +396,7 @@ export async function handleIncomingWithAI(
       businessId,
       conversationId,
       isAIResponse: true,
+      metadata: extracted ? { structured: extracted } : undefined,
     });
 
     return { responded: true, response };
@@ -338,7 +431,28 @@ async function handleHumanHandoff(
 
   await flagForHumanAttention(conversationId, 'customer_requested');
 
-  // TODO: Send push notification to owner/admins
+  const supabase = createAdminClient();
+  try {
+    const { data: users } = await supabase
+      .from('users')
+      .select(`id, role, status, preferences:notification_preferences(message_notifications)`)
+      .eq('business_id', business.id)
+      .eq('status', 'active')
+      .in('role', ['owner', 'admin']);
+    for (const user of users || []) {
+      const prefs = Array.isArray(user.preferences) ? user.preferences[0] : user.preferences;
+      if (prefs?.message_notifications !== false) {
+        await sendPushNotification({
+          userId: user.id,
+          businessId: business.id,
+          title: 'SMS Handoff Requested',
+          body: `Customer requested a human. Conversation ${conversationId}.`,
+          actionType: 'open_messages',
+          actionData: { conversationId },
+        });
+      }
+    }
+  } catch {}
 }
 
 /**
@@ -361,5 +475,26 @@ async function handleConversationLimitReached(
 
   await flagForHumanAttention(conversationId, 'ai_limit_reached');
 
-  // TODO: Send push notification to owner/admins
+  const supabase = createAdminClient();
+  try {
+    const { data: users } = await supabase
+      .from('users')
+      .select(`id, role, status, preferences:notification_preferences(message_notifications)`)
+      .eq('business_id', business.id)
+      .eq('status', 'active')
+      .in('role', ['owner', 'admin']);
+    for (const user of users || []) {
+      const prefs = Array.isArray(user.preferences) ? user.preferences[0] : user.preferences;
+      if (prefs?.message_notifications !== false) {
+        await sendPushNotification({
+          userId: user.id,
+          businessId: business.id,
+          title: 'AI Reached Limit',
+          body: `Conversation requires human response. Conversation ${conversationId}.`,
+          actionType: 'open_messages',
+          actionData: { conversationId },
+        });
+      }
+    }
+  } catch {}
 }
