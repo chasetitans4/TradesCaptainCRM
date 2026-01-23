@@ -58,10 +58,8 @@ export async function POST(
     /*
     await sendEmail({
       to: submission.client_email,
-      subject: submission.submission_type === 'trial'
-        ? 'Start Your 30-Day Free CRM Trial'
-        : 'Welcome to the TradesCaptain Founders Program!',
-      template: submission.submission_type === 'trial' ? 'trial-invite' : 'founders-invite',
+      subject: 'Start Your 30-Day Free CRM Trial',
+      template: 'trial-invite',
       data: {
         companyName: submission.client_company_name,
         registrationUrl,
@@ -76,7 +74,7 @@ export async function POST(
     // Log email
     await logEmail(
       null,
-      submission.submission_type === 'trial' ? 'trial_invite' : 'founders_invite',
+      'trial_invite',
       submission.client_email,
       { submissionId: id, registrationUrl }
     );

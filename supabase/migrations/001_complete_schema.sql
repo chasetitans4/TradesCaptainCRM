@@ -2313,14 +2313,14 @@ CREATE TABLE IF NOT EXISTS agent_submissions (
 );
 
 -- FOUNDERS PROGRAM
-CREATE TABLE IF NOT EXISTS founders_program (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  total_slots INTEGER DEFAULT 100,
-  slots_used INTEGER DEFAULT 0,
-  is_open BOOLEAN DEFAULT TRUE,
-  closed_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- CREATE TABLE IF NOT EXISTS founders_program (
+--   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--   total_slots INTEGER DEFAULT 100,
+--   slots_used INTEGER DEFAULT 0,
+--   is_open BOOLEAN DEFAULT TRUE,
+--   closed_at TIMESTAMPTZ,
+--   created_at TIMESTAMPTZ DEFAULT NOW()
+-- );
 
 -- CRM EMAIL LOG
 CREATE TABLE IF NOT EXISTS crm_email_log (

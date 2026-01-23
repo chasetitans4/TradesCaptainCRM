@@ -89,7 +89,6 @@ export const planColors: Record<string, string> = {
   starter: 'bg-muted text-muted-foreground',
   gold: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400',
   nevermiss: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
-  founders: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
   enterprise: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
 };
 

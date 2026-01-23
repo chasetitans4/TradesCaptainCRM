@@ -4,7 +4,7 @@
 -- Protects sensitive admin data from unauthorized access
 -- =====================================================
 
--- Enable RLS on admin_users if not already enabled
+-- Enable RLS on admin_users
 ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies if any (idempotent migration)
@@ -46,18 +46,6 @@ FROM admin_users;
 
 -- Grant access to the safe view
 GRANT SELECT ON admin_users_safe TO authenticated;
-
--- Enable RLS on founders_program table
-ALTER TABLE founders_program ENABLE ROW LEVEL SECURITY;
-
--- Everyone can read founders program status (it's public info)
-CREATE POLICY founders_program_read_all ON founders_program
-  FOR SELECT
-  TO authenticated
-  USING (true);
-
--- Only service role can modify founders_program
--- No INSERT/UPDATE/DELETE policies = service role only
 
 -- Enable RLS on agent_submissions
 ALTER TABLE agent_submissions ENABLE ROW LEVEL SECURITY;

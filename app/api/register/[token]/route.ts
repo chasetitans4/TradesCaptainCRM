@@ -53,7 +53,6 @@ export async function GET(
         users: plan?.users || 1,
         features: plan?.features || [],
       },
-      is_founders: submission.submission_type === 'founders',
       is_trial: submission.submission_type === 'trial',
     });
   } catch (error) {

@@ -91,8 +91,6 @@ export async function GET(
       plan_status: business?.subscription_status || crmAccount?.plan_status || 'active',
       trial_start_date: crmAccount?.trial_start_date,
       trial_end_date: crmAccount?.trial_end_date,
-      founders_start_date: crmAccount?.founders_start_date,
-      founders_end_date: crmAccount?.founders_end_date,
       cancelled_at: crmAccount?.cancelled_at,
       created_at: business?.created_at || crmAccount?.created_at,
       user_count: userCount,

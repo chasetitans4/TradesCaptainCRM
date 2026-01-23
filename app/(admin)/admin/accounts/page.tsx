@@ -57,11 +57,9 @@ interface CRMAccount {
   owner_name: string;
   phone?: string;
   plan_type: 'blue_starter' | 'blue_pro' | 'blue_enterprise';
-  plan_status: 'active' | 'trial' | 'founders' | 'cancelled' | 'expired' | 'suspended';
+  plan_status: 'active' | 'trial' | 'cancelled' | 'expired' | 'suspended';
   trial_start_date?: string;
   trial_end_date?: string;
-  founders_start_date?: string;
-  founders_end_date?: string;
   cancelled_at?: string;
   created_at: string;
 }
