@@ -127,9 +127,7 @@ export async function POST(
     }
 
     // Determine the final plan (user can change during registration for trials)
-    const finalPlan = submission.submission_type === 'founders'
-      ? 'blue_starter' // Founders always get Starter
-      : (plan_type || submission.crm_plan_selected) as PlanType;
+    const finalPlan = (plan_type || submission.crm_plan_selected) as PlanType;
 
     // Create CRM account
     const crmAccount = await createCRMAccount({
@@ -139,7 +137,6 @@ export async function POST(
       phone: submission.client_phone,
       planType: finalPlan,
       isTrial: submission.submission_type === 'trial',
-      isFounders: submission.submission_type === 'founders',
       webInvoiceNumber: submission.web_invoice_number,
       webPlanType: submission.web_plan_type,
       agentId: submission.agent_id,
@@ -154,7 +151,6 @@ export async function POST(
         plan_type: finalPlan,
         settings: {
           is_trial: submission.submission_type === 'trial',
-          is_founders: submission.submission_type === 'founders',
           crm_account_id: crmAccount.id,
         },
       })
@@ -185,7 +181,7 @@ export async function POST(
       crmAccount.id,
       'welcome',
       submission.client_email,
-      { planType: finalPlan, isFounders: submission.submission_type === 'founders' }
+      { planType: finalPlan }
     );
 
     return NextResponse.json({
@@ -197,7 +193,6 @@ export async function POST(
         plan_type: crmAccount.plan_type,
         plan_status: crmAccount.plan_status,
         trial_end_date: crmAccount.trial_end_date,
-        founders_end_date: crmAccount.founders_end_date,
       },
     }, { status: 201 });
   } catch (error) {

@@ -325,8 +325,6 @@ export default function AccountsPage() {
                   const status = statusColors[account.plan_status] || statusColors.active;
                   const daysRemaining = account.plan_status === 'trial'
                     ? getDaysRemaining(account.trial_end_date)
-                    : account.plan_status === 'founders'
-                    ? getDaysRemaining(account.founders_end_date)
                     : null;
 
                   return (
@@ -356,7 +354,6 @@ export default function AccountsPage() {
                           variant="secondary"
                           className={`${status.bg} ${status.text} border-0`}
                         >
-                          {account.plan_status === 'founders' && <Crown className="h-3 w-3 mr-1" />}
                           {account.plan_status === 'trial' && <Clock className="h-3 w-3 mr-1" />}
                           {account.plan_status === 'active' && <CheckCircle className="h-3 w-3 mr-1" />}
                           {account.plan_status === 'cancelled' && <XCircle className="h-3 w-3 mr-1" />}
@@ -372,8 +369,6 @@ export default function AccountsPage() {
                             <div className="text-xs text-muted-foreground">
                               {account.plan_status === 'trial' && account.trial_end_date
                                 ? `Ends ${format(new Date(account.trial_end_date), 'MMM d')}`
-                                : account.founders_end_date
-                                ? `Ends ${format(new Date(account.founders_end_date), 'MMM d')}`
                                 : ''}
                             </div>
                           </div>
