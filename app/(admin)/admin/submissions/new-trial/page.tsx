@@ -39,8 +39,14 @@ import {
   isOfferAvailableForPlan,
 } from '@/lib/pricing/offers';
 
-// v6.0 Track Configuration - active tracks only
+// v6.1 Track Configuration - active tracks
 const TRACK_CONFIG: Record<PlanTrack, { icon: React.ElementType; label: string; description: string; color: string }> = {
+  crm: {
+    icon: Building2,
+    label: 'CRM',
+    description: 'CRM for business management',
+    color: 'bg-blue-100 text-blue-700 border-blue-200',
+  },
   blue: {
     icon: Building2,
     label: 'Blue (CRM)',
@@ -58,6 +64,12 @@ const TRACK_CONFIG: Record<PlanTrack, { icon: React.ElementType; label: string; 
     label: 'SEO/AEO',
     description: 'SEO & AI Engine Optimization',
     color: 'bg-green-100 text-green-700 border-green-200',
+  },
+  gold: {
+    icon: DollarSign,
+    label: 'Gold Bundle',
+    description: 'Complete: CRM + Web + SEO + Leads Captain',
+    color: 'bg-yellow-100 text-yellow-700 border-yellow-200',
   },
 };
 

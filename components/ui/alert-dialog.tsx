@@ -71,6 +71,14 @@ export function AlertDialogContent({ children, className }: {
 }) {
   const { open, onOpenChange } = useAlertDialogContext();
 
+  // Lock body scroll when open (scroll ownership)
+  React.useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [open]);
+
   if (!open) return null;
 
   return (

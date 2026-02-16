@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { sendOutreachMessage } from '@/lib/outreach/sms';
+import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { apiLogger } from '@/lib/logger';
 
 interface RouteParams {
@@ -13,6 +14,9 @@ interface RouteParams {
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    const admin = await requireAgentOrHigher();
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { id } = await params;
     const supabase = await createClient();
 
@@ -45,6 +49,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
+    const admin = await requireAgentOrHigher();
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { id } = await params;
     const body = await request.json();
     const supabase = await createClient();

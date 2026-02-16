@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { jobLogger } from '@/lib/logger';
+import { verifyCronAuth } from '@/lib/auth/cron-guard';
 import {
   generateInsightsForBusiness,
   buildConversationSummary,
@@ -29,17 +30,9 @@ export const maxDuration = 300; // 5 minute timeout for batch processing
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
 
-  // Verify cron secret
-  const authHeader = request.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    jobLogger.warn({
-      msg: 'Unauthorized cron request',
-      path: '/api/cron/leads-captain/insights',
-    });
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  // Strict cron auth — fail-closed
+  const authError = verifyCronAuth(request);
+  if (authError) return authError;
 
   const supabase = createAdminClient();
   const results = {
@@ -217,6 +210,10 @@ export async function GET(request: NextRequest) {
  * Manual trigger for insights generation
  */
 export async function POST(request: NextRequest) {
+  // Strict cron auth — same guard for manual triggers
+  const authError = verifyCronAuth(request);
+  if (authError) return authError;
+
   const startTime = Date.now();
 
   try {

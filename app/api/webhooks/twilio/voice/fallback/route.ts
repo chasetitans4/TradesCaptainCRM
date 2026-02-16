@@ -22,15 +22,18 @@ export async function POST(request: NextRequest) {
       params[key] = value.toString();
     });
 
-    // Validate Twilio signature in production
-    if (process.env.NODE_ENV === 'production') {
+    // Validate Twilio signature (all environments)
+    if (process.env.TWILIO_AUTH_TOKEN) {
       const twilioSignature = request.headers.get('x-twilio-signature');
       const url = request.url;
 
       if (!twilioSignature || !validateTwilioSignature(twilioSignature, url, params)) {
         apiLogger.warn({ msg: 'Invalid Twilio signature on voice fallback webhook', url });
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        return new NextResponse('Forbidden', { status: 403 });
       }
+    } else {
+      apiLogger.error({ msg: 'TWILIO_AUTH_TOKEN not set - rejecting webhook' });
+      return new NextResponse('Forbidden', { status: 403 });
     }
 
     const dialCallStatus = params.DialCallStatus;

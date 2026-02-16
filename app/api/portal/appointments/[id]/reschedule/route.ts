@@ -5,11 +5,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
+import { getPortalSession } from '@/lib/portal/session';
 import { apiLogger } from '@/lib/logger';
 
 interface RescheduleRequest {
-  businessId: string;
   preferredDate: string;
   preferredTime?: string;
   reason?: string;
@@ -21,34 +20,23 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const body: RescheduleRequest = await request.json();
-    const { businessId, preferredDate, preferredTime, reason } = body;
 
-    if (!businessId || !preferredDate) {
+    // Verify portal session via signed JWT
+    const session = await getPortalSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { customerId, businessId } = session;
+
+    const body: RescheduleRequest = await request.json();
+    const { preferredDate, preferredTime, reason } = body;
+
+    if (!preferredDate) {
       return NextResponse.json(
-        { error: 'Business ID and preferred date are required' },
+        { error: 'Preferred date is required' },
         { status: 400 }
       );
-    }
-
-    // Verify portal session
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get(`portal_session_${businessId}`);
-
-    if (!sessionCookie) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    let sessionData;
-    try {
-      sessionData = JSON.parse(sessionCookie.value);
-    } catch {
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
-    }
-
-    const customerId = sessionData.customerId;
-    if (!customerId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const supabase = await createServerSupabaseClient();

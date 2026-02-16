@@ -1,11 +1,19 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 describe('logger (structured)', () => {
+  const originalEnv = process.env;
+
   beforeEach(() => {
+    jest.resetModules();
+    process.env = { ...originalEnv, LOG_LEVEL: 'debug' };
     jest.spyOn(console, 'info').mockImplementation(() => {});
     jest.spyOn(console, 'warn').mockImplementation(() => {});
     jest.spyOn(console, 'error').mockImplementation(() => {});
     jest.spyOn(console, 'debug').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
   });
 
   it('logApiRequest logs info/warn/error by status code', () => {

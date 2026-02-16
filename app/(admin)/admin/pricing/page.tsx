@@ -27,8 +27,14 @@ import Link from 'next/link';
 
 const adminPricingLogger = logger.child({ context: 'admin.pricing' });
 
-// v6.0 Track Configuration - active products only
+// v6.1 Track Configuration - active products
 const TRACK_CONFIG: Record<PlanTrack, { label: string; description: string; icon: React.ElementType; color: string }> = {
+  crm: {
+    label: 'CRM',
+    description: 'CRM plans - core business management',
+    icon: Users,
+    color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  },
   blue: {
     label: 'Blue (CRM)',
     description: 'CRM plans - Pro/Enterprise include AI SMS (Leads Captain)',
@@ -37,7 +43,7 @@ const TRACK_CONFIG: Record<PlanTrack, { label: string; description: string; icon
   },
   web: {
     label: 'Web (Website)',
-    description: 'Professional website plans',
+    description: 'Professional website plans with setup fees',
     icon: Globe,
     color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
   },
@@ -46,6 +52,12 @@ const TRACK_CONFIG: Record<PlanTrack, { label: string; description: string; icon
     description: 'SEO & AI Engine Optimization for existing websites',
     icon: MapPin,
     color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  },
+  gold: {
+    label: 'Gold Bundle',
+    description: 'Complete bundle: CRM + Web + SEO + Leads Captain',
+    icon: DollarSign,
+    color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
   },
 };
 
@@ -324,8 +336,9 @@ export default function PricingManagementPage() {
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="font-medium">{addon.name}</h3>
                   <span className="font-bold text-green-600 dark:text-green-400">
-                    ${addon.price}
-                    {addon.billing_type === 'recurring' && '/mo'}
+                    {addon.billing_type === 'one_time' && `$${addon.setup_price}`}
+                    {addon.billing_type === 'recurring' && `$${addon.monthly_price}/mo`}
+                    {addon.billing_type === 'setup_and_recurring' && `$${addon.setup_price} + $${addon.monthly_price}/mo`}
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">{addon.description}</p>

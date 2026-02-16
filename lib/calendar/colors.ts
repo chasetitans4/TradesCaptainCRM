@@ -14,7 +14,7 @@ export type JobType =
   | 'callback'
   | 'other';
 
-export type JobStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+export type JobStatus = 'scheduled' | 'on_way' | 'in_progress' | 'completed' | 'return_needed' | 'callback' | 'cancelled' | 'no_show';
 
 export interface JobColorScheme {
   bg: string;
@@ -89,9 +89,13 @@ export const JOB_TYPE_COLORS: Record<JobType, JobColorScheme> = {
 // Status overlay colors (applied on top of job type colors)
 export const JOB_STATUS_MODIFIERS: Record<JobStatus, { opacity: number; strikethrough?: boolean }> = {
   scheduled: { opacity: 1 },
+  on_way: { opacity: 1 },
   in_progress: { opacity: 1 },
   completed: { opacity: 0.6, strikethrough: true },
+  return_needed: { opacity: 0.8 },
+  callback: { opacity: 0.8 },
   cancelled: { opacity: 0.4, strikethrough: true },
+  no_show: { opacity: 0.4, strikethrough: true },
 };
 
 // Priority indicators

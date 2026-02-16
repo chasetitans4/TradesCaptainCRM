@@ -42,6 +42,8 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { QuietCustomerFlag } from '@/components/customers/quiet-customer-flag';
+import { MaintenanceAgreementTracker, useCustomerAgreement } from '@/components/customers';
 
 interface CustomerWithStats extends Omit<Customer, 'total_jobs' | 'total_revenue'> {
   total_jobs?: number;
@@ -355,6 +357,28 @@ export default function CustomerDetailPage() {
           )}
         </section>
 
+        {/* Quiet Customer Flag - Per CIL Spec Section 3.1 */}
+        <QuietCustomerFlag
+          customerId={customer.id}
+          customerFirstName={customer.name.split(' ')[0]}
+          businessName={user.business?.name || ''}
+          lastJobDate={
+            jobs.find((j) => j.status === 'completed')?.completed_at ||
+            jobs.find((j) => j.status === 'completed')?.scheduled_date
+          }
+          tags={customer.tags}
+          phone={customer.phone}
+          userId={user.id}
+          className="mt-4"
+        />
+
+        {/* Maintenance Agreement Tracker - Per CIL Spec Section 4.1 */}
+        <MaintenanceAgreementTrackerWrapper
+          customerId={customer.id}
+          userId={user.id}
+          completedJobsCount={jobs.filter((j) => j.status === 'completed').length}
+        />
+
         {/* Tabs */}
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
           {tabs.map((tab) => {
@@ -549,6 +573,33 @@ export default function CustomerDetailPage() {
 }
 
 // Helper components and functions
+
+/**
+ * Wrapper for MaintenanceAgreementTracker that fetches agreement data
+ */
+function MaintenanceAgreementTrackerWrapper({
+  customerId,
+  userId,
+  completedJobsCount,
+}: {
+  customerId: string;
+  userId: string;
+  completedJobsCount: number;
+}) {
+  const { agreement, isLoading } = useCustomerAgreement(customerId);
+
+  if (isLoading) return null;
+
+  return (
+    <MaintenanceAgreementTracker
+      customerId={customerId}
+      userId={userId}
+      completedJobsCount={completedJobsCount}
+      agreement={agreement}
+      className="mt-3"
+    />
+  );
+}
 
 function EmptyState({
   icon: Icon,

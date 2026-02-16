@@ -8,8 +8,9 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, error, errorMessage, id, ...props }, ref) => {
-    // Generate unique ID for error message association
-    const inputId = id || React.useId();
+    // Generate unique ID for error message association (must call unconditionally)
+    const generatedId = React.useId();
+    const inputId = id || generatedId;
     const errorId = `${inputId}-error`;
     const hasError = error || !!errorMessage;
 

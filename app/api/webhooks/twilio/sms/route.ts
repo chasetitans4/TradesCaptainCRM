@@ -2,6 +2,7 @@
 // TWILIO INCOMING SMS WEBHOOK
 // POST /api/webhooks/twilio/sms
 // Includes Leads Captain v2.0 with rules-first processing
+// Spec v1.1 Compliant - State Machine Integration
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -25,8 +26,9 @@ import {
   handleLeadsCaptainInboundSMS,
   TwilioInboundSmsPayload,
 } from '@/lib/leads-captain';
-import { processInboundMessage, type ProcessorOptions } from '@/lib/leads-captain/v2';
+import { processInboundMessage, type ProcessorOptions, handleCompliance } from '@/lib/leads-captain/v2';
 import { sendSMS } from '@/lib/twilio';
+import { initializeConversationState, startQualifying } from '@/lib/leads-captain/state-machine';
 
 /**
  * Check if message has already been processed (idempotency)
@@ -71,17 +73,48 @@ async function getV2ConfigId(
 
 /**
  * Handle message processing with Leads Captain v2
+ * Spec v1.1 Compliant - includes state machine integration
  */
 async function handleLeadsCaptainV2(
-  _supabase: ReturnType<typeof createAdminClient>,
+  supabase: ReturnType<typeof createAdminClient>,
   configId: string,
   businessId: string,
   from: string,
   to: string,
   body: string,
-  messageSid: string
+  messageSid: string,
+  isNewConversation: boolean = false
 ): Promise<void> {
   try {
+    // Spec v1.1: Check compliance with TCPA audit logging
+    const complianceResult = await handleCompliance(
+      body,
+      from,
+      configId,
+      '', // Business name will be fetched inside
+      messageSid
+    );
+
+    if (complianceResult.is_compliance_message) {
+      smsLogger.info({
+        msg: 'Leads Captain v2 compliance message handled',
+        businessId,
+        complianceType: complianceResult.compliance_type,
+        keyword: complianceResult.keyword_matched,
+      });
+
+      // Send compliance response
+      if (complianceResult.response_required && complianceResult.response_text) {
+        await sendSMS({
+          to: from,
+          body: complianceResult.response_text,
+          businessId,
+          isAIResponse: false, // Compliance messages are system messages
+        });
+      }
+      return; // Don't process further for compliance messages
+    }
+
     const options: ProcessorOptions = {
       config_id: configId,
       business_id: businessId,
@@ -92,6 +125,29 @@ async function handleLeadsCaptainV2(
     };
 
     const result = await processInboundMessage(options);
+
+    // Spec v1.1: Initialize conversation state for new conversations
+    if (isNewConversation && result.conversation_updates) {
+      // Get the conversation ID from the processor
+      const { data: conv } = await supabase
+        .from('leads_captain_conversations_v2')
+        .select('id')
+        .eq('config_id', configId)
+        .eq('customer_phone', from)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (conv) {
+        // Initialize state with initiation evidence (TCPA compliance)
+        await initializeConversationState(conv.id, 'incoming_sms', messageSid);
+
+        // If AI responded, transition to QUALIFYING
+        if (result.should_send && result.response_content) {
+          await startQualifying(conv.id);
+        }
+      }
+    }
 
     smsLogger.info({
       msg: 'Leads Captain v2 processing complete',
@@ -156,16 +212,14 @@ export async function POST(request: NextRequest) {
       params[key] = value.toString();
     });
 
-    // Validate Twilio signature in production
-    if (process.env.NODE_ENV === 'production') {
-      const headersList = await headers();
-      const signature = headersList.get('x-twilio-signature') || '';
-      const url = request.url;
+    // Validate Twilio signature in all environments
+    const headersList = await headers();
+    const signature = headersList.get('x-twilio-signature') || '';
+    const url = request.url;
 
-      if (!validateTwilioSignature(signature, url, params)) {
-        smsLogger.warn({ msg: 'Invalid Twilio signature', url });
-        return new NextResponse('Forbidden', { status: 403 });
-      }
+    if (!validateTwilioSignature(signature, url, params)) {
+      smsLogger.warn({ msg: 'Invalid Twilio signature', url });
+      return new NextResponse('Forbidden', { status: 403 });
     }
 
     const {
@@ -330,8 +384,9 @@ export async function POST(request: NextRequest) {
       const v2ConfigId = await getV2ConfigId(supabase, business.id);
 
       if (v2ConfigId) {
-        // Route to Leads Captain v2 processor (rules-first)
-        await handleLeadsCaptainV2(supabase, v2ConfigId, business.id, from, to, body, messageSid);
+        // Route to Leads Captain v2 processor (rules-first, spec v1.1 compliant)
+        const isNewConversation = conversation?.isNew ?? true;
+        await handleLeadsCaptainV2(supabase, v2ConfigId, business.id, from, to, body, messageSid, isNewConversation);
       } else {
         // Check if this business has Leads Captain v1 access
         const hasLeadsCaptain = await hasLeadsCaptainAccess(business.id);

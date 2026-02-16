@@ -7,21 +7,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { apiLogger } from '@/lib/logger';
-
-// Verify cron secret to prevent unauthorized access
-const CRON_SECRET = process.env.CRON_SECRET;
+import { verifyCronAuth } from '@/lib/auth/cron-guard';
 
 export async function GET(request: NextRequest) {
   try {
-    // SECURITY: Verify authorization - require CRON_SECRET to be configured
-    const authHeader = request.headers.get('authorization');
-    if (!CRON_SECRET) {
-      apiLogger.error({ msg: 'CRON_SECRET not configured - denying cron access' });
-      return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
-    }
-    if (authHeader !== `Bearer ${CRON_SECRET}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // Strict cron auth — fail-closed
+    const authError = verifyCronAuth(request);
+    if (authError) return authError;
 
     const supabase = await createServerSupabaseClient();
     const now = new Date().toISOString();

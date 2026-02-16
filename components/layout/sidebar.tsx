@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTodayJobCount } from '@/hooks/useTodayJobCount';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
@@ -34,6 +34,12 @@ import {
   Megaphone,
   Package,
   Zap,
+  Camera,
+  Star,
+  Bell,
+  Phone,
+  Wallet,
+  FileCheck,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -127,6 +133,38 @@ const navigationGroups: NavGroup[] = [
         href: '/inventory',
         icon: Package,
       },
+      {
+        name: 'Proof of Work',
+        href: '/settings/proof-of-work',
+        icon: Camera,
+      },
+    ],
+  },
+  {
+    id: 'communication',
+    label: 'Communication',
+    collapsible: true,
+    defaultExpanded: false,
+    items: [
+      {
+        name: 'Voice',
+        href: '/voice',
+        icon: Phone,
+        children: [
+          { name: 'Call Log', href: '/calls' },
+          { name: 'Voice Settings', href: '/settings/voice' },
+        ],
+      },
+      {
+        name: 'Follow-ups',
+        href: '/follow-ups',
+        icon: Bell,
+      },
+      {
+        name: 'Reminders',
+        href: '/reminders',
+        icon: Clock,
+      },
     ],
   },
   {
@@ -172,9 +210,41 @@ const navigationGroups: NavGroup[] = [
         ],
       },
       {
+        name: 'Reviews',
+        href: '/reviews',
+        icon: Star,
+        children: [
+          { name: 'Reviews', href: '/reviews' },
+          { name: 'Reputation', href: '/settings/reputation' },
+        ],
+      },
+      {
         name: 'Reports',
         href: '/reports',
         icon: BarChart3,
+      },
+    ],
+  },
+  {
+    id: 'finance',
+    label: 'Finance',
+    collapsible: true,
+    defaultExpanded: false,
+    items: [
+      {
+        name: 'Timesheets',
+        href: '/timesheets',
+        icon: Clock,
+      },
+      {
+        name: 'Expenses',
+        href: '/expenses',
+        icon: Wallet,
+      },
+      {
+        name: 'Receipts',
+        href: '/receipts',
+        icon: FileCheck,
       },
     ],
   },
@@ -212,6 +282,27 @@ export function Sidebar({ className, businessName = 'Your Business', planName = 
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<string[]>(['core', 'work']);
+  const todayJobCount = useTodayJobCount();
+  const [logoUrl, setLogoUrl] = useState<string>('/trades-captain-logo.png');
+
+  // Dynamic badge overrides
+  const getDynamicBadge = (itemName: string) => {
+    if (itemName === 'My Day' && todayJobCount !== null && todayJobCount > 0) {
+      return { badge: String(todayJobCount), badgeColor: 'bg-primary text-primary-foreground' };
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    fetch('/api/admin/platform-settings')
+      .then(res => res.json())
+      .then(data => {
+        if (data.settings?.platform_branding?.logo_url) {
+          setLogoUrl(data.settings.platform_branding.logo_url);
+        }
+      })
+      .catch(err => console.error('Failed to fetch logo', err));
+  }, []);
 
   // Auto-expand groups that contain active items
   useEffect(() => {
@@ -255,6 +346,10 @@ export function Sidebar({ className, businessName = 'Your Business', planName = 
       'Leads': 'nav-leads',
       'Leads Captain': 'nav-leads-captain',
       'Reports': 'nav-reports',
+      'Proof of Work': 'nav-proof-of-work',
+      'Voice': 'nav-voice',
+      'Timesheets': 'nav-timesheets',
+      'Reviews': 'nav-reviews',
     };
     return tourMap[name];
   };
@@ -262,20 +357,28 @@ export function Sidebar({ className, businessName = 'Your Business', planName = 
   return (
     <aside
       className={cn(
-        'fixed inset-y-0 left-0 z-50 w-64 flex flex-col',
-        'bg-gradient-to-b from-dark-800 to-dark-900 text-white',
+        'fixed inset-y-0 left-0 z-50 w-64 flex flex-col bg-white dark:bg-white',
         className
       )}
       role="navigation"
       aria-label="Main navigation"
-      data-tour="sidebar"
+      data-training="sidebar"
     >
-      {/* Logo */}
-      <div className="h-16 flex items-center px-6 border-b border-white/10">
-        <Link href="/dashboard" className="flex items-center">
-          <Image src="/bluehq-logo.svg" alt="BLUE HQ" width={120} height={32} />
+      {/* Logo — white background extends to top of viewport */}
+      <div className="h-16 flex items-center justify-center px-6 border-b border-gray-200 bg-white dark:bg-white">
+        <Link href="/dashboard" className="flex items-center justify-center w-full">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={logoUrl}
+            alt="Trades Captain"
+            className="h-12 w-auto max-w-full object-contain"
+            onError={(e) => { e.currentTarget.src = '/trades-captain-logo.png'; }}
+          />
         </Link>
       </div>
+
+      {/* Dark content area below logo */}
+      <div className="flex-1 flex flex-col bg-gradient-to-b from-dark-800 to-dark-900 text-white min-h-0">
 
       {/* Business Selector */}
       <div className="px-3 py-4 border-b border-white/10">
@@ -296,7 +399,7 @@ export function Sidebar({ className, businessName = 'Your Business', planName = 
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3" aria-label="Primary navigation">
+      <nav className="flex-1 overflow-y-auto scrollbar-hide py-4 px-3" aria-label="Primary navigation">
         {navigationGroups.map((group) => {
           const isGroupExpanded = expandedGroups.includes(group.id);
           const hasActiveItem = group.items.some(
@@ -357,7 +460,7 @@ export function Sidebar({ className, businessName = 'Your Business', planName = 
                               )}
                               aria-expanded={expanded}
                               aria-controls={`submenu-${item.name.replace(/\s+/g, '-')}`}
-                              data-tour={getTourId(item.name)}
+                              data-training={getTourId(item.name)}
                             >
                               <item.icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
                               <span className="flex-1 text-left">{item.name}</span>
@@ -412,20 +515,21 @@ export function Sidebar({ className, businessName = 'Your Business', planName = 
                                 : 'text-gray-300 hover:bg-white/10 hover:text-white'
                             )}
                             aria-current={active ? 'page' : undefined}
-                            data-tour={getTourId(item.name)}
+                            data-training={getTourId(item.name)}
                           >
                             <item.icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
                             <span className="flex-1">{item.name}</span>
-                            {item.badge && (
-                              <span
-                                className={cn(
-                                  'px-2 py-0.5 text-xs font-medium rounded-full',
-                                  item.badgeColor || 'bg-white/20'
-                                )}
-                              >
-                                {item.badge}
-                              </span>
-                            )}
+                            {(() => {
+                              const dynamic = getDynamicBadge(item.name);
+                              const badgeText = dynamic?.badge || item.badge;
+                              const badgeColor = dynamic?.badgeColor || item.badgeColor || 'bg-white/20';
+                              if (!badgeText) return null;
+                              return (
+                                <span className={cn('px-2 py-0.5 text-xs font-medium rounded-full', badgeColor)}>
+                                  {badgeText}
+                                </span>
+                              );
+                            })()}
                           </Link>
                         )}
                       </li>
@@ -535,6 +639,7 @@ export function Sidebar({ className, businessName = 'Your Business', planName = 
           </button>
         </div>
       </div>
+      </div>{/* end dark content area */}
     </aside>
   );
 }

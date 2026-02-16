@@ -30,7 +30,7 @@ import {
   ChevronLeft,
   MoreVertical,
 } from 'lucide-react';
-import { QuickStatusButton, JobQuickActions } from '@/components/jobs';
+import { QuickStatusButton, JobQuickActions, EntitySubTabs } from '@/components/jobs';
 
 interface JobWithDetails extends Job {
   customer: Pick<Customer, 'id' | 'name' | 'phone' | 'address_line1' | 'city'>;
@@ -43,6 +43,7 @@ type FilterOption = 'all' | 'today' | 'tomorrow' | 'week' | 'upcoming';
 const JOB_STATUSES: { value: JobStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'scheduled', label: 'Scheduled' },
+  { value: 'on_way', label: 'On My Way' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'completed', label: 'Completed' },
   { value: 'cancelled', label: 'Cancelled' },
@@ -50,8 +51,11 @@ const JOB_STATUSES: { value: JobStatus | 'all'; label: string }[] = [
 
 const STATUS_COLORS: Record<JobStatus, string> = {
   scheduled: 'bg-info/10 text-info border-info/20',
+  on_way: 'bg-primary/10 text-primary border-primary/20',
   in_progress: 'bg-warning/10 text-warning border-warning/20',
   completed: 'bg-success/10 text-success border-success/20',
+  return_needed: 'bg-warning/10 text-warning border-warning/20',
+  callback: 'bg-info/10 text-info border-info/20',
   cancelled: 'bg-danger/10 text-danger border-danger/20',
   no_show: 'bg-muted/10 text-muted-foreground border-muted/20',
 };
@@ -379,6 +383,9 @@ export default function JobsPage() {
           )}
         </div>
       </header>
+
+      {/* Entity Sub-Tabs: All Jobs | Leads | Quotes | Invoices */}
+      <EntitySubTabs counts={{ jobs: jobs.length }} />
 
       {/* Calendar Week View */}
       {viewMode === 'calendar' && (

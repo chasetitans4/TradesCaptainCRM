@@ -16,16 +16,14 @@ export async function POST(request: NextRequest) {
       params[key] = value.toString();
     });
 
-    // Validate Twilio signature in production
-    if (process.env.NODE_ENV === 'production') {
-      const headersList = await headers();
-      const signature = headersList.get('x-twilio-signature') || '';
-      const url = request.url;
+    // Validate Twilio signature
+    const headersList = await headers();
+    const signature = headersList.get('x-twilio-signature') || '';
+    const url = request.url;
 
-      if (!validateTwilioSignature(signature, url, params)) {
-        smsLogger.warn('Invalid Twilio signature', 'Invalid Twilio signature');
-        return new NextResponse('Forbidden', { status: 403 });
-      }
+    if (!validateTwilioSignature(signature, url, params)) {
+      smsLogger.warn('Invalid Twilio signature', 'Invalid Twilio signature');
+      return new NextResponse('Forbidden', { status: 403 });
     }
 
     const {

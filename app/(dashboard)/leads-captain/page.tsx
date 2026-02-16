@@ -61,7 +61,7 @@ export default function LeadsCaptainDashboardPage() {
       const configRes = await fetch('/api/leads-captain/v2/config');
       const configData = await configRes.json();
 
-      if (configData.needs_setup) {
+      if (configData.needs_setup || configData.error || !configData.config) {
         setNeedsSetup(true);
         setLoading(false);
         return;

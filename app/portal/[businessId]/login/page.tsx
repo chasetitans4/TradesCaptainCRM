@@ -9,11 +9,15 @@ interface BusinessInfo {
   name: string;
   logo_url?: string;
   primary_color?: string;
+  platform_settings?: {
+    logo_url?: string;
+    name?: string;
+  };
 }
 
 export default function PortalLoginPage() {
   const params = useParams();
-  const router = useRouter();
+  // const router = useRouter();
   const businessId = params.businessId as string;
 
   const [business, setBusiness] = useState<BusinessInfo | null>(null);
@@ -76,7 +80,7 @@ export default function PortalLoginPage() {
           businessId={businessId}
           businessName={business.name}
           primaryColor={business.primary_color}
-          logoUrl={business.logo_url}
+          logoUrl={business.logo_url || business.platform_settings?.logo_url || '/trades-captain-logo.svg'}
           onSuccess={handleSuccess}
         />
       </div>

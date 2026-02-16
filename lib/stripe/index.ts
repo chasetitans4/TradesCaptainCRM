@@ -20,3 +20,20 @@ export {
   handleInvoicePaymentFailed,
   handleCheckoutCompleted,
 } from './webhooks';
+
+// ACH Bank Transfer Payments
+export {
+  createAchPaymentIntent,
+  confirmAchPayment,
+  getAchPaymentIntent,
+  cancelAchPayment,
+  getOrCreateCustomerForAch,
+  getAchPaymentStatusInfo,
+  calculateAchFee,
+  calculateCardFee,
+  getFeeComparison,
+  type AchPaymentStatus,
+  type AchPaymentIntent,
+  type AchPaymentResult,
+  type AchStatusInfo,
+} from './ach';

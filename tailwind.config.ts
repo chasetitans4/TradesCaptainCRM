@@ -129,17 +129,65 @@ const config: Config = {
           950: '#172554',
         },
 
-        // Neutral Palette
+        // ========================================
+        // TRADES CAPTAIN SEMANTIC DESIGN TOKENS
+        // UI Constraints v2.0 - These reference CSS variables in globals.css
+        // ========================================
+        // All semantic tokens use 'tc-' prefix to distinguish from:
+        // - Raw Tailwind colors (bg-blue-500, text-gray-600)
+        // - shadcn/ui tokens (bg-destructive, text-muted-foreground)
+        // Pattern: bg-tc-accent, text-tc-success, border-tc-danger
+        // Exception: surface-* and text-* use unique names (no prefix needed)
+        // ========================================
+
+        // Surface tokens (backgrounds)
         surface: {
-          DEFAULT: 'hsl(var(--card))',
+          DEFAULT: 'var(--color-surface)',
+          muted: 'var(--color-surface-muted)',
+          elevated: 'var(--color-surface-elevated)',
+          // Legacy aliases for backwards compatibility
           secondary: 'hsl(var(--muted))',
           tertiary: 'hsl(var(--accent))',
         },
+
+        // Text tokens
         text: {
-          DEFAULT: 'hsl(var(--foreground))',
-          secondary: 'hsl(var(--muted-foreground))',
-          muted: 'hsl(var(--muted-foreground))',
+          DEFAULT: 'var(--color-text-primary)',
+          primary: 'var(--color-text-primary)',
+          secondary: 'var(--color-text-secondary)',
+          muted: 'var(--color-text-muted)',
+          // Legacy alias
           light: 'hsl(var(--muted-foreground))',
+        },
+
+        // Semantic accent (Trades Captain Blue)
+        'tc-accent': {
+          DEFAULT: 'var(--color-accent)',
+          muted: 'var(--color-accent-muted)',
+        },
+
+        // Semantic status colors
+        'tc-success': {
+          DEFAULT: 'var(--color-success)',
+          muted: 'var(--color-success-muted)',
+        },
+        'tc-warning': {
+          DEFAULT: 'var(--color-warning)',
+          muted: 'var(--color-warning-muted)',
+        },
+        'tc-danger': {
+          DEFAULT: 'var(--color-danger)',
+          muted: 'var(--color-danger-muted)',
+        },
+        'tc-info': {
+          DEFAULT: 'var(--color-info)',
+          muted: 'var(--color-info-muted)',
+        },
+
+        // Semantic border colors
+        'tc-border': {
+          DEFAULT: 'var(--color-border)',
+          muted: 'var(--color-border-muted)',
         },
 
         // UI colors (shadcn/ui compatibility)
@@ -180,11 +228,33 @@ const config: Config = {
         'xl': ['1.25rem', { lineHeight: '1.75rem' }],
         '2xl': ['1.5rem', { lineHeight: '2rem' }],
         '3xl': ['1.875rem', { lineHeight: '2.25rem' }],
+        // UI Constraints v2.0 - Section 10.2 Typography Scale
+        'micro': ['12px', { lineHeight: '1.4' }],
+        'caption': ['13px', { lineHeight: '1.5' }],
+        'body': ['15px', { lineHeight: '1.5' }],
+        'h3': ['16px', { lineHeight: '1.5', fontWeight: '500' }],
+        'h2': ['18px', { lineHeight: '1.4', fontWeight: '600' }],
+        'h1': ['22px', { lineHeight: '1.4', fontWeight: '600' }],
       },
       spacing: {
         // Mobile-friendly tap targets
         'tap': '48px',
         'tap-sm': '44px',
+        // UI Constraints v2.0 - Section 1.3 Spacing Scale (Only these values allowed)
+        '1': '4px',
+        '2': '8px',
+        '3': '12px',
+        '4': '16px',
+        '6': '24px',
+        '8': '32px',
+        '12': '48px',
+        '16': '64px',
+      },
+      transitionDuration: {
+        // UI Constraints v2.0 - Animation timing
+        'fast': '150ms',
+        'normal': '200ms',
+        'slow': '220ms',
       },
       minHeight: {
         'tap': '48px',
@@ -195,14 +265,25 @@ const config: Config = {
         'tap-sm': '44px',
       },
       borderRadius: {
+        // Existing (keep for backwards compatibility with shadcn/ui)
         'lg': '0.625rem',
         'xl': '0.875rem',
         '2xl': '1rem',
         '3xl': '1.5rem',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        // UI Constraints v2.0 spec values (use for new Trades Captain components)
+        'tc-sm': '4px',
+        'tc-md': '8px',
+        'tc-lg': '12px',
+        'tc-xl': '16px',
       },
       boxShadow: {
+        // UI Constraints v2.0 - Standard shadows (3 levels only)
+        'sm': '0 1px 2px rgba(0,0,0,0.04)',
+        'md': '0 6px 16px rgba(0,0,0,0.08)',
+        'none': 'none',
+        // Legacy shadows (for backwards compatibility)
         'soft': '0 2px 8px -2px rgba(0, 0, 0, 0.05), 0 4px 16px -4px rgba(0, 0, 0, 0.1)',
         'medium': '0 4px 12px -2px rgba(0, 0, 0, 0.08), 0 8px 24px -4px rgba(0, 0, 0, 0.12)',
         'strong': '0 8px 24px -4px rgba(0, 0, 0, 0.12), 0 16px 48px -8px rgba(0, 0, 0, 0.16)',

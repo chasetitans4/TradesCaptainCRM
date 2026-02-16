@@ -41,8 +41,9 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { LeadsCaptainConversation, LeadsCaptainMessage, ConversationDetailResponse } from '@/types/leads-captain';
+import type { LeadsCaptainConversation, LeadsCaptainMessage, ConversationDetailResponse, ConversationState } from '@/types/leads-captain';
 import { logger } from '@/lib/logger';
+import { StateBadge, HumanTakeoverBadge } from '@/components/leads-captain';
 
 export default function LeadsCaptainConversationsPage() {
   const router = useRouter();
@@ -279,7 +280,12 @@ export default function LeadsCaptainConversationsPage() {
                 <SelectContent>
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="human_takeover">Human</SelectItem>
+                  <SelectItem value="qualifying">Qualifying</SelectItem>
+                  <SelectItem value="qualified">Qualified</SelectItem>
+                  <SelectItem value="routed">Routed</SelectItem>
+                  <SelectItem value="human_takeover">Human Active</SelectItem>
+                  <SelectItem value="unresponsive">Unresponsive</SelectItem>
+                  <SelectItem value="opted_out">Opted Out</SelectItem>
                   <SelectItem value="closed">Closed</SelectItem>
                 </SelectContent>
               </Select>
@@ -314,24 +320,41 @@ export default function LeadsCaptainConversationsPage() {
                           {conv.last_message_at ? formatTime(conv.last_message_at) : ''}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant={
-                            conv.status === 'active'
-                              ? 'default'
-                              : conv.status === 'human_takeover'
-                              ? 'secondary'
-                              : 'outline'
-                          }
-                          className="text-xs"
-                        >
-                          {conv.status === 'human_takeover' ? 'Human' : conv.status}
-                        </Badge>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* State Badge - shows conversation state machine state */}
+                        {(conv as any).conversation_state && (
+                          <StateBadge state={(conv as any).conversation_state as ConversationState} />
+                        )}
+                        {/* Legacy status badge for backwards compatibility */}
+                        {!(conv as any).conversation_state && (
+                          <Badge
+                            variant={
+                              conv.status === 'active'
+                                ? 'default'
+                                : conv.status === 'human_takeover'
+                                ? 'secondary'
+                                : 'outline'
+                            }
+                            className="text-xs"
+                          >
+                            {conv.status === 'human_takeover' ? 'Human' : conv.status}
+                          </Badge>
+                        )}
+                        {/* Human takeover indicator */}
+                        {conv.status === 'human_takeover' && (
+                          <HumanTakeoverBadge isHumanActive={true} />
+                        )}
                         {conv.is_hot_lead && (
                           <Flame className="h-3 w-3 text-orange-500" />
                         )}
                         {conv.is_emergency && (
                           <AlertTriangle className="h-3 w-3 text-red-500" />
+                        )}
+                        {/* Muted indicator */}
+                        {conv.muted_until && new Date(conv.muted_until) > new Date() && (
+                          <span title="AI muted">
+                            <VolumeX className="h-3 w-3 text-slate-500" />
+                          </span>
                         )}
                         <span className="text-xs text-muted-foreground">
                           {conv.message_count} msg

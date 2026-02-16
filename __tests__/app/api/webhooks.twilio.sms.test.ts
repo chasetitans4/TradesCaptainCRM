@@ -54,24 +54,20 @@ jest.mock('@/lib/twilio', () => ({
 }));
 
 describe('twilio webhook POST', () => {
-  beforeAll(() => {
-    (process.env as any).NODE_ENV = 'production';
-  });
-
   it('rejects missing required fields with 400', async () => {
-    const prev = process.env.NODE_ENV;
-    (process.env as any).NODE_ENV = 'development';
+    const { validateTwilioSignature } = require('@/lib/twilio');
+    validateTwilioSignature.mockReturnValueOnce(true);
     const req: any = {
+      url: 'http://example.com/api/webhooks/twilio/sms',
       formData: async () => ({
         forEach: () => {},
       }),
     };
     const res = await POST(req);
     expect(res.status).toBe(400);
-    (process.env as any).NODE_ENV = prev;
   });
 
-  it('rejects invalid signature with 403 in production', async () => {
+  it('rejects invalid signature with 403', async () => {
     const req: any = {
       url: 'http://example.com/api/webhooks/twilio/sms',
       formData: async () => ({

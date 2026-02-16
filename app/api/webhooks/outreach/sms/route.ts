@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { handleInboundMessage, sendOutreachMessage, generateAIResponse } from '@/lib/outreach/sms';
 import { qualifyContact } from '@/lib/outreach/sms';
 import { smsLogger } from '@/lib/logger';
+import { verifyTwilioWebhook } from '@/lib/auth/twilio-webhook-guard';
 
 /**
  * POST /api/webhooks/outreach/sms
@@ -14,6 +15,12 @@ export async function POST(request: NextRequest) {
     const from = formData.get('From') as string;
     const body = formData.get('Body') as string;
     const messageSid = formData.get('MessageSid') as string;
+
+    // Validate Twilio webhook signature
+    const params: Record<string, string> = {};
+    formData.forEach((value, key) => { params[key] = value.toString(); });
+    const sigError = await verifyTwilioWebhook(request, params);
+    if (sigError) return sigError;
 
     if (!from || !body) {
       return NextResponse.json(

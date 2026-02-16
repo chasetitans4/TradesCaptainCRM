@@ -13,6 +13,10 @@ import {
   Save,
   Eye,
   EyeOff,
+  Palette,
+  Upload,
+  Image as ImageIcon,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { useAgentOrHigher } from '@/hooks/useAdminAuth';
 import { AdminPageHeader } from '@/components/admin/page-header';
@@ -43,8 +47,15 @@ interface NotificationSettings {
   browser_notifications: boolean;
 }
 
+interface PlatformSettings {
+  platform_branding: {
+    logo_url: string;
+    name: string;
+  };
+}
+
 export default function AdminSettingsPage() {
-  const { loading: authLoading, isAuthorized } = useAgentOrHigher();
+  const { loading: authLoading, isAuthorized, user: currentUser } = useAgentOrHigher();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<AdminProfile | null>(null);
@@ -54,6 +65,12 @@ export default function AdminSettingsPage() {
     email_weekly_summary: true,
     browser_notifications: false,
   });
+  const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoInputMode, setLogoInputMode] = useState<'upload' | 'url'>('upload');
+  const [logoUrlInput, setLogoUrlInput] = useState('');
+
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
@@ -64,7 +81,7 @@ export default function AdminSettingsPage() {
 
   useEffect(() => {
     if (isAuthorized) {
-      fetchProfile();
+      Promise.all([fetchProfile(), fetchPlatformSettings()]);
     }
   }, [isAuthorized]);
 
@@ -84,6 +101,98 @@ export default function AdminSettingsPage() {
       setLoading(false);
     }
   };
+
+  const fetchPlatformSettings = async () => {
+    try {
+      const res = await fetch('/api/admin/platform-settings');
+      if (res.ok) {
+        const data = await res.json();
+        setPlatformSettings(data.settings);
+      }
+    } catch (error) {
+      console.error('Failed to fetch platform settings', error);
+    }
+  };
+
+  const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+        showError('File size must be less than 2MB');
+        return;
+      }
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePlatformSettingsSave = async () => {
+    setSaving(true);
+    try {
+      let logoUrl = platformSettings?.platform_branding?.logo_url;
+
+      // Handle file upload
+      if (logoFile) {
+        const formData = new FormData();
+        formData.append('file', logoFile);
+
+        const uploadRes = await fetch('/api/admin/platform-settings/logo', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!uploadRes.ok) throw new Error('Failed to upload logo');
+        const data = await uploadRes.json();
+        logoUrl = data.url;
+      }
+      // Handle URL input
+      else if (logoInputMode === 'url' && logoUrlInput.trim()) {
+        // Validate URL format
+        try {
+          new URL(logoUrlInput.trim());
+          logoUrl = logoUrlInput.trim();
+        } catch {
+          showError('Please enter a valid URL');
+          setSaving(false);
+          return;
+        }
+      }
+
+      const newSettings = {
+        logo_url: logoUrl,
+        name: platformSettings?.platform_branding?.name || 'Trades Captain'
+      };
+
+      const res = await fetch('/api/admin/platform-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: 'platform_branding',
+          value: newSettings
+        }),
+      });
+
+      if (res.ok) {
+        showSuccess('Platform settings updated');
+        setLogoFile(null);
+        setLogoPreview(null);
+        setLogoUrlInput('');
+        fetchPlatformSettings();
+      } else {
+        showError('Failed to update settings');
+      }
+    } catch (error) {
+      console.error('Error updating settings:', error);
+      showError('An error occurred');
+    } finally {
+      setSaving(false);
+    }
+  };
+
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,7 +298,174 @@ export default function AdminSettingsPage() {
               <Bell className="h-4 w-4 mr-2" />
               Notifications
             </TabsTrigger>
+            {['super_admin', 'admin'].includes(currentUser?.role || '') && (
+              <TabsTrigger value="platform">
+                <Palette className="h-4 w-4 mr-2" />
+                Platform
+              </TabsTrigger>
+            )}
           </TabsList>
+
+          {/* Platform Tab */}
+          <TabsContent value="platform">
+            <Card>
+              <CardHeader>
+                <CardTitle>Platform Branding</CardTitle>
+                <CardDescription>Customize the global look and feel of the platform</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div>
+                    <Label>Platform Logo</Label>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Upload your horizontal logo. This will be displayed centered in the header of the CRM and customer portal.
+                    </p>
+
+                    {/* Sizing Guidelines */}
+                    <div className="mb-4 p-4 rounded-lg bg-muted/50 border">
+                      <p className="text-sm font-medium mb-2">Recommended Logo Specifications:</p>
+                      <ul className="text-sm text-muted-foreground space-y-1">
+                        <li>• <strong>Upload Size:</strong> 360 × 80 pixels (2x for retina displays)</li>
+                        <li>• <strong>Display Size:</strong> 180 × 40 pixels (centered in header)</li>
+                        <li>• <strong>Orientation:</strong> Horizontal / landscape format</li>
+                        <li>• <strong>Format:</strong> PNG (transparent background) or SVG recommended</li>
+                        <li>• <strong>Max File Size:</strong> 2MB</li>
+                      </ul>
+                    </div>
+
+                    {/* Input Mode Toggle */}
+                    <div className="flex items-center gap-4 mb-4">
+                      <button
+                        type="button"
+                        onClick={() => setLogoInputMode('upload')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          logoInputMode === 'upload'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                      >
+                        <Upload className="h-4 w-4" />
+                        Upload File
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLogoInputMode('url')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          logoInputMode === 'url'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        }`}
+                      >
+                        <LinkIcon className="h-4 w-4" />
+                        Image URL
+                      </button>
+                    </div>
+
+                    <div className="flex flex-col md:flex-row items-start gap-6">
+                      {/* Logo Preview */}
+                      <div className="flex flex-col items-center gap-2">
+                        <p className="text-xs text-muted-foreground">Preview (actual display size)</p>
+                        <div className="border rounded-lg p-4 bg-muted/50">
+                          {logoPreview || logoUrlInput || platformSettings?.platform_branding?.logo_url ? (
+                            <div className="relative h-10 w-[180px]">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={logoPreview || logoUrlInput || platformSettings?.platform_branding?.logo_url || ''}
+                                alt="Platform Logo"
+                                className="h-full w-full object-contain"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <div className="h-10 w-[180px] flex items-center justify-center text-muted-foreground border-2 border-dashed rounded">
+                              <span className="text-xs">180 × 40px</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex-1">
+                        {logoInputMode === 'upload' ? (
+                          <>
+                            <Label htmlFor="logo-upload" className="cursor-pointer">
+                              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                                <Button type="button" variant="outline" className="pointer-events-none">
+                                  <Upload className="h-4 w-4 mr-2" />
+                                  Upload New Logo
+                                </Button>
+                                <span className="text-sm text-muted-foreground">
+                                  {logoFile ? logoFile.name : 'No file selected'}
+                                </span>
+                              </div>
+                              <Input
+                                id="logo-upload"
+                                type="file"
+                                accept="image/png,image/svg+xml,image/jpeg,image/webp"
+                                className="hidden"
+                                onChange={handleLogoSelect}
+                              />
+                            </Label>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Accepts PNG, SVG, JPEG, or WebP files up to 2MB
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <Label htmlFor="logo-url">Logo URL</Label>
+                            <Input
+                              id="logo-url"
+                              type="url"
+                              placeholder="https://example.com/logo.png"
+                              value={logoUrlInput}
+                              onChange={(e) => setLogoUrlInput(e.target.value)}
+                              className="mt-1"
+                            />
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Paste a direct link to your logo from an image hosting service (e.g., Imgur, Postimg, Cloudinary)
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="platform-name">Platform Name</Label>
+                    <Input
+                      id="platform-name"
+                      value={platformSettings?.platform_branding?.name || ''}
+                      onChange={(e) => setPlatformSettings(prev => prev ? {
+                        ...prev,
+                        platform_branding: {
+                          ...prev.platform_branding,
+                          name: e.target.value
+                        }
+                      } : null)}
+                      className="mt-1 max-w-md"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-4">
+                  <Button onClick={handlePlatformSettingsSave} disabled={saving}>
+                    {saving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Save Changes
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Profile Tab */}
           <TabsContent value="profile">

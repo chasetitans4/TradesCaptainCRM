@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile } from '@/lib/supabase/server';
-import { deleteJobPhoto } from '@/lib/photos';
+import { deleteJobPhotoServer } from '@/lib/photos';
 import { apiLogger } from '@/lib/logger';
 
 export async function DELETE(
@@ -21,7 +21,7 @@ export async function DELETE(
 
     const { id } = await params;
 
-    await deleteJobPhoto(id);
+    await deleteJobPhotoServer(id, profile.business_id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -6,7 +6,7 @@ import { Loader2 } from 'lucide-react';
 
 const buttonVariants = cva(
   // Base styles with improved press feedback (active:scale-95 for tactile feel)
-  'inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-95 active:transition-none',
+  'inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-all duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97]',
   {
     variants: {
       variant: {
@@ -16,8 +16,8 @@ const buttonVariants = cva(
         danger: 'bg-danger text-white hover:bg-danger/90 shadow-sm', // alias for destructive
         outline: 'border border-border bg-background hover:bg-muted hover:text-primary',
         secondary: 'bg-muted text-text hover:bg-muted/80',
-        ghost: 'hover:bg-muted hover:text-primary',
-        link: 'text-primary underline-offset-4 hover:underline active:scale-100', // links shouldn't scale
+        ghost: 'hover:bg-muted hover:text-primary active:scale-100',
+        link: 'text-primary underline-offset-4 hover:underline active:scale-100',
         success: 'bg-success text-white hover:bg-success/90 shadow-sm',
         warning: 'bg-warning text-white hover:bg-warning/90 shadow-sm',
       },

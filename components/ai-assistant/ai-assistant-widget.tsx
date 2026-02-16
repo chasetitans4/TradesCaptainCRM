@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TicketCategory } from '@/lib/admin/types';
+import { useAIAssistant } from '@/lib/contexts/ai-assistant-context';
 
 interface Message {
   id: string;
@@ -55,7 +56,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 export function AIAssistantWidget() {
-  const [isOpen, setIsOpen] = useState(false);
+  const { isOpen, toggle: toggleAssistant, close: closeAssistant } = useAIAssistant();
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -96,6 +97,14 @@ export function AIAssistantWidget() {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [isOpen, isMinimized, ticketFlowState]);
+
+  // Reset minimized state when opening
+  useEffect(() => {
+    if (isOpen) {
+      setIsMinimized(false);
+      setHasUnread(false);
+    }
+  }, [isOpen]);
 
   // Add welcome message on first open
   useEffect(() => {
@@ -352,11 +361,8 @@ export function AIAssistantWidget() {
     fetchSuggestions();
   };
 
-  const toggleOpen = () => {
-    if (!isOpen) {
-      setHasUnread(false);
-    }
-    setIsOpen(!isOpen);
+  const handleClose = () => {
+    closeAssistant();
     setIsMinimized(false);
   };
 
@@ -510,7 +516,7 @@ export function AIAssistantWidget() {
 
   return (
     <>
-      {/* Floating Button */}
+      {/* Floating Chat Bubble - Upper Right */}
       <AnimatePresence>
         {!isOpen && (
           <motion.button
@@ -519,22 +525,22 @@ export function AIAssistantWidget() {
             exit={{ scale: 0, opacity: 0 }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={toggleOpen}
+            onClick={toggleAssistant}
             className={cn(
-              'fixed bottom-6 right-6 z-50',
-              'w-14 h-14 rounded-full',
-              'bg-primary text-white shadow-lg',
+              'fixed z-[70] w-12 h-12 rounded-full shadow-lg',
+              'bg-primary text-white',
               'flex items-center justify-center',
               'hover:bg-primary/90 transition-colors',
-              hasUnread && 'ring-2 ring-offset-2 ring-primary'
+              // Lower right - above bottom nav bar
+              'bottom-24 right-4',
+              // Desktop: lower right corner (no bottom bar)
+              'lg:bottom-6 lg:right-6'
             )}
             aria-label="Open AI Assistant"
           >
-            <MessageCircle className="h-6 w-6" />
+            <Bot className="h-5 w-5" />
             {hasUnread && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-xs">
-                !
-              </span>
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full" />
             )}
           </motion.button>
         )}
@@ -549,23 +555,27 @@ export function AIAssistantWidget() {
               opacity: 1,
               y: 0,
               scale: 1,
-              height: isMinimized ? 'auto' : '550px',
+              height: isMinimized ? 'auto' : '500px',
             }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
             className={cn(
-              'fixed bottom-6 right-6 z-50',
-              'w-[400px] max-w-[calc(100vw-48px)]',
-              'bg-white rounded-2xl shadow-2xl',
+              'fixed z-[70]',
+              // Mobile: above bottom nav bar
+              'bottom-24 left-4 right-4',
+              // Desktop: lower right corner
+              'lg:bottom-6 lg:right-6 lg:left-auto',
+              'lg:w-[380px] max-w-full',
+              'bg-surface rounded-2xl shadow-lg',
               'flex flex-col overflow-hidden',
-              'border border-gray-200'
+              'border border-border'
             )}
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 bg-primary text-white">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                  <Sparkles className="h-4 w-4" />
+                  <Bot className="h-4 w-4" />
                 </div>
                 <div>
                   <h3 className="font-medium text-sm">AI Assistant</h3>
@@ -592,7 +602,7 @@ export function AIAssistantWidget() {
                   )}
                 </button>
                 <button
-                  onClick={toggleOpen}
+                  onClick={handleClose}
                   className="p-2 hover:bg-white/10 rounded-lg transition-colors"
                   title="Close"
                 >
@@ -604,7 +614,7 @@ export function AIAssistantWidget() {
             {/* Chat Area */}
             {!isMinimized && (
               <>
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                <div className="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 bg-gray-50">
                   {messages.map((message) => (
                     <div
                       key={message.id}

@@ -5,6 +5,7 @@ import {
   revokeConsent,
   isSafeToContact,
 } from '@/lib/outreach/compliance';
+import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { apiLogger } from '@/lib/logger';
 
 /**
@@ -13,6 +14,9 @@ import { apiLogger } from '@/lib/logger';
  */
 export async function GET(request: NextRequest) {
   try {
+    const admin = await requireAgentOrHigher();
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const searchParams = request.nextUrl.searchParams;
     const phone = searchParams.get('phone');
     const checkFull = searchParams.get('full') === 'true';
@@ -48,6 +52,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const admin = await requireAgentOrHigher();
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const body = await request.json();
 
     const {
@@ -103,6 +110,9 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const admin = await requireAgentOrHigher();
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const searchParams = request.nextUrl.searchParams;
     const phone = searchParams.get('phone');
     const method = (searchParams.get('method') || 'manual') as 'STOP_reply' | 'manual' | 'complaint';

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { rescheduleCall, completeCall, markNoShow } from '@/lib/outreach/scheduling';
+import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { apiLogger } from '@/lib/logger';
 
 interface RouteParams {
@@ -13,6 +14,9 @@ interface RouteParams {
  */
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   try {
+    const admin = await requireAgentOrHigher();
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { id } = await params;
     const supabase = await createClient();
 
@@ -46,6 +50,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
  */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
+    const admin = await requireAgentOrHigher();
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { id } = await params;
     const body = await request.json();
     const { action, ...data } = body;
@@ -164,6 +171,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
  */
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
+    const admin = await requireAgentOrHigher();
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { id } = await params;
     const supabase = await createClient();
 

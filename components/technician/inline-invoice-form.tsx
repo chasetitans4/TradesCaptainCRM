@@ -208,7 +208,7 @@ export function InlineInvoiceForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4 animate-slide-up">
       {/* Job Info Summary */}
       {job && (
         <div className="p-3 rounded-lg bg-muted/50">

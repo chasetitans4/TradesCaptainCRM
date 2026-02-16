@@ -1,13 +1,8 @@
 export { OnboardingChecklist } from './onboarding-checklist';
 export { WelcomeModal } from './welcome-modal';
 export { FeatureTooltip } from './feature-tooltip';
-export {
-  InteractiveTour,
-  TourTriggerButton,
-  useTour,
-  resetAllTours,
-  type TourId,
-} from './interactive-tour';
+// InteractiveTour removed - consolidated into unified training system
+// Tour functionality now handled by TrainingProvider + TrainingOverlay in @/components/training
 export { PrerequisiteGate, SetupProgress } from './prerequisite-gate';
 export {
   MilestoneCelebration,

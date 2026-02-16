@@ -4,7 +4,7 @@
 // =====================================================
 
 const isProduction = process.env.NODE_ENV === 'production';
-const logLevel = process.env.LOG_LEVEL || (isProduction ? 'info' : 'debug');
+const logLevel = process.env.LOG_LEVEL || (isProduction ? 'info' : 'info');
 
 // Log level priorities
 const LOG_LEVELS: Record<string, number> = {

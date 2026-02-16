@@ -210,3 +210,178 @@ export function PageSkeleton({ type = 'table' }: { type?: 'table' | 'cards' | 'f
     </div>
   );
 }
+
+// =====================================================
+// CONSTITUTION-COMPLIANT SKELETONS
+// Per Design Constitution Section 3.13
+// =====================================================
+
+/**
+ * Job detail skeleton per Constitution Section 3.13.2
+ * Load order: header first, then content
+ */
+export function JobDetailSkeleton() {
+  return (
+    <div className="space-y-4 px-4 py-4">
+      {/* Header - loads first */}
+      <div className="flex items-center gap-3">
+        <Skeleton index={0} className="h-10 w-10 rounded-lg" />
+        <div className="flex-1 space-y-1">
+          <Skeleton index={1} className="h-6 w-48" />
+          <Skeleton index={2} className="h-5 w-24 rounded-full" />
+        </div>
+      </div>
+
+      {/* Progress stepper */}
+      <Skeleton index={3} className="h-12 w-full rounded-xl" />
+
+      {/* Quick contact - 3 buttons */}
+      <div className="grid grid-cols-3 gap-3">
+        {[4, 5, 6].map((i) => (
+          <Skeleton key={i} index={i} className="h-20 rounded-xl" />
+        ))}
+      </div>
+
+      {/* Job details card */}
+      <div className="rounded-xl border bg-background p-4 space-y-3">
+        <Skeleton index={7} className="h-5 w-24" />
+        <div className="space-y-2">
+          <Skeleton index={8} className="h-4 w-full" />
+          <Skeleton index={9} className="h-4 w-3/4" />
+          <Skeleton index={10} className="h-4 w-1/2" />
+        </div>
+      </div>
+
+      {/* Customer card */}
+      <div className="rounded-xl border bg-background p-4">
+        <div className="flex items-center gap-3">
+          <Skeleton index={11} className="h-10 w-10 rounded-full" />
+          <div className="space-y-1">
+            <Skeleton index={12} className="h-4 w-32" />
+            <Skeleton index={13} className="h-3 w-24" />
+          </div>
+        </div>
+      </div>
+
+      {/* Photos section */}
+      <div className="space-y-3">
+        <Skeleton index={14} className="h-5 w-20" />
+        <div className="grid grid-cols-3 gap-2">
+          {[15, 16, 17].map((i) => (
+            <Skeleton key={i} index={i} className="aspect-square rounded-lg" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Quick Action Bar skeleton per Constitution Section 3.7.4
+ * 70px height, 5 action buttons
+ */
+export function QuickActionBarSkeleton() {
+  return (
+    <div className="fixed bottom-16 inset-x-0 z-40 bg-background border-t border-border md:hidden">
+      <div className="h-[70px] px-3 flex items-center justify-around gap-2">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div key={i} className="flex flex-col items-center gap-1">
+            <Skeleton index={i} className="h-6 w-6 rounded" />
+            <Skeleton index={i + 5} className="h-2 w-10 rounded" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Actionable indicators skeleton per Constitution Section 3.8.3
+ */
+export function ActionableIndicatorsSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div className="flex gap-2 overflow-hidden">
+      {[...Array(count)].map((_, i) => (
+        <Skeleton
+          key={i}
+          index={i}
+          className="min-w-[100px] h-[80px] rounded-xl shrink-0"
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Today's jobs list skeleton per Constitution Section 3.8.5
+ */
+export function TodaysJobsListSkeleton({ count = 3 }: { count?: number }) {
+  return (
+    <div className="rounded-xl border bg-background overflow-hidden">
+      {[...Array(count)].map((_, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-b-0 min-h-[70px]"
+        >
+          {/* Status indicator */}
+          <Skeleton index={i * 4} className="h-4 w-4 rounded-full" />
+          {/* Time */}
+          <Skeleton index={i * 4 + 1} className="h-4 w-14" />
+          {/* Details */}
+          <div className="flex-1 space-y-1">
+            <Skeleton index={i * 4 + 2} className="h-4 w-32" />
+            <Skeleton index={i * 4 + 3} className="h-3 w-48" />
+          </div>
+          {/* Chevron */}
+          <Skeleton index={i * 4 + 4} className="h-4 w-4 rounded" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Dashboard skeleton with Constitution layout
+ * Actionable indicators + Today's jobs
+ */
+export function ConstitutionDashboardSkeleton() {
+  return (
+    <div className="space-y-4 px-4 py-4">
+      {/* Greeting */}
+      <div className="space-y-1">
+        <Skeleton index={0} className="h-6 w-48" />
+        <Skeleton index={1} className="h-4 w-32" />
+      </div>
+
+      {/* Actionable indicators */}
+      <ActionableIndicatorsSkeleton />
+
+      {/* Today's jobs header */}
+      <div className="flex items-center justify-between">
+        <Skeleton index={10} className="h-5 w-32" />
+      </div>
+
+      {/* Today's jobs list */}
+      <TodaysJobsListSkeleton />
+    </div>
+  );
+}
+
+/**
+ * Mobile form skeleton per Constitution Section 3.9.4
+ * 50px minimum input height
+ */
+export function MobileFormSkeleton({ fields = 4 }: { fields?: number }) {
+  return (
+    <div className="space-y-4 px-4">
+      {[...Array(fields)].map((_, i) => (
+        <div key={i} className="space-y-1.5">
+          <Skeleton index={i * 2} className="h-4 w-20" />
+          <Skeleton index={i * 2 + 1} className="h-[50px] w-full rounded-xl" />
+        </div>
+      ))}
+      {/* Submit button - 50px per Constitution */}
+      <Skeleton index={fields * 2} className="h-[50px] w-full rounded-xl" />
+    </div>
+  );
+}

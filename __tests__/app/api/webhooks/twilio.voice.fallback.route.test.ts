@@ -15,14 +15,31 @@ function mockNextServer() {
       text() {
         return Promise.resolve(this._body);
       }
+      static json(data: any, init?: any) {
+        return new SimpleResponse(JSON.stringify(data), init);
+      }
     }
     return { NextResponse: SimpleResponse };
   });
 }
 
+function mockTwilioLib(overrides: Record<string, unknown> = {}) {
+  const mock = {
+    validateTwilioSignature: () => true,
+    formatPhoneE164: (x: string) => x,
+    sendSMS: jest.fn(async () => ({})),
+    ...overrides,
+  };
+  jest.doMock('@/lib/twilio', () => mock);
+  jest.doMock('@/lib/twilio/client', () => mock);
+}
+
 function makeRequest(form: Record<string, string>) {
   return {
     url: 'https://example.com/api/webhooks/twilio/voice/fallback',
+    headers: {
+      get: (key: string) => key === 'x-twilio-signature' ? 'test-sig' : null,
+    },
     async formData() {
       const FD = (global as any).FormData || require('formdata-node').FormData;
       const fd = new FD();
@@ -33,9 +50,24 @@ function makeRequest(form: Record<string, string>) {
 }
 
 describe('Twilio voice fallback route', () => {
+  const origToken = process.env.TWILIO_AUTH_TOKEN;
+
+  beforeAll(() => {
+    process.env.TWILIO_AUTH_TOKEN = 'test-auth-token';
+  });
+
+  afterAll(() => {
+    if (origToken !== undefined) {
+      process.env.TWILIO_AUTH_TOKEN = origToken;
+    } else {
+      delete process.env.TWILIO_AUTH_TOKEN;
+    }
+  });
+
   it('returns voicemail TwiML and triggers Leads Captain v2 when not completed', async () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
+      mockTwilioLib();
       jest.doMock('@/lib/supabase/server', () => ({
         createAdminClient: () => ({
           from: (table: string) => {
@@ -60,10 +92,6 @@ describe('Twilio voice fallback route', () => {
         hasLeadsCaptainAccess: async () => false,
         handleMissedCall: jest.fn(async () => ({})),
       }));
-      jest.doMock('@/lib/twilio', () => ({
-        formatPhoneE164: (x: string) => x,
-        sendSMS: jest.fn(async () => ({})),
-      }));
       const route = require('@/app/api/webhooks/twilio/voice/fallback/route');
       const res: NextResponse = await route.POST(
         makeRequest({ DialCallStatus: 'no-answer', CallSid: 'CAx', From: '+15550000000', To: '+15551112222' })
@@ -78,6 +106,7 @@ describe('Twilio voice fallback route', () => {
   it('returns simple TwiML when call completed', async () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
+      mockTwilioLib();
       const route = require('@/app/api/webhooks/twilio/voice/fallback/route');
       const res: NextResponse = await route.POST(
         makeRequest({ DialCallStatus: 'completed', CallSid: 'CAy', From: '+15550000000', To: '+15551112222' })
@@ -92,6 +121,7 @@ describe('Twilio voice fallback route', () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
       const sendSpy = jest.fn(async () => ({}));
+      mockTwilioLib({ sendSMS: sendSpy });
       jest.doMock('@/lib/supabase/server', () => ({
         createAdminClient: () => ({
           from: (table: string) => {
@@ -116,10 +146,6 @@ describe('Twilio voice fallback route', () => {
         hasLeadsCaptainAccess: async () => false,
         handleMissedCall: jest.fn(async () => ({})),
       }));
-      jest.doMock('@/lib/twilio', () => ({
-        formatPhoneE164: (x: string) => x,
-        sendSMS: sendSpy,
-      }));
       const route = require('@/app/api/webhooks/twilio/voice/fallback/route');
       const res: NextResponse = await route.POST(
         makeRequest({ DialCallStatus: 'busy', CallSid: 'CAz', From: '+15550000009', To: '+15551112222' })
@@ -137,6 +163,7 @@ describe('Twilio voice fallback route', () => {
   it('handles Leads Captain v2 error gracefully without failing TwiML', async () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
+      mockTwilioLib();
       jest.doMock('@/lib/supabase/server', () => ({
         createAdminClient: () => ({
           from: (table: string) => {
@@ -157,10 +184,6 @@ describe('Twilio voice fallback route', () => {
         hasLeadsCaptainAccess: async () => false,
         handleMissedCall: jest.fn(async () => ({})),
       }));
-      jest.doMock('@/lib/twilio', () => ({
-        formatPhoneE164: (x: string) => x,
-        sendSMS: jest.fn(async () => ({})),
-      }));
       const route = require('@/app/api/webhooks/twilio/voice/fallback/route');
       const res: NextResponse = await route.POST(
         makeRequest({ DialCallStatus: 'failed', CallSid: 'CAfail', From: '+15550000020', To: '+15551112222' })
@@ -175,6 +198,7 @@ describe('Twilio voice fallback route', () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
       const handleMissedSpy = jest.fn(async () => ({}));
+      mockTwilioLib();
       jest.doMock('@/lib/supabase/server', () => ({
         createAdminClient: () => ({
           from: (table: string) => {
@@ -191,10 +215,6 @@ describe('Twilio voice fallback route', () => {
       jest.doMock('@/lib/leads-captain', () => ({
         hasLeadsCaptainAccess: async () => true,
         handleMissedCall: handleMissedSpy,
-      }));
-      jest.doMock('@/lib/twilio', () => ({
-        formatPhoneE164: (x: string) => x,
-        sendSMS: jest.fn(async () => ({})),
       }));
       const route = require('@/app/api/webhooks/twilio/voice/fallback/route');
       const res: NextResponse = await route.POST(

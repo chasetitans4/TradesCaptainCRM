@@ -451,3 +451,254 @@ export function requiresApproval(
       return false;
   }
 }
+
+// =====================================================
+// HUMAN OVERRIDE GUARDRAILS - Spec v1.1 Compliant
+// =====================================================
+
+/**
+ * Conversation states where AI is DISABLED
+ * Per spec: HUMAN_ACTIVE is ABSOLUTE - AI cannot re-engage
+ */
+const AI_DISABLED_STATES = [
+  'HUMAN_ACTIVE',
+  'OPTED_OUT',
+  'CLOSED',
+  'UNRESPONSIVE',
+] as const;
+
+/**
+ * Check if AI is allowed to respond in the current conversation state
+ *
+ * CRITICAL: Per spec Section 8, when a human takes over:
+ * - AI IMMEDIATELY disengages
+ * - State → HUMAN_ACTIVE
+ * - AI CANNOT re-engage (even if human stops responding)
+ * - NO timers, NO auto-resume
+ *
+ * AI may only re-engage if:
+ * - Customer initiates a NEW inbound conversation, OR
+ * - Admin explicitly resets the conversation via API
+ *
+ * @param conversationState Current conversation state
+ * @param humanActiveTimestamp When human took over (if applicable)
+ * @returns Whether AI is allowed to respond
+ */
+export function isAIAllowedToRespond(
+  conversationState: string | null,
+  humanActiveTimestamp?: string | null
+): {
+  allowed: boolean;
+  reason?: string;
+} {
+  // No state = new conversation, AI allowed
+  if (!conversationState) {
+    return { allowed: true };
+  }
+
+  // Check if in a disabled state
+  if (AI_DISABLED_STATES.includes(conversationState as typeof AI_DISABLED_STATES[number])) {
+    // Provide specific reason
+    switch (conversationState) {
+      case 'HUMAN_ACTIVE':
+        return {
+          allowed: false,
+          reason: humanActiveTimestamp
+            ? `Human took over at ${humanActiveTimestamp} - AI permanently disabled for this conversation`
+            : 'Human has taken over - AI permanently disabled for this conversation',
+        };
+      case 'OPTED_OUT':
+        return {
+          allowed: false,
+          reason: 'Customer has opted out',
+        };
+      case 'CLOSED':
+        return {
+          allowed: false,
+          reason: 'Conversation is closed',
+        };
+      case 'UNRESPONSIVE':
+        return {
+          allowed: false,
+          reason: 'Customer marked as unresponsive after 48+ hours',
+        };
+      default:
+        return {
+          allowed: false,
+          reason: `AI disabled in state: ${conversationState}`,
+        };
+    }
+  }
+
+  return { allowed: true };
+}
+
+/**
+ * Check if a message sender is a human team member (not AI, not customer)
+ *
+ * Used to detect when a human responds to a conversation,
+ * which triggers HUMAN_ACTIVE state and permanently disables AI.
+ *
+ * @param senderId The user ID who sent the message
+ * @param businessId The business ID
+ * @param isOutbound Whether the message is outbound (from business)
+ */
+export async function isHumanTeamMember(
+  senderId: string | null,
+  businessId: string,
+  isOutbound: boolean
+): Promise<boolean> {
+  // Inbound messages are from customer
+  if (!isOutbound) {
+    return false;
+  }
+
+  // No sender ID = AI-generated
+  if (!senderId) {
+    return false;
+  }
+
+  // Check if sender is a team member
+  // Import dynamically to avoid circular dependencies
+  const { createAdminClient } = await import('@/lib/supabase/server');
+  const supabase = createAdminClient();
+
+  const { data: user } = await supabase
+    .from('users')
+    .select('id, business_id')
+    .eq('id', senderId)
+    .eq('business_id', businessId)
+    .single();
+
+  return !!user;
+}
+
+/**
+ * Handle human takeover for a conversation
+ *
+ * Per spec Section 8: This is an ABSOLUTE rule.
+ * Once a human responds, AI is PERMANENTLY disabled.
+ * There is NO auto-resume timer.
+ *
+ * @param conversationId The conversation to take over
+ * @param humanUserId Optional: The user who took over
+ */
+export async function triggerHumanTakeover(
+  conversationId: string,
+  humanUserId?: string
+): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  const { createAdminClient } = await import('@/lib/supabase/server');
+  const supabase = createAdminClient();
+  const now = new Date().toISOString();
+
+  // Get current conversation state
+  const { data: conversation, error: fetchError } = await supabase
+    .from('leads_captain_conversations_v2')
+    .select('id, conversation_state, config_id')
+    .eq('id', conversationId)
+    .single();
+
+  if (fetchError || !conversation) {
+    return {
+      success: false,
+      error: `Conversation not found: ${conversationId}`,
+    };
+  }
+
+  const previousState = conversation.conversation_state;
+
+  // Update conversation to HUMAN_ACTIVE
+  const { error: updateError } = await supabase
+    .from('leads_captain_conversations_v2')
+    .update({
+      conversation_state: 'HUMAN_ACTIVE',
+      state_changed_at: now,
+      state_change_reason: humanUserId
+        ? `Human takeover by user ${humanUserId}`
+        : 'Human team member responded',
+      human_active_since: now,
+      status: 'human_takeover', // Legacy status field
+      requires_human: false, // Human is now active
+      // IMPORTANT: NO auto-resume timer fields
+      // Per spec, AI CANNOT re-engage automatically
+      next_follow_up_at: null,
+      routing_timeout_at: null,
+    })
+    .eq('id', conversationId);
+
+  if (updateError) {
+    jobLogger.error({
+      msg: 'Failed to trigger human takeover',
+      conversationId,
+      error: updateError.message,
+    });
+    return {
+      success: false,
+      error: updateError.message,
+    };
+  }
+
+  // Log state transition
+  await supabase.from('conversation_state_log').insert({
+    conversation_id: conversationId,
+    from_state: previousState,
+    to_state: 'HUMAN_ACTIVE',
+    reason: humanUserId
+      ? `Human takeover by user ${humanUserId}`
+      : 'Human team member responded',
+    triggered_by: 'human',
+  });
+
+  // Log audit
+  await supabase.from('leads_captain_audit_log').insert({
+    config_id: conversation.config_id,
+    conversation_id: conversationId,
+    action: 'human_takeover',
+    actor: humanUserId || 'human',
+    details: {
+      previous_state: previousState,
+      human_user_id: humanUserId,
+      timestamp: now,
+    },
+  });
+
+  jobLogger.info({
+    msg: 'Human takeover triggered - AI PERMANENTLY DISABLED for this conversation',
+    conversationId,
+    previousState,
+    humanUserId,
+  });
+
+  return { success: true };
+}
+
+/**
+ * One-click takeover API handler
+ *
+ * For UI: "Take Over" button that immediately disables AI
+ * and lets the human respond.
+ */
+export async function oneClickTakeover(
+  conversationId: string,
+  userId: string
+): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  const result = await triggerHumanTakeover(conversationId, userId);
+
+  if (result.success) {
+    return {
+      success: true,
+      message: 'AI has been disabled for this conversation. You can now respond directly.',
+    };
+  }
+
+  return {
+    success: false,
+    message: result.error || 'Failed to take over conversation',
+  };
+}

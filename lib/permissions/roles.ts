@@ -48,6 +48,10 @@ export type Permission =
   // Calendar
   | 'manage_calendar'
   | 'view_calendar'
+  // Bookings
+  | 'view_bookings'
+  | 'manage_bookings'
+  | 'manage_booking_settings'
   // Reminders
   | 'view_reminders'
   | 'manage_own_reminders'
@@ -86,7 +90,10 @@ export type Permission =
   | 'view_admin_leads'
   | 'manage_admin_leads'
   | 'view_admin_commissions'
-  | 'manage_admin_commissions';
+  | 'manage_admin_commissions'
+  // Voice Receptionist
+  | 'view_voice_receptionist'
+  | 'manage_voice_receptionist';
 
 // Permissions by role
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
@@ -123,6 +130,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'manage_email_recipients',
     'manage_calendar',
     'view_calendar',
+    'view_bookings',
+    'manage_bookings',
+    'manage_booking_settings',
     'view_reminders',
     'manage_own_reminders',
     'view_calls',
@@ -152,7 +162,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'view_admin_leads',
     'manage_admin_leads',
     'view_admin_commissions',
-    'manage_admin_commissions'
+    'manage_admin_commissions',
+    'view_voice_receptionist',
+    'manage_voice_receptionist'
   ],
   admin: [
     // Everything except billing and ownership transfer
@@ -185,6 +197,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'manage_email_recipients',
     'manage_calendar',
     'view_calendar',
+    'view_bookings',
+    'manage_bookings',
+    'manage_booking_settings',
     'view_reminders',
     'manage_own_reminders',
     'view_calls',
@@ -209,8 +224,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'manage_admin_accounts',
     'view_admin_leads',
     'manage_admin_leads',
-    'view_admin_commissions',
-    'manage_admin_commissions'
+    'view_admin_commissions', 'manage_admin_commissions',
+    'view_voice_receptionist', 'manage_voice_receptionist'
   ],
   technician: [
     // Limited access - assigned jobs only
@@ -249,6 +264,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'view_team', 'invite_team', 'manage_team', 'transfer_ownership',
     'manage_billing', 'manage_settings', 'manage_ai_sms', 'manage_email_recipients',
     'manage_calendar', 'view_calendar',
+    'view_bookings', 'manage_bookings', 'manage_booking_settings',
     'view_reminders', 'manage_own_reminders',
     'view_calls', 'create_calls', 'log_calls',
     'view_knowledge_base',

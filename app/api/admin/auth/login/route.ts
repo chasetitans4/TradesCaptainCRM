@@ -92,8 +92,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { email, password } = body;
 
-    console.log(`[Admin Login] Attempt for email: ${email}`);
-
     if (!email || !password) {
       return NextResponse.json(
         { error: 'Email and password are required' },
@@ -110,45 +108,29 @@ export async function POST(request: NextRequest) {
       .eq('email', email.toLowerCase())
       .single();
 
-    if (error) {
-      console.error('[Admin Login] Database error or user not found:', error);
-      // Handle "Row not found" specifically
-      if (error.code === 'PGRST116') {
-        return NextResponse.json(
-          { error: 'User not found' }, // Debugging: explicit error
-          { status: 401 }
-        );
-      }
+    if (error || !user) {
+      apiLogger.warn({ msg: 'Admin login failed: user lookup', email });
       return NextResponse.json(
-        { error: `User lookup failed: ${error.message}` },
-        { status: 401 }
-      );
-    }
-
-    if (!user) {
-      console.error('[Admin Login] User not found (no error, but null data)');
-       return NextResponse.json(
-        { error: 'User not found' }, // Debugging: explicit error
+        { error: 'Invalid credentials' },
         { status: 401 }
       );
     }
 
     if (user.status !== 'active') {
-      console.log(`[Admin Login] User ${email} is not active. Status: ${user.status}`);
+      apiLogger.warn({ msg: 'Admin login failed: inactive account', email });
       return NextResponse.json(
-        { error: 'Account is not active' },
+        { error: 'Invalid credentials' },
         { status: 401 }
       );
     }
 
     // Verify password
-    console.log(`[Admin Login] Verifying password for ${email}...`);
     const passwordValid = await verifyPassword(password, user.password_hash);
-    console.log(`[Admin Login] Password valid: ${passwordValid}`);
-    
+
     if (!passwordValid) {
+      apiLogger.warn({ msg: 'Admin login failed: bad password', email });
       return NextResponse.json(
-        { error: 'Password mismatch' }, // Temporary for debugging
+        { error: 'Invalid credentials' },
         { status: 401 }
       );
     }

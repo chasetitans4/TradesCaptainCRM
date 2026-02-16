@@ -191,7 +191,7 @@ export function CommandPalette({ className }: CommandPaletteProps) {
 
       {/* Palette */}
       <div className="fixed inset-x-4 top-[20%] z-50 max-w-xl mx-auto animate-in slide-in-from-top-4 fade-in duration-200">
-        <div className="bg-background rounded-xl shadow-2xl border border-border overflow-hidden">
+        <div className="bg-background rounded-xl shadow-md border border-border overflow-hidden">
           {/* Input */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
             <Search className="h-5 w-5 text-muted-foreground shrink-0" />

@@ -245,12 +245,15 @@ export default function OutreachContactsPage() {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <Select
+                    value={statusFilter || 'all'}
+                    onValueChange={(val) => setStatusFilter(val === 'all' ? '' : val)}
+                  >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Statuses</SelectItem>
+                      <SelectItem value="all">All Statuses</SelectItem>
                       {statusOptions.map((opt) => (
                         <SelectItem key={opt.value} value={opt.value}>
                           {opt.label}
@@ -258,12 +261,15 @@ export default function OutreachContactsPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Select value={interestFilter} onValueChange={setInterestFilter}>
+                  <Select
+                    value={interestFilter || 'all'}
+                    onValueChange={(val) => setInterestFilter(val === 'all' ? '' : val)}
+                  >
                     <SelectTrigger className="w-[120px]">
                       <SelectValue placeholder="Interest" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All</SelectItem>
+                      <SelectItem value="all">All</SelectItem>
                       {interestOptions.map((opt) => (
                         <SelectItem key={opt.value} value={opt.value}>
                           {opt.label}

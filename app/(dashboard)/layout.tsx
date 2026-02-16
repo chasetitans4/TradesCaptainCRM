@@ -1,21 +1,24 @@
 'use client';
 
-import { useEffect, useState, Suspense, useCallback } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { createClient, getCurrentUserProfile } from '@/lib/supabase/client';
+import { getCurrentUserProfile } from '@/lib/supabase/client';
 import type { UserWithBusiness } from '@/types';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { MobileNav } from '@/components/layout/mobile-nav';
 import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
 import { prefetchRoutes, CRITICAL_ROUTES, SECONDARY_ROUTES } from '@/lib/performance';
-import { InteractiveTour } from '@/components/onboarding';
+// InteractiveTour removed - consolidated into unified training system
 import { logger } from '@/lib/logger';
 import { BusinessThemeProvider } from '@/lib/contexts/business-theme-context';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { OfflineProvider } from '@/lib/offline/context';
 import { OfflineIndicator } from '@/components/offline/offline-indicator';
+import { TrainingProvider, TrainingOverlay } from '@/components/training';
+import { AIAssistantProvider } from '@/lib/contexts/ai-assistant-context';
+import { NavigationProvider } from '@/lib/navigation';
 
 // Dynamic imports for non-critical components (loaded after initial render)
 const CommandPalette = dynamic(
@@ -44,13 +47,6 @@ export default function DashboardLayout({
   const [loading, setLoading] = useState(true);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const dashboardLayoutLogger = logger.child({ context: 'dashboard.layout' });
-
-  // Memoized sign out handler
-  const handleSignOut = useCallback(async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push('/login');
-  }, [router]);
 
   // Initialize keyboard shortcuts
   useKeyboardShortcuts({
@@ -112,21 +108,16 @@ export default function DashboardLayout({
     return null;
   }
 
-  const userInitials = user.full_name
-    ? user.full_name
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .toUpperCase()
-    : 'U';
-
   return (
     <OfflineProvider autoInitialize syncInterval={5 * 60 * 1000}>
       <BusinessThemeProvider
         primaryColor={user.business?.primary_color || '#1D4ED8'}
         secondaryColor={user.business?.secondary_color || '#0369A1'}
       >
-        <div className="min-h-screen bg-muted/30">
+        <AIAssistantProvider>
+        <NavigationProvider>
+        <TrainingProvider userId={user.id} businessId={user.business_id}>
+        <div className="min-h-screen bg-muted/30 overflow-x-hidden">
         {/* Desktop Sidebar */}
         <Sidebar
           className="hidden lg:flex"
@@ -143,14 +134,11 @@ export default function DashboardLayout({
 
         {/* Main Content Area */}
         <div className="lg:pl-64">
-          <Header
-            userName={user.full_name || 'User'}
-            userEmail={user.email || ''}
-            userRole={user.role || 'owner'}
-            userInitials={userInitials}
-            onSignOut={handleSignOut}
-          />
-          <main className="p-4 lg:p-6 pb-20 lg:pb-6">
+          {/* Desktop Header - hidden on mobile since MobileNav handles top bar */}
+          <div className="hidden lg:block bg-white dark:bg-white">
+            <Header />
+          </div>
+          <main className="p-4 lg:p-6 pb-20 lg:pb-6 min-h-[calc(100vh-4rem)] overflow-y-auto animate-fade-in">
             <ErrorBoundary>
               <Suspense fallback={
                 <div className="animate-pulse space-y-4">
@@ -181,17 +169,17 @@ export default function DashboardLayout({
           <AIAssistantWidget />
         </Suspense>
 
-        {/* Interactive Onboarding Tour - shows for new users on dashboard */}
-        {pathname === '/dashboard' && (
-          <InteractiveTour
-            tourId="dashboard-intro"
-            autoStart
-          />
-        )}
+        {/* Training handled by TrainingOverlay via ContextualTrainingPrompt on dashboard page */}
 
         {/* Offline Status Indicator */}
         <OfflineIndicator position="bottom" />
         </div>
+
+        {/* Guided Training System Overlay */}
+        <TrainingOverlay />
+        </TrainingProvider>
+        </NavigationProvider>
+        </AIAssistantProvider>
       </BusinessThemeProvider>
     </OfflineProvider>
   );

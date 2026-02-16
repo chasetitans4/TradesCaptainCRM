@@ -9,22 +9,13 @@ import { createAdminClient } from '@/lib/supabase/server';
 import { sendPaymentReminder, updateOverdueInvoices } from '@/lib/invoices';
 import { isEmailConfigured } from '@/lib/email';
 import { apiLogger } from '@/lib/logger';
-
-// Verify cron secret for automated calls
-function verifyCronSecret(request: NextRequest): boolean {
-  const authHeader = request.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (!cronSecret) return true; // No secret configured, allow all
-  return authHeader === `Bearer ${cronSecret}`;
-}
+import { verifyCronAuth } from '@/lib/auth/cron-guard';
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify this is a legitimate cron call
-    if (!verifyCronSecret(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // Strict cron auth — fail-closed
+    const authError = verifyCronAuth(request);
+    if (authError) return authError;
 
     if (!isEmailConfigured()) {
       return NextResponse.json(
@@ -188,8 +179,12 @@ export async function POST(request: NextRequest) {
 }
 
 // GET endpoint to check reminder configuration
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
+    // Strict cron auth — fail-closed
+    const authError = verifyCronAuth(request);
+    if (authError) return authError;
+
     return NextResponse.json({
       configured: isEmailConfigured(),
       defaultSettings: {

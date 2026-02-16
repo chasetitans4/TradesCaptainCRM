@@ -6,16 +6,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { cleanupLogger } from '@/lib/logger';
+import { verifyCronAuth } from '@/lib/auth/cron-guard';
 
 export async function GET(request: NextRequest) {
-  // Check for authorized header (cron secret)
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    // In production, strictly enforce this
-    if (process.env.NODE_ENV === 'production' && process.env.CRON_SECRET) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-  }
+  // Strict cron auth — fail-closed in all environments
+  const authError = verifyCronAuth(request);
+  if (authError) return authError;
 
   try {
     // Note: Since we now use hard deletes for customers (no deleted_at column),

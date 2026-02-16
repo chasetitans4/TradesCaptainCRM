@@ -1,14 +1,25 @@
 // =====================================================
 // TWILIO INCOMING VOICE CALL WEBHOOK
 // POST /api/webhooks/twilio/voice
+//
+// AI Voice Receptionist v2.0 with Delta Adjustments:
+// - Delta 1: Emergency-only voice escalation
+// - Delta 2: Multi-location config hierarchy
+// - Delta 3: Hard minute caps
+// - Delta 4: Silence-over-guessing
+// - Delta 5: Initiation evidence logging
+// - Delta 6: No training / no cross-tenant
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { validateTwilioSignature, formatPhoneE164 } from '@/lib/twilio';
 import { createAdminClient } from '@/lib/supabase/server';
+import { handleIncomingCall } from '@/lib/voice';
 import twilio from 'twilio';
 import { smsLogger } from '@/lib/logger';
+
+const voiceLogger = smsLogger.child({ context: 'api.twilio.voice' });
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,16 +29,19 @@ export async function POST(request: NextRequest) {
       params[key] = value.toString();
     });
 
-    // Validate Twilio signature in production
-    if (process.env.NODE_ENV === 'production') {
+    // Validate Twilio signature (all environments)
+    if (process.env.TWILIO_AUTH_TOKEN) {
       const headersList = await headers();
       const signature = headersList.get('x-twilio-signature') || '';
       const url = request.url;
 
       if (!validateTwilioSignature(signature, url, params)) {
-        smsLogger.warn({ msg: 'Invalid Twilio voice signature', url });
+        voiceLogger.warn({ msg: 'Invalid Twilio voice signature', url });
         return new NextResponse('Forbidden', { status: 403 });
       }
+    } else {
+      voiceLogger.error({ msg: 'TWILIO_AUTH_TOKEN not set - rejecting webhook' });
+      return new NextResponse('Forbidden', { status: 403 });
     }
 
     const {
@@ -39,7 +53,6 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient();
 
     // Deduplicate by CallSid to prevent double-processing
-    // Twilio may retry webhooks if they timeout or fail
     if (callSid) {
       try {
         const idempotencyKey = `twilio_call:${callSid}`;
@@ -51,12 +64,12 @@ export async function POST(request: NextRequest) {
             .single();
 
           if (existing) {
-            smsLogger.info({ msg: 'Duplicate call webhook ignored', callSid });
+            voiceLogger.info({ msg: 'Duplicate call webhook ignored', callSid });
             return twimlVoicemail('Thank you for calling.');
           }
         }
 
-        // Mark as processed early to prevent race conditions (best-effort)
+        // Mark as processed early
         if (qb && typeof qb.upsert === 'function') {
           await qb.upsert({
             event_id: idempotencyKey,
@@ -65,7 +78,7 @@ export async function POST(request: NextRequest) {
           }, { onConflict: 'event_id' });
         }
       } catch {
-        smsLogger.warn({ msg: 'Voice idempotency check failed', callSid });
+        voiceLogger.warn({ msg: 'Voice idempotency check failed', callSid });
       }
     }
 
@@ -88,11 +101,18 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (!business) {
-      smsLogger.warn({ msg: 'No business found for voice number', to });
+      voiceLogger.warn({ msg: 'No business found for voice number', to });
       return twimlVoicemail('Sorry, this number is not configured properly.');
     }
 
-    // Log the incoming call
+    // Check if AI Voice Receptionist is enabled for this business
+    const { data: voiceSettings } = await supabase
+      .from('voice_receptionist_settings')
+      .select('id, enable_daytime_ai_voice, daytime_ai_voice_consent_at')
+      .eq('business_id', business.id)
+      .single();
+
+    // Find existing customer
     const { data: customer } = await supabase
       .from('customers')
       .select('id')
@@ -100,6 +120,7 @@ export async function POST(request: NextRequest) {
       .eq('phone', formatPhoneE164(from))
       .single();
 
+    // Log the incoming call (legacy)
     await supabase.from('call_logs').insert({
       business_id: business.id,
       customer_id: customer?.id || null,
@@ -107,7 +128,39 @@ export async function POST(request: NextRequest) {
       direction: 'inbound',
     });
 
-    // Determine call handling mode
+    // If AI Voice is configured and consented, use the AI handler
+    if (voiceSettings?.daytime_ai_voice_consent_at) {
+      try {
+        const result = await handleIncomingCall({
+          callSid,
+          from: formatPhoneE164(from),
+          to: formatPhoneE164(to),
+          businessId: business.id,
+          customerId: customer?.id,
+          callerName: params.CallerName,
+        });
+
+        voiceLogger.info({
+          msg: 'AI Voice handler response',
+          callSid,
+          useAIVoice: result.useAIVoice,
+          availabilityState: result.availabilityState,
+        });
+
+        return new NextResponse(result.twiml, {
+          status: 200,
+          headers: { 'Content-Type': 'text/xml' },
+        });
+      } catch (error) {
+        voiceLogger.error({
+          msg: 'AI Voice handler failed, falling back to legacy',
+          error: error instanceof Error ? { name: error.name, message: error.message } : { message: 'Unknown error' },
+        });
+        // Fall through to legacy handling
+      }
+    }
+
+    // Legacy call handling (non-AI)
     let mode = business.call_forwarding_mode || 'voicemail';
 
     // Check if we should use after-hours mode
@@ -148,7 +201,7 @@ export async function POST(request: NextRequest) {
         return twimlVoicemail(`Thank you for calling ${business.name}. Please leave a message after the beep.`, greetingUrl);
     }
   } catch (error) {
-    smsLogger.error({
+    voiceLogger.error({
       msg: 'Error processing voice webhook',
       error: error instanceof Error ? { name: error.name, message: error.message } : { message: 'Unknown error' },
     });

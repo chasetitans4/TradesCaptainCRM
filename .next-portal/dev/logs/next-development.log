@@ -1,0 +1,68 @@
+[00:00:03.674] Server  LOG     
+[00:00:03.674] Server  LOG        We detected TypeScript in your project and reconfigured your tsconfig.json file for you.
+[00:00:03.674] Server  LOG        The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+
+[00:00:03.675] Server  LOG        	- include was updated to add '.next-portal/types/**/*.ts'
+[00:00:03.676] Server  LOG        	- include was updated to add '.next-portal/dev/types/**/*.ts'
+[00:00:03.676] Server  LOG     
+[00:00:03.904] Server  WARN     ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+[00:00:04.786] Server  LOG      ✓ Ready in 4.3s
+[00:00:04.904] Server  LOG     [Middleware] Processing: { pathname: '/', host: 'localhost:3001' }
+[00:00:04.937] Server  LOG     [Middleware] Processing: {
+  pathname: '/portal/11111111-1111-1111-1111-111111111111/login',
+  host: 'localhost:3001'
+}
+[00:00:08.176] Server  LOG      ○ Compiling /portal/[businessId]/login ...
+[00:00:14.498] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:14.602] Server  LOG     [Middleware] Processing: { pathname: '/api/portal/business', host: 'localhost:3001' }
+[00:00:14.722] Server  LOG     [Middleware] Processing: { pathname: '/@vite/client', host: 'localhost:3001' }
+[00:00:16.406] Server  LOG     [Middleware] Processing: { pathname: '/sw.js', host: 'localhost:3001' }
+[00:00:34.812] Server  LOG     [Middleware] Processing: { pathname: '/api/portal/auth', host: 'localhost:3001' }
+[00:00:36.047] Server  WARN    2026-02-03T02:22:23.178Z WARN [api] Portal login failed {"service":"trades-captain-crm","version":"development","context":"api","businessId":"11111111-1111-1111-1111-111111111111","emailHash":"adm***","locked":false,"remainingAttempts":5}
+[00:00:36.161] Browser ERROR   Portal login error: {}
+[00:01:01.876] Server  LOG     [Middleware] Processing: {
+  pathname: '/portal/11111111-1111-1111-1111-111111111111/login',
+  host: 'localhost:3001'
+}
+[00:01:02.202] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:01:02.280] Server  LOG     [Middleware] Processing: { pathname: '/api/portal/business', host: 'localhost:3001' }
+[00:01:02.731] Server  LOG     [Middleware] Processing: { pathname: '/@vite/client', host: 'localhost:3001' }
+[00:01:03.927] Server  LOG     [Middleware] Processing: { pathname: '/sw.js', host: 'localhost:3001' }
+[00:01:06.301] Server  LOG     [Middleware] Processing: {
+  pathname: '/portal/11111111-1111-1111-1111-111111111111/login',
+  host: 'localhost:3001'
+}
+[00:01:06.624] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:01:06.678] Server  LOG     [Middleware] Processing: { pathname: '/api/portal/business', host: 'localhost:3001' }
+[00:01:06.697] Server  LOG     [Middleware] Processing: { pathname: '/@vite/client', host: 'localhost:3001' }
+[00:01:08.302] Server  LOG     [Middleware] Processing: { pathname: '/sw.js', host: 'localhost:3001' }
+[00:01:29.867] Server  LOG     [Middleware] Processing: { pathname: '/api/portal/auth', host: 'localhost:3001' }
+[00:01:30.243] Server  WARN    2026-02-03T02:23:17.374Z WARN [api] Portal login failed {"service":"trades-captain-crm","version":"development","context":"api","businessId":"11111111-1111-1111-1111-111111111111","emailHash":"adm***","locked":false,"remainingAttempts":5}
+[00:01:30.360] Browser ERROR   Portal login error: {}
+[00:31:22.064] Server  LOG     [Middleware] Processing: {
+  pathname: '/portal/11111111-1111-1111-1111-111111111111/login',
+  host: 'localhost:3001'
+}
+[00:31:22.650] Server  LOG     [Middleware] Processing: {
+  pathname: '/portal/11111111-1111-1111-1111-111111111111/login',
+  host: 'localhost:3001'
+}
+[00:31:23.072] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:31:23.160] Server  LOG     [Middleware] Processing: { pathname: '/api/portal/business', host: 'localhost:3001' }
+[00:31:23.177] Server  LOG     [Middleware] Processing: { pathname: '/@vite/client', host: 'localhost:3001' }
+[00:31:23.624] Server  LOG     [Middleware] Processing: { pathname: '/sw.js', host: 'localhost:3001' }
+[00:31:24.717] Server  LOG     [Middleware] Processing: { pathname: '/sw.js', host: 'localhost:3001' }
+[00:31:33.633] Server  LOG     [Middleware] Processing: { pathname: '/api/portal/auth', host: 'localhost:3001' }
+[00:31:34.595] Server  WARN    2026-02-03T02:53:21.726Z WARN [api] Portal login failed {"service":"trades-captain-crm","version":"development","context":"api","businessId":"11111111-1111-1111-1111-111111111111","emailHash":"cap***","locked":false,"remainingAttempts":4}
+[00:31:34.712] Browser ERROR   Portal login error: {}
+[00:31:39.171] Server  LOG     [Middleware] Processing: {
+  pathname: '/portal/11111111-1111-1111-1111-111111111111/login',
+  host: 'localhost:3001'
+}
+[00:31:39.600] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:31:39.649] Server  LOG     [Middleware] Processing: { pathname: '/@vite/client', host: 'localhost:3001' }
+[00:31:39.660] Server  LOG     [Middleware] Processing: { pathname: '/api/portal/business', host: 'localhost:3001' }
+[00:31:41.326] Server  LOG     [Middleware] Processing: { pathname: '/sw.js', host: 'localhost:3001' }
+[00:31:46.791] Server  LOG     [Middleware] Processing: { pathname: '/api/portal/auth', host: 'localhost:3001' }
+[00:31:47.437] Server  WARN    2026-02-03T02:53:34.569Z WARN [api] Portal login failed {"service":"trades-captain-crm","version":"development","context":"api","businessId":"11111111-1111-1111-1111-111111111111","emailHash":"cap***","locked":false,"remainingAttempts":3}
+[00:31:47.554] Browser ERROR   Portal login error: {}

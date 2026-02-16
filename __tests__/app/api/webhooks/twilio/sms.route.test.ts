@@ -448,6 +448,14 @@ describe('app/api/webhooks/twilio/sms route', () => {
           notifications: [],
           decision_details: { ai_response: 0.9 },
         })),
+        handleCompliance: jest.fn(async () => ({
+          is_compliance_message: false,
+          compliance_type: null,
+          keyword_matched: null,
+          response_required: false,
+          response_text: null,
+          should_block_further_processing: false,
+        })),
       }));
       jest.doMock('@/lib/leads-captain', () => ({
         isPhoneSuppressed: jest.fn(async () => false),

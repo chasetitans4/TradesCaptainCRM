@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getPortalSession } from '@/lib/portal/session';
-import { getBusinessForPortal, getCustomerProfile } from '@/lib/portal/data';
+import { getBusinessForPortal, getCustomerProfile, getPlatformSettings } from '@/lib/portal/data';
 import { apiLogger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
@@ -39,9 +39,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Get customer and business info using admin client (via data lib)
-    const [customer, business] = await Promise.all([
+    const [customer, business, platform] = await Promise.all([
       getCustomerProfile(session.customerId),
       getBusinessForPortal(businessId),
+      getPlatformSettings(),
     ]);
 
     if (!customer) {
@@ -54,6 +55,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       customer,
       business,
+      platform,
     });
   } catch (error) {
     apiLogger.error({ error, context: 'Error in GET /api/portal/session' });

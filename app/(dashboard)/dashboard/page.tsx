@@ -33,6 +33,8 @@ import {
 import { GlobalPauseToggle } from '@/components/automation/global-pause-toggle';
 import { RevenueWidget } from '@/components/dashboard/revenue-widget';
 import { AgingReportWidget } from '@/components/dashboard/aging-report';
+import { ContextualTrainingPrompt } from '@/components/training';
+import { useTrainingProgress } from '@/lib/training/hooks/use-training-progress';
 
 // Dashboard section types
 interface DashboardStats {
@@ -67,6 +69,11 @@ export default function DashboardPage() {
   const [tomorrowJobs, setTomorrowJobs] = useState<TodayJob[]>([]);
   const [recentLeads, setRecentLeads] = useState<RecentLead[]>([]);
   const [unrepliedMessages, setUnrepliedMessages] = useState<UnrepliedConversation[]>([]);
+
+  // Training progress for showing contextual prompts
+  const { isCourseComplete, isLoaded: trainingLoaded } = useTrainingProgress();
+  const [trainingDismissed, setTrainingDismissed] = useState(false);
+  const showGettingStarted = trainingLoaded && !isCourseComplete('getting-started') && !trainingDismissed;
 
   // Load user profile
   useEffect(() => {
@@ -347,10 +354,10 @@ export default function DashboardPage() {
       <header className="sticky-header bg-background border-b border-border">
         <div className="flex items-center justify-between px-4 py-3">
           <div>
-            <h1 className="text-lg font-semibold text-text">
+            <p className="text-sm text-text-muted">
               {getGreeting()}, {user.name?.split(' ')[0] || 'there'}
-            </h1>
-            <p className="text-sm text-text-muted">{user.business?.name}</p>
+            </p>
+            <h1 className="text-lg font-semibold text-text">Business Health</h1>
           </div>
           <div className="flex items-center gap-2">
             {/* Global Pause Toggle - 1 tap accessible from dashboard (Section 7.3) */}
@@ -380,6 +387,18 @@ export default function DashboardPage() {
           </div>
         </div>
       </header>
+
+      {/* Getting Started Training Prompt - for new users */}
+      {showGettingStarted && (
+        <div className="px-4 pt-4">
+          <ContextualTrainingPrompt
+            courseId="getting-started"
+            title="Welcome to Trades Captain!"
+            description="Take a quick 5-minute tour to learn the basics of your new command center."
+            onDismiss={() => setTrainingDismissed(true)}
+          />
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="px-4 py-4 space-y-6">

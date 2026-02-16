@@ -83,8 +83,13 @@ export async function POST(request: NextRequest) {
     const eta = new Date(Date.now() + estimatedMinutes * 60 * 1000);
     etaTime = eta.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
-    // Update job status to on_way (custom status or just update a field)
-    // Using a simpler approach: add to dispatch_history and track
+    // Update job status to on_way
+    await supabase
+      .from('jobs')
+      .update({ status: 'on_way' })
+      .eq('id', jobId);
+
+    // Record in dispatch history for audit trail
     await supabase.from('dispatch_history').insert({
       job_id: jobId,
       action: 'en_route',

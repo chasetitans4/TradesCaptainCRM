@@ -8,26 +8,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { generateAllFollowUps } from '@/lib/automation/follow-up-triggers';
 import { logger } from '@/lib/logger';
+import { verifyCronAuth } from '@/lib/auth/cron-guard';
 
 const cronLogger = logger.child({ context: 'cron.follow-ups' });
-
-// Verify the request is from our cron service (Vercel, etc.)
-function verifyCronAuth(request: NextRequest): boolean {
-  const authHeader = request.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
-
-  // If no secret is configured, allow in development
-  if (!cronSecret && process.env.NODE_ENV === 'development') {
-    return true;
-  }
-
-  // Check authorization header
-  if (authHeader && authHeader === `Bearer ${cronSecret}`) {
-    return true;
-  }
-
-  return false;
-}
 
 // GET - Check cron status
 export async function GET(request: NextRequest) {
@@ -41,10 +24,9 @@ export async function GET(request: NextRequest) {
 
 // POST - Run the cron job
 export async function POST(request: NextRequest) {
-  // Verify auth
-  if (!verifyCronAuth(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  // Strict cron auth — fail-closed
+  const authError = verifyCronAuth(request);
+  if (authError) return authError;
 
   cronLogger.info({ msg: 'Starting follow-up reminders cron job' });
 

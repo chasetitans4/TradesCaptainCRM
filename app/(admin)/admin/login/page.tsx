@@ -1,8 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shield, Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
+
+interface PlatformBranding {
+  logo_url?: string;
+  name?: string;
+}
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -11,6 +16,23 @@ export default function AdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [platformBranding, setPlatformBranding] = useState<PlatformBranding | null>(null);
+
+  useEffect(() => {
+    async function fetchPlatformBranding() {
+      try {
+        const res = await fetch('/api/admin/platform-settings');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.settings?.platform_branding) {
+          setPlatformBranding(data.settings.platform_branding);
+        }
+      } catch {
+        // Use default branding
+      }
+    }
+    fetchPlatformBranding();
+  }, []);
 
 
   async function handleSubmit(e: React.FormEvent) {
@@ -56,11 +78,22 @@ export default function AdminLoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-primary/20 mb-4">
-            <Shield className="h-8 w-8 text-primary" />
-          </div>
+          {platformBranding?.logo_url ? (
+            <div className="mb-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={platformBranding.logo_url}
+                alt={platformBranding.name || 'Trades Captain'}
+                className="h-12 w-auto max-w-[200px] mx-auto object-contain"
+              />
+            </div>
+          ) : (
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-primary/20 mb-4">
+              <Shield className="h-8 w-8 text-primary" />
+            </div>
+          )}
           <h1 className="text-2xl font-bold text-foreground">Admin Portal</h1>
-          <p className="text-muted-foreground mt-2">TradesCaptain CRM Management</p>
+          <p className="text-muted-foreground mt-2">{platformBranding?.name || 'Trades Captain'} Management</p>
         </div>
 
         {/* Login Card */}

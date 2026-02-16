@@ -8,24 +8,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runMediaCleanup } from '@/lib/jobs/media-cleanup';
 import { apiLogger } from '@/lib/logger';
+import { verifyCronAuth } from '@/lib/auth/cron-guard';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes max
 
 export async function GET(request: NextRequest) {
   try {
-    // Verify cron secret
-    const authHeader = request.headers.get('authorization');
-    const cronSecret = process.env.CRON_SECRET;
-
-    if (!cronSecret) {
-      apiLogger.error({ msg: 'CRON_SECRET not configured' });
-      return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
-    }
-
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // Strict cron auth — fail-closed
+    const authError = verifyCronAuth(request);
+    if (authError) return authError;
 
     // Run cleanup
     const result = await runMediaCleanup(100);

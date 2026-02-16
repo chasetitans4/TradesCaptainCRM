@@ -28,7 +28,7 @@ export type GlobalMode = 'normal' | 'templates_only' | 'paused';
 // Approval requirement levels
 export type ApprovalRequirement = 'never' | 'low_confidence' | 'first_message' | 'all';
 
-// Conversation status
+// Conversation status (Legacy/UI simplified status)
 export type ConversationStatus = 'active' | 'human_takeover' | 'closed' | 'blocked';
 
 // Sentiment analysis results
@@ -512,6 +512,79 @@ export interface LeadsCaptainAuditLog {
 }
 
 // =====================================================
+// FEATURE GATING & LIMITS
+// =====================================================
+
+export type PlanTier = 'standalone' | 'silver' | 'gold';
+
+export interface LeadsCaptainFeatureLimits {
+  max_rules: number;
+  max_templates: number;
+  max_notification_recipients: number;
+  max_price_list_items: number;
+  ai_enabled: boolean;
+  ai_max_messages_per_conversation: number;
+  approval_queue_enabled: boolean;
+  analytics_enabled: boolean;
+  crm_integration_enabled: boolean;
+  custom_intents_enabled: boolean;
+  multi_language_enabled: boolean;
+}
+
+export const PLAN_FEATURE_LIMITS: Record<PlanTier, LeadsCaptainFeatureLimits> = {
+  standalone: {
+    max_rules: 10,
+    max_templates: 15,
+    max_notification_recipients: 2,
+    max_price_list_items: 20,
+    ai_enabled: true,
+    ai_max_messages_per_conversation: 5,
+    approval_queue_enabled: false,
+    analytics_enabled: false,
+    crm_integration_enabled: false,
+    custom_intents_enabled: false,
+    multi_language_enabled: false,
+  },
+  silver: {
+    max_rules: 25,
+    max_templates: 50,
+    max_notification_recipients: 5,
+    max_price_list_items: 50,
+    ai_enabled: true,
+    ai_max_messages_per_conversation: 10,
+    approval_queue_enabled: true,
+    analytics_enabled: true,
+    crm_integration_enabled: true,
+    custom_intents_enabled: false,
+    multi_language_enabled: false,
+  },
+  gold: {
+    max_rules: 100,
+    max_templates: 200,
+    max_notification_recipients: 20,
+    max_price_list_items: 200,
+    ai_enabled: true,
+    ai_max_messages_per_conversation: 25,
+    approval_queue_enabled: true,
+    analytics_enabled: true,
+    crm_integration_enabled: true,
+    custom_intents_enabled: true,
+    multi_language_enabled: true,
+  },
+};
+
+// =====================================================
+// COMPLIANCE CONSTANTS
+// =====================================================
+
+// TCPA Compliance keywords
+export const COMPLIANCE_KEYWORDS = {
+  OPT_OUT: ['STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT'],
+  HELP: ['HELP', 'INFO'],
+  OPT_IN: ['START', 'YES', 'UNSTOP'],
+} as const;
+
+// =====================================================
 // API REQUEST/RESPONSE TYPES
 // =====================================================
 
@@ -843,212 +916,163 @@ export interface AIGenerationOptions {
 // AI response result
 export interface AIResponseResult {
   content: string;
-  confidence: number;
-  model: string;
-  tokens_used: number;
-  guardrails_applied: string[];
+  confidence?: number;
+  model?: string;
+  tokens_used?: number;
+  guardrails_applied?: string[];
 }
 
-// Processing result
+// =====================================================
+// MISSING EXPORTS RESTORATION
+// =====================================================
+
+export type ConversationState =
+  | 'INITIATED'
+  | 'QUALIFYING'
+  | 'QUALIFIED'
+  | 'ROUTED'
+  | 'HUMAN_ACTIVE'
+  | 'UNRESPONSIVE'
+  | 'OPTED_OUT'
+  | 'CLOSED';
+
+export const VALID_STATE_TRANSITIONS: Record<ConversationState, ConversationState[]> = {
+  INITIATED: ['QUALIFYING', 'OPTED_OUT', 'CLOSED'],
+  QUALIFYING: ['QUALIFIED', 'HUMAN_ACTIVE', 'UNRESPONSIVE', 'OPTED_OUT', 'CLOSED'],
+  QUALIFIED: ['ROUTED', 'HUMAN_ACTIVE', 'OPTED_OUT', 'CLOSED'],
+  ROUTED: ['HUMAN_ACTIVE', 'UNRESPONSIVE', 'OPTED_OUT', 'CLOSED'],
+  HUMAN_ACTIVE: ['OPTED_OUT', 'CLOSED'],
+  UNRESPONSIVE: ['QUALIFYING', 'HUMAN_ACTIVE', 'OPTED_OUT', 'CLOSED'],
+  OPTED_OUT: ['QUALIFYING'], // Via opt-in
+  CLOSED: [],
+};
+
+export function isValidStateTransition(
+  fromState: ConversationState | null,
+  toState: ConversationState
+): boolean {
+  if (fromState === null) {
+    return toState === 'INITIATED';
+  }
+  return VALID_STATE_TRANSITIONS[fromState]?.includes(toState) ?? false;
+}
+
+export type StateChangeTrigger = 'ai' | 'system' | 'human' | 'customer' | 'admin';
+
+export interface StateTransitionLog {
+  id: string;
+  conversation_id: string;
+  from_state: ConversationState | null;
+  to_state: ConversationState;
+  reason: string | null;
+  triggered_by: StateChangeTrigger;
+  created_at: string;
+}
+
+export type LeadUrgency = 'routine' | 'soon' | 'urgent' | 'emergency';
+
+export const URGENCY_ROUTING_TIMEOUT: Record<LeadUrgency, number> = {
+  routine: 30,
+  soon: 30,
+  urgent: 10,
+  emergency: 0,
+};
+
+export interface QualificationData {
+  name?: string;
+  service_needed?: string;
+  urgency?: LeadUrgency;
+  address?: string;
+  availability?: string;
+  photos_offered?: boolean;
+}
+
+export interface QualificationStatus {
+  isComplete: boolean;
+  missingRequired: (keyof QualificationData)[];
+  nextQuestion: string | null;
+  data: QualificationData;
+}
+
+export const REQUIRED_QUALIFICATION_FIELDS: (keyof QualificationData)[] = ['name', 'service_needed', 'urgency'];
+
+export function isQualificationComplete(data: QualificationData): boolean {
+  return REQUIRED_QUALIFICATION_FIELDS.every(field => !!data[field as keyof QualificationData]);
+}
+
+export const FOLLOW_UP_TIMING = {
+  first: 60,
+  second: 240,
+  third: 1440,
+  unresponsiveAfter: 120, // 2 hours
+};
+
+export const RATE_LIMITS = {
+  maxConsecutiveFollowUps: 3,
+};
+
+export function getFollowUpDelay(followUpNumber: 1 | 2 | 3): number {
+  switch (followUpNumber) {
+    case 1: return FOLLOW_UP_TIMING.first;
+    case 2: return FOLLOW_UP_TIMING.second;
+    case 3: return FOLLOW_UP_TIMING.third;
+  }
+}
+
+export interface FollowUpSchedule {
+  id: string;
+  conversation_id: string;
+  follow_up_number: 1 | 2 | 3;
+  scheduled_at: string;
+  sent_at: string | null;
+  customer_responded: boolean;
+  created_at: string;
+}
+
+// =====================================================
+// TIMEZONE TYPES - Spec v1.1 Section 4.5
+// =====================================================
+
+/** Timezone source priority per spec */
+export type TimezonePriority = 'customer_profile' | 'service_address' | 'area_code' | 'business_default';
+
+/** Resolved timezone with confidence level */
+export interface TimezoneResolution {
+  timezone: string;
+  source: TimezonePriority;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+/** Default quiet hours: 9 PM to 8 AM local time */
+export const QUIET_HOURS = {
+  start: 21, // 9 PM
+  end: 8,    // 8 AM
+} as const;
+
+// =====================================================
+// MESSAGE PROCESSING RESULT
+// =====================================================
+
+/** Notification recipient for message processing */
+export interface NotificationRecipientResult {
+  recipient_id: string;
+  methods: ('sms' | 'push' | 'email')[];
+  urgency: 'immediate' | 'normal' | 'low' | string;
+}
+
+/** Result from processing an inbound message */
 export interface MessageProcessingResult {
-  // What was decided
   response_content: string | null;
   should_send: boolean;
   requires_approval: boolean;
-
-  // How it was decided
   classification: IntentClassificationResult;
   rule_matched: LeadsCaptainRule | null;
   template_used: LeadsCaptainTemplate | null;
   ai_used: boolean;
-
-  // Decision explanation
   explanation: string;
   decision_details: DecisionDetails;
-
-  // Actions to take
-  notifications: Array<{
-    recipient_id: string;
-    methods: ('sms' | 'push' | 'email')[];
-    urgency: NotificationUrgency;
-  }>;
-  conversation_updates: Partial<LeadsCaptainConversation>;
+  notifications: NotificationRecipientResult[];
+  conversation_updates: Partial<LeadsCaptainConversation> & Record<string, unknown>;
   should_escalate: boolean;
-
-  // Compliance
-  compliance_action?: 'opt_out' | 'help' | 'opt_in';
+  compliance_action?: string;
 }
-
-// =====================================================
-// FEATURE GATING
-// =====================================================
-
-export type PlanTier = 'standalone' | 'silver' | 'gold';
-
-export interface LeadsCaptainFeatureLimits {
-  max_rules: number;
-  max_templates: number;
-  max_notification_recipients: number;
-  max_price_list_items: number;
-  ai_enabled: boolean;
-  ai_max_messages_per_conversation: number;
-  approval_queue_enabled: boolean;
-  analytics_enabled: boolean;
-  crm_integration_enabled: boolean;
-  custom_intents_enabled: boolean;
-  multi_language_enabled: boolean;
-}
-
-export const PLAN_FEATURE_LIMITS: Record<PlanTier, LeadsCaptainFeatureLimits> = {
-  standalone: {
-    max_rules: 10,
-    max_templates: 15,
-    max_notification_recipients: 2,
-    max_price_list_items: 20,
-    ai_enabled: true,
-    ai_max_messages_per_conversation: 5,
-    approval_queue_enabled: false,
-    analytics_enabled: false,
-    crm_integration_enabled: false,
-    custom_intents_enabled: false,
-    multi_language_enabled: false,
-  },
-  silver: {
-    max_rules: 25,
-    max_templates: 50,
-    max_notification_recipients: 5,
-    max_price_list_items: 50,
-    ai_enabled: true,
-    ai_max_messages_per_conversation: 10,
-    approval_queue_enabled: true,
-    analytics_enabled: true,
-    crm_integration_enabled: true,
-    custom_intents_enabled: false,
-    multi_language_enabled: false,
-  },
-  gold: {
-    max_rules: 100,
-    max_templates: 200,
-    max_notification_recipients: 20,
-    max_price_list_items: 200,
-    ai_enabled: true,
-    ai_max_messages_per_conversation: 25,
-    approval_queue_enabled: true,
-    analytics_enabled: true,
-    crm_integration_enabled: true,
-    custom_intents_enabled: true,
-    multi_language_enabled: true,
-  },
-};
-
-// =====================================================
-// COMPLIANCE CONSTANTS
-// =====================================================
-
-// TCPA Compliance keywords
-export const COMPLIANCE_KEYWORDS = {
-  OPT_OUT: ['STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT'],
-  HELP: ['HELP', 'INFO'],
-  OPT_IN: ['START', 'YES', 'UNSTOP'],
-} as const;
-
-// Default system intents
-export const SYSTEM_INTENTS = [
-  { code: 'new_lead', label: 'New Service Request', category: 'lead' },
-  { code: 'pricing', label: 'Pricing Question', category: 'lead' },
-  { code: 'availability', label: 'Availability Question', category: 'lead' },
-  { code: 'emergency', label: 'Emergency Request', category: 'lead' },
-  { code: 'schedule', label: 'Schedule Appointment', category: 'scheduling' },
-  { code: 'reschedule', label: 'Reschedule Request', category: 'scheduling' },
-  { code: 'cancel', label: 'Cancellation Request', category: 'scheduling' },
-  { code: 'existing_customer', label: 'Existing Customer', category: 'service' },
-  { code: 'complaint', label: 'Complaint', category: 'service' },
-  { code: 'refund', label: 'Refund Request', category: 'service' },
-  { code: 'wrong_number', label: 'Wrong Number', category: 'other' },
-  { code: 'spam', label: 'Spam/Solicitation', category: 'other' },
-  { code: 'bot_check', label: 'Bot Check', category: 'other' },
-  { code: 'general', label: 'General Question', category: 'other' },
-] as const;
-
-// Template keys for system templates
-export const SYSTEM_TEMPLATE_KEYS = [
-  'missed_call_initial',
-  'new_lead',
-  'pricing',
-  'after_hours',
-  'emergency',
-  'bot_check',
-  'angry_customer',
-  'booking_confirmation',
-  'wrong_number',
-  'opt_out',
-] as const;
-
-export type SystemTemplateKey = typeof SYSTEM_TEMPLATE_KEYS[number];
-
-// =====================================================
-// HELPER TYPES
-// =====================================================
-
-// Pagination params
-export interface PaginationParams {
-  page?: number;
-  page_size?: number;
-}
-
-// Sort params
-export interface SortParams {
-  sort_by?: string;
-  sort_order?: 'asc' | 'desc';
-}
-
-// API error response
-export interface APIError {
-  error: string;
-  code?: string;
-  details?: Record<string, unknown>;
-}
-
-// API success response
-export interface APISuccess<T = void> {
-  success: true;
-  data?: T;
-  message?: string;
-}
-
-// Generic API response
-export type APIResponse<T = void> = APISuccess<T> | APIError;
-
-// =====================================================
-// BACKWARD COMPATIBILITY ALIASES (deprecated)
-// Use LeadsCaptain* names in new code
-// =====================================================
-
-/** @deprecated Use LeadsCaptainConfig instead */
-export type NevermissConfig = LeadsCaptainConfig;
-/** @deprecated Use LeadsCaptainIntent instead */
-export type NevermissIntent = LeadsCaptainIntent;
-/** @deprecated Use LeadsCaptainTemplate instead */
-export type NevermissTemplate = LeadsCaptainTemplate;
-/** @deprecated Use LeadsCaptainRule instead */
-export type NevermissRule = LeadsCaptainRule;
-/** @deprecated Use LeadsCaptainPriceItem instead */
-export type NevermissPriceItem = LeadsCaptainPriceItem;
-/** @deprecated Use LeadsCaptainNotificationRecipient instead */
-export type NevermissNotificationRecipient = LeadsCaptainNotificationRecipient;
-/** @deprecated Use LeadsCaptainConversation instead */
-export type NevermissConversation = LeadsCaptainConversation;
-/** @deprecated Use LeadsCaptainMessage instead */
-export type NevermissMessage = LeadsCaptainMessage;
-/** @deprecated Use LeadsCaptainTraining instead */
-export type NevermissTraining = LeadsCaptainTraining;
-/** @deprecated Use LeadsCaptainAuditLog instead */
-export type NevermissAuditLog = LeadsCaptainAuditLog;
-/** @deprecated Use LeadsCaptainFeatureLimits instead */
-export type NevermissFeatureLimits = LeadsCaptainFeatureLimits;
-
-// =====================================================
-// RE-EXPORT PROMPT TYPES
-// =====================================================
-
-export * from './prompt-types';

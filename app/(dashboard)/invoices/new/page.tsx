@@ -20,6 +20,7 @@ import {
 import { createClient, getCurrentUserProfile } from '@/lib/supabase/client';
 import { formatPhoneNumber } from '@/lib/utils';
 import type { UserWithBusiness, Customer } from '@/types';
+import { WhileImHereDrawer } from '@/components/invoices';
 
 // Partial customer type for search results
 type CustomerSearchResult = Pick<Customer, 'id' | 'name' | 'phone' | 'email'> & { address?: string };
@@ -238,6 +239,27 @@ export default function NewInvoicePage() {
     setLineItems(lineItems.filter((item) => item.id !== id));
   };
 
+  // Handle adding suggestion to invoice (from "While I'm Here" drawer)
+  const handleAddSuggestionToInvoice = (description: string) => {
+    setLineItems([
+      ...lineItems,
+      {
+        id: crypto.randomUUID(),
+        saved_service_id: null,
+        name: description,
+        description: '',
+        quantity: 1,
+        unit_price: 0, // Description-only per spec
+        is_taxable: true,
+      },
+    ]);
+  };
+
+  // Handle adding suggestion as note (from "While I'm Here" drawer)
+  const handleAddSuggestionNote = (note: string) => {
+    setInternalNotes((prev) => (prev ? `${prev}\n\n${note}` : note));
+  };
+
   const handleSave = async (sendAfter: boolean = false) => {
     if (!user || !selectedCustomer || lineItems.length === 0) {
       alert('Please select a customer and add at least one line item');
@@ -387,6 +409,16 @@ export default function NewInvoicePage() {
             </>
           )}
         </div>
+
+        {/* "While I'm Here" Suggestions - Per CIL Spec Section 3.2 */}
+        {selectedCustomer && jobId && (
+          <WhileImHereDrawer
+            customerId={selectedCustomer.id}
+            jobId={jobId}
+            onAddToInvoice={handleAddSuggestionToInvoice}
+            onAddNote={handleAddSuggestionNote}
+          />
+        )}
 
         {/* Line Items */}
         <div className="bg-card rounded-xl border border-border p-4">

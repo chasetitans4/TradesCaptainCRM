@@ -43,7 +43,7 @@ function MetricCard({
   return (
     <Link
       href={href}
-      className="group relative p-5 bg-card rounded-xl border shadow-soft hover:shadow-medium transition-all duration-200"
+      className="group relative p-5 bg-card rounded-xl border shadow-soft hover:shadow-medium transition-all duration-200 lg:hover:-translate-y-0.5"
     >
       <div className="flex items-start justify-between">
         <div className={cn('p-2.5 rounded-lg', colorMap[color])}>

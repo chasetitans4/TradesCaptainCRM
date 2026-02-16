@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserProfile, createClient } from '@/lib/supabase/server';
-import { getJobPhotos } from '@/lib/photos';
+import { getJobPhotosServer } from '@/lib/photos';
 import { checkUploadRateLimit } from '@/lib/rate-limit';
 import { apiLogger } from '@/lib/logger';
 import { processImage } from '@/lib/images/processor';
@@ -33,7 +33,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Job ID is required' }, { status: 400 });
     }
 
-    const photos = await getJobPhotos(jobId);
+    // Verify the job belongs to the user's business
+    const supabase = await createClient();
+    const { data: job } = await supabase
+      .from('jobs')
+      .select('id')
+      .eq('id', jobId)
+      .eq('business_id', profile.business_id)
+      .single();
+
+    if (!job) {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+    }
+
+    const photos = await getJobPhotosServer(jobId);
 
     return NextResponse.json(photos);
   } catch (error) {

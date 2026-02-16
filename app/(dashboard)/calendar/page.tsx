@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import type { UserWithBusiness, CalendarDisplayEvent } from '@/types';
 import { AddressLink } from '@/components/ui/address-link';
 import { ScheduleCalendar, CalendarJob, CrewMember } from '@/components/calendar/schedule-calendar';
+import { ListView } from '@/components/calendar/list-view';
+import { MapView } from '@/components/calendar/map-view';
 import {
   Plus,
   ChevronLeft,
@@ -23,10 +25,12 @@ import {
   LayoutGrid,
   List,
   Users,
+  Map,
 } from 'lucide-react';
 import { showError, showSuccess } from '@/lib/toast';
 
-type ViewMode = 'day' | 'week' | 'month';
+// Per UI Constraints v2.0 Section 2 - Schedule/Calendar Views
+type ViewMode = 'day' | 'week' | 'month' | 'list' | 'map';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const FULL_DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -236,7 +240,7 @@ export default function CalendarPage() {
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-bold text-text">Schedule</h1>
             <div className="flex items-center gap-2">
-              {/* View Toggle */}
+              {/* View Toggle - Per UI Constraints v2.0 Section 2 */}
               <div className="flex bg-muted rounded-lg p-1">
                 <button
                   onClick={() => setViewMode('day')}
@@ -267,6 +271,26 @@ export default function CalendarPage() {
                   title="Month View"
                 >
                   Month
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={cn(
+                    'px-2 py-1.5 text-xs font-medium rounded transition-colors',
+                    viewMode === 'list' ? 'bg-background shadow-sm' : 'text-muted-foreground'
+                  )}
+                  title="List View"
+                >
+                  <List className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('map')}
+                  className={cn(
+                    'px-2 py-1.5 text-xs font-medium rounded transition-colors',
+                    viewMode === 'map' ? 'bg-background shadow-sm' : 'text-muted-foreground'
+                  )}
+                  title="Map View"
+                >
+                  <Map className="h-4 w-4" />
                 </button>
               </div>
               <Link href="/calendar/team">
@@ -315,7 +339,7 @@ export default function CalendarPage() {
           loading={refreshing}
           className="flex-1"
         />
-      ) : (
+      ) : viewMode === 'month' ? (
         <div className="flex-1 overflow-auto">
           {/* Month View Header */}
           <div className="sticky top-0 bg-background border-b border-border px-4 py-3 z-10">
@@ -359,10 +383,22 @@ export default function CalendarPage() {
             />
           </div>
         </div>
-      )}
+      ) : viewMode === 'list' ? (
+        /* List View - Per UI Constraints v2.0 Section 2.3 */
+        <div className="flex-1 overflow-auto">
+          <ListView jobs={calendarJobs} />
+        </div>
+      ) : viewMode === 'map' ? (
+        /* Map View - Per UI Constraints v2.0 Section 2.4 */
+        <MapView
+          jobs={calendarJobs}
+          selectedDate={currentDate}
+          className="flex-1"
+        />
+      ) : null}
 
       {/* FAB for new job */}
-      {viewMode === 'month' && (
+      {(viewMode === 'month' || viewMode === 'list' || viewMode === 'map') && (
         <Link href="/jobs/new" className="fab">
           <Plus className="h-6 w-6" />
         </Link>

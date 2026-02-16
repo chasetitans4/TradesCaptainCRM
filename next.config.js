@@ -64,6 +64,8 @@ const withPWA = require('next-pwa')({
 });
 
 const nextConfig = {
+  // Use a separate build directory when running the portal to avoid lock conflicts
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   reactStrictMode: true,
   // Turbopack is the default bundler in Next.js 16
   turbopack: {},

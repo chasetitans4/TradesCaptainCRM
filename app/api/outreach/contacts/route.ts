@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getContacts, createContact } from '@/lib/outreach/contacts';
 import type { OutreachContactFilters } from '@/types/outreach';
+import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { apiLogger } from '@/lib/logger';
 
 /**
@@ -9,6 +10,9 @@ import { apiLogger } from '@/lib/logger';
  */
 export async function GET(request: NextRequest) {
   try {
+    const admin = await requireAgentOrHigher();
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const searchParams = request.nextUrl.searchParams;
 
     const filters: OutreachContactFilters = {};
@@ -75,6 +79,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const admin = await requireAgentOrHigher();
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const body = await request.json();
 
     const {

@@ -15,6 +15,43 @@ const STORE_NAME = 'media_queue';
 export type MediaType = 'photo' | 'voice_note' | 'signature' | 'receipt';
 export type SyncStatus = 'pending' | 'uploading' | 'completed' | 'failed';
 
+/**
+ * Photo types per Design Constitution Section 3.10
+ */
+export type PhotoType = 'before' | 'after' | 'during' | 'issue' | 'resolution' | 'general';
+
+/**
+ * Upload priority per Design Constitution Section 3.10.4
+ * 1. Proof of Work photos (before/after pairs) - highest
+ * 2. Issue documentation
+ * 3. General job photos - lowest
+ */
+export type UploadPriority = 1 | 2 | 3;
+
+/**
+ * Constitution-compliant photo metadata (Section 3.10.2)
+ */
+export interface ConstitutionPhotoMetadata {
+  /** Photo type for categorization */
+  photoType: PhotoType;
+  /** GPS coordinates if available */
+  location?: {
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+  };
+  /** Technician ID who took the photo */
+  technicianId: string;
+  /** Technician name for display */
+  technicianName?: string;
+  /** Equipment ID if photographing specific equipment */
+  equipmentId?: string;
+  /** ID of paired "before" photo (for "after" photos) */
+  pairedWithId?: string;
+  /** Optional caption */
+  caption?: string;
+}
+
 export interface QueuedMedia {
   id: string;
   type: MediaType;
@@ -33,6 +70,8 @@ export interface QueuedMedia {
   retryCount: number;
   lastError?: string;
   uploadUrl?: string; // Set after successful upload
+  /** Upload priority (1=highest, 3=lowest) per Constitution Section 3.10.4 */
+  uploadPriority?: UploadPriority;
 }
 
 // Database instance
@@ -143,6 +182,101 @@ export async function queuePhoto(
   });
 
   return id;
+}
+
+/**
+ * Queue a Constitution-compliant photo with full metadata
+ *
+ * Per Design Constitution Section 3.10:
+ * - Automatic metadata tagging (Section 3.10.2)
+ * - Upload priority (Section 3.10.4)
+ *
+ * Upload Priority:
+ * 1. Before/After pairs (Proof of Work)
+ * 2. Issue documentation
+ * 3. General photos
+ */
+export async function queueConstitutionPhoto(
+  photoBlob: Blob,
+  jobId: string,
+  metadata: ConstitutionPhotoMetadata
+): Promise<string> {
+  const id = generateId();
+
+  // Determine upload priority per Constitution Section 3.10.4
+  let uploadPriority: UploadPriority = 3; // Default: general
+  if (metadata.photoType === 'before' || metadata.photoType === 'after') {
+    uploadPriority = 1; // Highest: Proof of Work
+  } else if (metadata.photoType === 'issue' || metadata.photoType === 'resolution') {
+    uploadPriority = 2; // Medium: Issue documentation
+  }
+
+  const item: QueuedMedia = {
+    id,
+    type: 'photo',
+    blob: photoBlob,
+    jobId,
+    metadata: {
+      mimeType: 'image/jpeg',
+      filename: `photo-${metadata.photoType}-${Date.now()}.jpg`,
+      photoType: metadata.photoType,
+      // Constitution-specific metadata
+      location: metadata.location,
+      technicianId: metadata.technicianId,
+      technicianName: metadata.technicianName,
+      equipmentId: metadata.equipmentId,
+      pairedWithId: metadata.pairedWithId,
+      caption: metadata.caption,
+    },
+    createdAt: new Date().toISOString(),
+    syncStatus: 'pending',
+    retryCount: 0,
+    uploadPriority,
+  };
+
+  await putMediaItem(item);
+
+  mediaQueueLogger.info({
+    msg: 'Constitution-compliant photo queued',
+    id,
+    jobId,
+    photoType: metadata.photoType,
+    uploadPriority,
+    hasLocation: !!metadata.location,
+    isPaired: !!metadata.pairedWithId,
+  });
+
+  return id;
+}
+
+/**
+ * Get pending media sorted by upload priority
+ * Per Constitution Section 3.10.4 - Upload Priority
+ */
+export async function getPendingMediaByPriority(): Promise<QueuedMedia[]> {
+  const pending = await getPendingMedia();
+
+  // Sort by priority (1 = highest, 3 = lowest)
+  return pending.sort((a, b) => {
+    const priorityA = a.uploadPriority ?? 3;
+    const priorityB = b.uploadPriority ?? 3;
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+    // Same priority: sort by creation time (oldest first)
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
+}
+
+/**
+ * Get pending photo count by job
+ * Used for badge display in Quick Action Bar
+ */
+export async function getPendingPhotoCount(jobId: string): Promise<number> {
+  const media = await getMediaByJob(jobId);
+  return media.filter(
+    (m) => m.type === 'photo' && (m.syncStatus === 'pending' || m.syncStatus === 'uploading')
+  ).length;
 }
 
 /**

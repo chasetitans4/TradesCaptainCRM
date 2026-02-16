@@ -5,6 +5,7 @@ import {
   getSpeedReport,
   getCampaignPerformance,
 } from '@/lib/outreach/analytics';
+import { requireAgentOrHigher } from '@/lib/admin/auth';
 import { apiLogger } from '@/lib/logger';
 
 /**
@@ -13,6 +14,9 @@ import { apiLogger } from '@/lib/logger';
  */
 export async function GET(request: NextRequest) {
   try {
+    const admin = await requireAgentOrHigher();
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get('type') || 'dashboard';
     const agentId = searchParams.get('agent_id');

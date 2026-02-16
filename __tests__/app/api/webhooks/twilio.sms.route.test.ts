@@ -20,6 +20,24 @@ function mockNextServer() {
   });
 }
 
+/** Mock next/headers + @/lib/twilio so signature validation passes */
+function mockSignaturePass(twilioOverrides: Record<string, any> = {}) {
+  jest.doMock('next/headers', () => ({
+    headers: async () => ({
+      get: (key: string) => (key === 'x-twilio-signature' ? 'valid-sig' : null),
+    }),
+  }));
+  jest.doMock('@/lib/twilio', () => ({
+    validateTwilioSignature: () => true,
+    getOrCreateConversation: jest.fn(async () => ({ id: 'conv-1', customer_id: null, isNew: true })),
+    saveIncomingMessage: jest.fn(async () => {}),
+    handleIncomingWithAI: jest.fn(async () => {}),
+    formatPhoneE164: (x: string) => x,
+    sendSMS: jest.fn(async () => ({ success: true })),
+    ...twilioOverrides,
+  }));
+}
+
 function makeRequest(form: Record<string, string>) {
   return {
     url: 'https://example.com/api/webhooks/twilio/sms',
@@ -94,6 +112,17 @@ function makeSupabase(overrides: {
           upsert: async () => ({ data: {}, error: null }),
         };
       }
+      if (table === 'rate_limit_cache') {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: async () => ({ data: null, error: null }),
+            }),
+          }),
+          insert: async () => ({ data: {}, error: null }),
+          upsert: async () => ({ data: {}, error: null }),
+        };
+      }
       return {
         upsert: async () => ({ data: {}, error: null }),
         select: () => ({ single: async () => ({ data: null, error: null }) }),
@@ -106,6 +135,7 @@ describe('Twilio SMS webhook route', () => {
   it('returns 400 for missing required fields', async () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
+      mockSignaturePass();
       jest.doMock('@/lib/supabase/server', () => ({ createAdminClient: () => makeSupabase() }));
       const route = require('@/app/api/webhooks/twilio/sms/route');
       const res: NextResponse = await route.POST(makeRequest({ From: '+15550000000', To: '+15551112222' }));
@@ -113,10 +143,9 @@ describe('Twilio SMS webhook route', () => {
     });
   });
 
-  it('returns 403 when signature invalid in production', async () => {
+  it('returns 403 when signature invalid', async () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
-      process.env.NODE_ENV = 'production';
       jest.doMock('next/headers', () => ({
         headers: async () => ({
           get: (key: string) => (key === 'x-twilio-signature' ? 'bad' : null),
@@ -127,13 +156,13 @@ describe('Twilio SMS webhook route', () => {
       const route = require('@/app/api/webhooks/twilio/sms/route');
       const res: NextResponse = await route.POST(makeRequest({ From: '+15550000000', To: '+15551112222', Body: 'hi', MessageSid: 'SMxxx' }));
       expect(res.status).toBe(403);
-      process.env.NODE_ENV = 'test';
     });
   });
 
   it('returns empty TwiML when business not found', async () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
+      mockSignaturePass();
       jest.doMock('@/lib/supabase/server', () => ({ createAdminClient: () => makeSupabase({ business: null }) }));
       const route = require('@/app/api/webhooks/twilio/sms/route');
       const res: NextResponse = await route.POST(makeRequest({ From: '+15550000000', To: '+15551112222', Body: 'hi', MessageSid: 'SM1' }));
@@ -144,6 +173,7 @@ describe('Twilio SMS webhook route', () => {
   it('suppresses messages from suppressed phones', async () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
+      mockSignaturePass();
       jest.doMock('@/lib/leads-captain', () => {
         const real = jest.requireActual('@/lib/leads-captain');
         return { ...real, isPhoneSuppressed: async () => true };
@@ -158,6 +188,7 @@ describe('Twilio SMS webhook route', () => {
   it('handles compliance and returns response TwiML', async () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
+      mockSignaturePass();
       jest.doMock('@/lib/leads-captain', () => {
         const real = jest.requireActual('@/lib/leads-captain');
         return { ...real, handleComplianceKeywords: async () => ({ handled: true, response: 'You are unsubscribed' }) };
@@ -174,6 +205,7 @@ describe('Twilio SMS webhook route', () => {
   it('blocks for abuse and returns empty TwiML', async () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
+      mockSignaturePass();
       jest.doMock('@/lib/leads-captain', () => {
         const real = jest.requireActual('@/lib/leads-captain');
         return {
@@ -193,7 +225,7 @@ describe('Twilio SMS webhook route', () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
       const sendSMSMock = jest.fn(async () => ({ success: true }));
-      jest.doMock('@/lib/twilio', () => ({ sendSMS: sendSMSMock, formatPhoneE164: (x: string) => x }));
+      mockSignaturePass({ sendSMS: sendSMSMock });
       jest.doMock('@/lib/supabase/server', () => ({
         createAdminClient: () => ({
           from(table: string) {
@@ -205,6 +237,12 @@ describe('Twilio SMS webhook route', () => {
             }
             if (table === 'leads_captain_config') {
               return { select: () => ({ eq: () => ({ neq: () => ({ single: async () => ({ data: { id: 'cfg1', global_mode: 'normal' } }) }) }) }) };
+            }
+            if (table === 'rate_limit_cache') {
+              return {
+                select: () => ({ eq: () => ({ single: async () => ({ data: null, error: null }) }) }),
+                insert: async () => ({ data: {}, error: null }),
+              };
             }
             return { upsert: async () => ({}) };
           },
@@ -237,6 +275,7 @@ describe('Twilio SMS webhook route', () => {
   it('routes to v1 when hasLeadsCaptainAccess', async () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
+      mockSignaturePass();
       const v1Mock = jest.fn(async () => {});
       jest.doMock('@/lib/leads-captain', () => {
         const real = jest.requireActual('@/lib/leads-captain');
@@ -254,6 +293,12 @@ describe('Twilio SMS webhook route', () => {
             if (table === 'leads_captain_config') {
               return { select: () => ({ eq: () => ({ neq: () => ({ single: async () => ({ data: null }) }) }) }) };
             }
+            if (table === 'rate_limit_cache') {
+              return {
+                select: () => ({ eq: () => ({ single: async () => ({ data: null, error: null }) }) }),
+                insert: async () => ({ data: {}, error: null }),
+              };
+            }
             return { upsert: async () => ({}) };
           },
         }),
@@ -270,14 +315,10 @@ describe('Twilio SMS webhook route', () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
       const aiMock = jest.fn(async () => {});
+      mockSignaturePass({ handleIncomingWithAI: aiMock });
       jest.doMock('@/lib/leads-captain', () => {
         const real = jest.requireActual('@/lib/leads-captain');
         return { ...real, hasLeadsCaptainAccess: async () => false };
-      });
-      // The original AI handler is exported from lib/twilio
-      jest.doMock('@/lib/twilio', () => {
-        const real = jest.requireActual('@/lib/twilio');
-        return { ...real, handleIncomingWithAI: aiMock, formatPhoneE164: (x: string) => x };
       });
       jest.doMock('@/lib/supabase/server', () => ({
         createAdminClient: () => ({
@@ -290,6 +331,12 @@ describe('Twilio SMS webhook route', () => {
             }
             if (table === 'leads_captain_config') {
               return { select: () => ({ eq: () => ({ neq: () => ({ single: async () => ({ data: null }) }) }) }) };
+            }
+            if (table === 'rate_limit_cache') {
+              return {
+                select: () => ({ eq: () => ({ single: async () => ({ data: null, error: null }) }) }),
+                insert: async () => ({ data: {}, error: null }),
+              };
             }
             return { upsert: async () => ({}) };
           },
@@ -306,6 +353,7 @@ describe('Twilio SMS webhook route', () => {
   it('skips processing when message already processed (idempotent)', async () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
+      mockSignaturePass();
       const incrementMock = jest.fn(async () => {});
       jest.doMock('@/lib/leads-captain', () => {
         const real = jest.requireActual('@/lib/leads-captain');

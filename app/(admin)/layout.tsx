@@ -43,6 +43,11 @@ interface AdminUser {
   role: 'super_admin' | 'admin' | 'agent' | 'support' | 'finance';
 }
 
+interface PlatformBranding {
+  logo_url?: string;
+  name?: string;
+}
+
 const managementNav = [
   { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { name: 'CRM Accounts', href: '/admin/accounts', icon: Building2 },
@@ -85,11 +90,29 @@ export default function AdminPortalLayout({
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [platformBranding, setPlatformBranding] = useState<PlatformBranding | null>(null);
 
   // Keyboard shortcuts
   const { showHelp, setShowHelp } = useAdminKeyboardShortcuts({
     enabled: pathname !== '/admin/login',
   });
+
+  // Fetch platform branding
+  useEffect(() => {
+    async function fetchPlatformBranding() {
+      try {
+        const res = await fetch('/api/admin/platform-settings');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.settings?.platform_branding) {
+          setPlatformBranding(data.settings.platform_branding);
+        }
+      } catch {
+        // Use default branding
+      }
+    }
+    fetchPlatformBranding();
+  }, []);
 
   useEffect(() => {
     // Skip auth check for login page
@@ -184,7 +207,7 @@ export default function AdminPortalLayout({
   }
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-muted/30 overflow-x-hidden">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
@@ -204,8 +227,19 @@ export default function AdminPortalLayout({
         {/* Sidebar Header */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-white/10 flex-shrink-0">
           <div className="flex items-center gap-2">
-            <Shield className="h-8 w-8 text-primary" aria-hidden="true" />
-            <span className="text-white font-bold">Admin Portal</span>
+            {platformBranding?.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={platformBranding.logo_url}
+                alt={platformBranding.name || 'Trades Captain'}
+                className="h-10 w-auto max-w-[150px] object-contain"
+              />
+            ) : (
+              <>
+                <Shield className="h-8 w-8 text-primary" aria-hidden="true" />
+                <span className="text-white font-bold">Admin Portal</span>
+              </>
+            )}
           </div>
           <button
             className="lg:hidden text-gray-400 hover:text-white"
@@ -335,7 +369,7 @@ export default function AdminPortalLayout({
         </header>
 
         {/* Page content */}
-        <main className="p-4 lg:p-6">
+        <main className="p-4 lg:p-6 min-h-[calc(100vh-4rem)] overflow-y-auto">
           <ErrorBoundary>
             {children}
           </ErrorBoundary>

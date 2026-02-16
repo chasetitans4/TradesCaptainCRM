@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { Button, Input, Label, Progress, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Alert, AlertDescription } from '@/components/ui';
 import { createClient, getCurrentUser } from '@/lib/supabase/client';
-import { Building2, Calendar, Wrench, ArrowRight, Check, Plus, Trash2 } from 'lucide-react';
+import { Building2, Calendar, Wrench, ArrowRight, Check, Plus, Trash2, Upload, X } from 'lucide-react';
 import type { TradeType } from '@/types';
 import { logger } from '@/lib/logger';
 
@@ -48,6 +49,8 @@ export default function OnboardingPage() {
     trade_type: 'plumbing',
   });
 
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   // Step 3: Saved Services
   const [services, setServices] = useState<SavedService[]>([
@@ -86,6 +89,33 @@ export default function OnboardingPage() {
     if (services.length > 1) {
       setServices(services.filter((_, i) => i !== index));
     }
+  };
+
+  const removeLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+  };
+
+  const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Logo file must be less than 5MB');
+      return;
+    }
+
+    // Validate file type
+    const validTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
+    if (!validTypes.includes(file.type)) {
+      setError('Logo must be PNG, JPG, WebP, or SVG');
+      return;
+    }
+
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+    setError(null);
   };
 
   const handleNext = async () => {
@@ -188,6 +218,25 @@ export default function OnboardingPage() {
         }
       }
 
+      // Upload logo if selected
+      if (logoFile) {
+        try {
+          const formData = new FormData();
+          formData.append('file', logoFile);
+          
+          const uploadRes = await fetch('/api/business/logo', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!uploadRes.ok) {
+            onboardingLogger.warn({ msg: 'Failed to upload logo during onboarding', status: uploadRes.status });
+          }
+        } catch (uploadErr) {
+          onboardingLogger.error({ msg: 'Error uploading logo', error: uploadErr });
+        }
+      }
+
       // Add saved services
       const validServices = services.filter(s => s.name.trim() && s.price.trim());
       if (validServices.length > 0) {
@@ -257,6 +306,58 @@ export default function OnboardingPage() {
           </div>
 
           <div className="space-y-4 flex-1">
+            <div className="space-y-2">
+              <Label>Business Logo (Optional)</Label>
+              <div className="flex items-center gap-4">
+                <div className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden bg-gray-50 relative">
+                  {logoPreview ? (
+                    <Image
+                      src={logoPreview}
+                      alt="Logo preview"
+                      fill
+                      className="object-contain p-1"
+                    />
+                  ) : (
+                    <Building2 className="w-8 h-8 text-gray-300" />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => document.getElementById('logo-upload')?.click()}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload Logo
+                    </Button>
+                    {logoPreview && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={removeLogo}
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                  <input
+                    id="logo-upload"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    className="hidden"
+                    onChange={handleLogoSelect}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    PNG, JPG, WebP or SVG (max 5MB)
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="business-name">Business Name</Label>
               <Input

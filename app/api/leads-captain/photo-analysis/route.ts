@@ -273,6 +273,8 @@ async function savePhotoAnalysis(
  */
 export async function DELETE(request: NextRequest) {
   try {
+    await checkPermission('manage_leads_captain');
+
     const searchParams = request.nextUrl.searchParams;
     const analysisId = searchParams.get('analysisId');
     const configId = searchParams.get('configId');

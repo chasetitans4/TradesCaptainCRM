@@ -1,7 +1,6 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { UserRole } from '@/types';
 import {
@@ -12,7 +11,8 @@ import {
   Clock,
   CheckCircle2,
   DollarSign,
-  TrendingUp,
+  WifiOff,
+  RefreshCw,
 } from 'lucide-react';
 
 interface TechStats {
@@ -31,6 +31,11 @@ interface TechModeHeaderProps {
   onLockToggle: () => void;
   onLockPressStart: () => void;
   onLockPressEnd: () => void;
+  /** Offline sync status */
+  isOnline?: boolean;
+  pendingCount?: number;
+  isSyncing?: boolean;
+  onTriggerSync?: () => void;
 }
 
 export function TechModeHeader({
@@ -41,9 +46,13 @@ export function TechModeHeader({
   onLockToggle,
   onLockPressStart,
   onLockPressEnd,
+  isOnline = true,
+  pendingCount = 0,
+  isSyncing = false,
+  onTriggerSync,
 }: TechModeHeaderProps) {
   const isOwnerOrAdmin = userRole === 'owner' || userRole === 'admin';
-  const showRevenue = isOwnerOrAdmin && stats?.earnedToday !== undefined;
+  const showRevenue = stats?.earnedToday !== undefined;
 
   // Format time since last completion
   const getLastCompletedText = () => {
@@ -60,7 +69,7 @@ export function TechModeHeader({
   };
 
   return (
-    <div className="bg-primary text-primary-foreground">
+    <div className="bg-primary text-primary-foreground animate-fade-in">
       {/* Title Bar */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <div className="flex items-center gap-2">
@@ -69,16 +78,49 @@ export function TechModeHeader({
           </div>
           <div>
             <h1 className="text-lg font-bold">Technician Mode</h1>
-            <p className="text-xs text-primary-foreground/80">Today's Work</p>
+            <p className="text-xs text-primary-foreground/80">Today&apos;s Work</p>
           </div>
         </div>
+
+        <div className="flex items-center gap-2">
+          {/* Sync Status Badge */}
+          {(!isOnline || pendingCount > 0) && (
+            <button
+              onClick={onTriggerSync}
+              disabled={!isOnline || isSyncing}
+              className={cn(
+                'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors',
+                !isOnline
+                  ? 'bg-amber-500/20 text-amber-200'
+                  : isSyncing
+                    ? 'bg-white/15 text-primary-foreground/80'
+                    : 'bg-white/20 text-primary-foreground hover:bg-white/30'
+              )}
+              aria-label={!isOnline ? 'Offline' : `${pendingCount} pending changes`}
+            >
+              {!isOnline ? (
+                <WifiOff className="h-3.5 w-3.5" />
+              ) : isSyncing ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+              <span>
+                {!isOnline
+                  ? 'Offline'
+                  : isSyncing
+                    ? 'Syncing...'
+                    : `${pendingCount} pending`}
+              </span>
+            </button>
+          )}
 
         {/* Lock Button */}
         <Button
           variant="ghost"
           size="icon"
           className={cn(
-            'relative h-10 w-10 rounded-full text-primary-foreground hover:bg-white/20',
+            'relative h-14 w-14 rounded-full text-primary-foreground hover:bg-white/20',
             isLocked && 'bg-white/20'
           )}
           onClick={onLockToggle}
@@ -90,9 +132,9 @@ export function TechModeHeader({
           aria-label={isLocked ? 'Unlock (hold for 3 seconds)' : 'Lock Technician Mode'}
         >
           {isLocked ? (
-            <Lock className="h-5 w-5" />
+            <Lock className="h-6 w-6" />
           ) : (
-            <Unlock className="h-5 w-5" />
+            <Unlock className="h-6 w-6" />
           )}
 
           {/* Lock progress indicator */}
@@ -114,6 +156,7 @@ export function TechModeHeader({
             </svg>
           )}
         </Button>
+        </div>
       </div>
 
       {/* Stats Bar */}
@@ -134,11 +177,11 @@ export function TechModeHeader({
             highlight={stats?.jobsRemaining === 0}
           />
 
-          {/* Last Completed OR Revenue (for owners) */}
+          {/* Last Completed OR Revenue */}
           {showRevenue ? (
             <StatPill
               icon={DollarSign}
-              label="Earned"
+              label={isOwnerOrAdmin ? 'Earned' : 'Est. Earned'}
               value={`$${(stats?.earnedToday ?? 0).toLocaleString()}`}
               highlight
             />
@@ -151,12 +194,10 @@ export function TechModeHeader({
           )}
         </div>
 
-        {/* Revenue toggle hint for owners */}
-        {isOwnerOrAdmin && (
+        {/* Revenue hint */}
+        {showRevenue && (
           <p className="text-xs text-primary-foreground/60 mt-2 text-center">
-            {showRevenue
-              ? `$${(stats?.pendingToday ?? 0).toLocaleString()} pending`
-              : 'Tap to see revenue'}
+            {`$${(stats?.pendingToday ?? 0).toLocaleString()} ${isOwnerOrAdmin ? 'pending' : 'upcoming'}`}
           </p>
         )}
       </div>

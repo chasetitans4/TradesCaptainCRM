@@ -42,7 +42,8 @@ export type LeadSource =
   | 'nextdoor'
   | 'other';
 
-export type JobStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
+export type JobStatus = 'scheduled' | 'on_way' | 'in_progress' | 'completed' | 'return_needed' | 'callback' | 'cancelled' | 'no_show';
+export type WrapUpCompletionStatus = 'completed' | 'return_needed' | 'callback';
 export type PhotoLabel = 'before' | 'after' | 'issue' | 'other';
 
 export type QuoteStatus = 'draft' | 'sent' | 'viewed' | 'accepted' | 'declined' | 'expired';
@@ -266,6 +267,17 @@ export interface Customer extends Timestamps {
   total_jobs: number;
   total_revenue: number;
   last_job_date: string | null;
+
+  // Access & site info
+  gate_code: string | null;
+  has_dog: boolean | null;
+  dog_info: string | null;
+  access_notes: string | null;
+  parking_notes: string | null;
+
+  // Coordinates
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface CustomerWithHistory extends Customer {
@@ -357,6 +369,30 @@ export interface Job extends Timestamps {
   customer_confirmed_at: string | null;
 
   google_calendar_event_id: string | null;
+}
+
+export interface JobWrapup {
+  id: string;
+  business_id: string;
+  job_id: string;
+  customer_id?: string;
+  technician_id: string;
+  technician_name?: string;
+  completion_status: WrapUpCompletionStatus;
+  return_reason?: string;
+  return_scheduled_for?: string;
+  callback_reason?: string;
+  invoice_ready: boolean;
+  note_id?: string;
+  reminder_id?: string;
+  photo_count: number;
+  job_arrival_time?: string;
+  job_departure_time?: string;
+  job_duration_minutes?: number;
+  wrapup_started_at: string;
+  wrapup_confirmed_at?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface JobWithRelations extends Job {

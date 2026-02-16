@@ -55,7 +55,8 @@ export function PortalLogin({
 
       setMagicLinkSent(true);
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message || 'An unexpected error occurred');
+      console.error('Portal login error:', e);
     } finally {
       setLoading(false);
     }
@@ -90,7 +91,8 @@ export function PortalLogin({
         window.location.reload();
       }
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message || 'An unexpected error occurred');
+      console.error('Portal login error:', e);
     } finally {
       setLoading(false);
     }

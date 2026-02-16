@@ -1,6 +1,7 @@
 // =====================================================
 // Leads Captain v2.0 Message Processor
 // Main orchestration pipeline for inbound messages
+// Spec v1.1 Compliant
 // =====================================================
 
 import { createAdminClient } from '@/lib/supabase/server';
@@ -18,13 +19,45 @@ import {
   RuleEvaluationContext,
   IntentClassificationResult,
 } from '@/types/leads-captain';
-import { handleCompliance, isOptedOut, sanitizeMessage } from './compliance';
+import { handleCompliance, isOptedOut, sanitizeMessage, checkOptBackInPending, processOptBackInResume } from './compliance';
 import { classifyIntent, extractCustomerName } from './intent-classifier';
 import { evaluateRules, executeRuleActions, isWithinBusinessHours, isWithinQuietHours } from './rule-engine';
 import { renderTemplate, buildTemplateVariables, addEmoji } from './template-renderer';
-import { generateAIResponse, requiresApproval } from './guardrails';
+import { generateAIResponse, requiresApproval, isAIAllowedToRespond } from './guardrails';
 import { canAccessFeature, checkPlanLimit } from './features';
 import { processWithNewOrchestrator } from './orchestrator-adapter';
+import { scheduleNextFollowUp, cancelPendingFollowUps } from '../follow-up-scheduler';
+import { extractQualificationData } from '../qualification';
+import { resolveTimezone, isQuietHours as checkQuietHours, generateQuietHoursMessage } from '../timezone';
+
+// =====================================================
+// Spec v1.1: Urgency-based Routing Timeouts
+// =====================================================
+
+type LeadUrgency = 'routine' | 'soon' | 'urgent' | 'emergency';
+
+/** Routing timeout by urgency (in minutes) per spec Section 7 */
+const URGENCY_ROUTING_TIMEOUT: Record<LeadUrgency, number> = {
+  routine: 30,   // 30 minutes
+  soon: 30,      // 30 minutes
+  urgent: 10,    // 10 minutes
+  emergency: 0,  // Immediate routing
+};
+
+/**
+ * Calculate routing timeout timestamp based on urgency
+ */
+function calculateRoutingTimeout(urgency: LeadUrgency | null): string | null {
+  if (!urgency) return null;
+
+  const timeoutMinutes = URGENCY_ROUTING_TIMEOUT[urgency];
+  if (timeoutMinutes === 0) {
+    // Emergency: immediate routing (return current time)
+    return new Date().toISOString();
+  }
+
+  return new Date(Date.now() + timeoutMinutes * 60 * 1000).toISOString();
+}
 
 export interface ProcessorOptions {
   config_id: string;
@@ -290,7 +323,60 @@ export async function processInboundMessage(
     };
   }
 
-  // If human has taken over, don't auto-respond
+  // Spec v1.1: Check conversation state using new state machine
+  const conversationState = (conversation as { conversation_state?: string }).conversation_state;
+  const humanActiveSince = (conversation as { human_active_since?: string }).human_active_since;
+  const aiAllowedResult = isAIAllowedToRespond(conversationState || null, humanActiveSince);
+
+  if (!aiAllowedResult.allowed) {
+    // Still save the inbound message but don't generate AI response
+    await saveInboundMessage(supabase, conversation.id, sanitizedMessage, options.twilio_sid);
+
+    return {
+      response_content: null,
+      should_send: false,
+      requires_approval: false,
+      classification: {
+        intent: conversationState === 'HUMAN_ACTIVE' ? 'human_takeover' : (conversationState?.toLowerCase() || 'blocked'),
+        confidence: 100,
+        sentiment: 'neutral',
+        language: 'en',
+        entities: {},
+        is_compliance: false,
+      },
+      rule_matched: null,
+      template_used: null,
+      ai_used: false,
+      explanation: aiAllowedResult.reason || `AI disabled in state: ${conversationState}`,
+      decision_details: {
+        conversation_state: conversationState,
+        ai_disabled_reason: aiAllowedResult.reason,
+      },
+      notifications: [
+        // Notify about new message during takeover/disabled state
+        ...buildNotifications(notificationRecipients, 'every_message', false),
+      ],
+      conversation_updates: {
+        last_customer_message_at: new Date().toISOString(),
+        message_count: conversation.message_count + 1,
+      },
+      should_escalate: false,
+    };
+  }
+
+  // Spec v1.1: Check for opt-back-in pending (safety delay)
+  // AI resumes on THIS message if customer previously sent START
+  const optBackInPending = await checkOptBackInPending(conversation.id);
+  if (optBackInPending) {
+    // Clear the pending flag and resume AI
+    await processOptBackInResume(conversation.id);
+    jobLogger.info({
+      msg: 'Processing opt-back-in resume - AI re-enabled',
+      conversationId: conversation.id,
+    });
+  }
+
+  // Legacy check: If human has taken over (using legacy status), don't auto-respond
   if (conversation.status === 'human_takeover') {
     // Still save the inbound message but don't generate response
     await saveInboundMessage(supabase, conversation.id, sanitizedMessage, options.twilio_sid);
@@ -388,6 +474,46 @@ export async function processInboundMessage(
   if (customerName && customerName !== conversation.customer_name) {
     conversationUpdates.customer_name = customerName;
   }
+
+  // Spec v1.1: Extract qualification data and detect urgency
+  const existingQualData = (conversation as { qualification_data?: Record<string, unknown> }).qualification_data || {};
+  const extractedData = extractQualificationData(sanitizedMessage, existingQualData as Record<string, string | boolean | undefined>);
+
+  // Update qualification data if new info extracted
+  if (Object.keys(extractedData).length > 0) {
+    const mergedQualData = { ...existingQualData, ...extractedData };
+    (conversationUpdates as Record<string, unknown>).qualification_data = mergedQualData;
+
+    // If urgency was detected, set routing timeout
+    if (extractedData.urgency) {
+      const urgency = extractedData.urgency as LeadUrgency;
+      (conversationUpdates as Record<string, unknown>).urgency = urgency;
+
+      // Calculate and set routing timeout based on urgency
+      const routingTimeout = calculateRoutingTimeout(urgency);
+      if (routingTimeout) {
+        (conversationUpdates as Record<string, unknown>).routing_timeout_at = routingTimeout;
+
+        // For emergencies, also flag the conversation
+        if (urgency === 'emergency') {
+          conversationUpdates.is_emergency = true;
+        }
+
+        decisionDetails.urgency = urgency;
+        decisionDetails.routing_timeout_at = routingTimeout;
+
+        jobLogger.info({
+          msg: 'Set urgency-based routing timeout',
+          conversationId: conversation.id,
+          urgency,
+          routingTimeout,
+        });
+      }
+    }
+  }
+
+  // Cancel any pending follow-ups since customer responded
+  await cancelPendingFollowUps(conversation.id);
 
   // Step 7: Generate response based on rule or AI fallback
   let shouldEscalate = false;
@@ -574,6 +700,20 @@ export async function processInboundMessage(
       last_message_at: new Date().toISOString(),
     })
     .eq('id', conversation.id);
+
+  // Spec v1.1: Schedule follow-up if AI responded
+  // Follow-up timing: 1hr, 4hr, 24hr - then mark UNRESPONSIVE after 48hr
+  if (responseContent && !requiresApprovalFlag && !shouldEscalate) {
+    try {
+      await scheduleNextFollowUp(conversation.id);
+    } catch (followUpError) {
+      jobLogger.warn({
+        msg: 'Failed to schedule follow-up',
+        conversationId: conversation.id,
+        error: followUpError instanceof Error ? followUpError.message : String(followUpError),
+      });
+    }
+  }
 
   // Log audit
   await logAudit(supabase, options.config_id, conversation.id, inboundMessageId, 'message_received', 'system', {

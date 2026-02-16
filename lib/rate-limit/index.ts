@@ -228,11 +228,10 @@ export async function checkEmailRateLimit(businessId: string): Promise<RateLimit
 }
 
 /**
- * Login rate limit: 100 attempts per 5 minutes per IP (sliding window for security)
- * Note: Increased for development/admin usage
+ * Login rate limit: 5 attempts per 15 minutes per IP (sliding window for security)
  */
 export async function checkLoginRateLimit(ip: string): Promise<RateLimitResult> {
-  return checkRateLimit(`login:${ip}`, 100, 300);
+  return checkRateLimit(`login:${ip}`, 5, 900);
 }
 
 /**
@@ -297,6 +296,20 @@ export async function checkSearchRateLimit(userId: string): Promise<RateLimitRes
  */
 export async function checkBatchOperationRateLimit(adminId: string): Promise<RateLimitResult> {
   return checkRateLimit(`batch:${adminId}`, 10, 60);
+}
+
+/**
+ * ACH payment rate limit: 10 requests per 5 minutes per IP
+ */
+export async function checkAchRateLimit(ip: string): Promise<RateLimitResult> {
+  return checkRateLimit(`ach:${ip}`, 10, 300);
+}
+
+/**
+ * Widget booking rate limit: 10 bookings per hour per IP
+ */
+export async function checkWidgetBookingRateLimit(ip: string): Promise<RateLimitResult> {
+  return checkSimpleRateLimit(`widget_book:${ip}`, 10, 3600);
 }
 
 // =====================================================

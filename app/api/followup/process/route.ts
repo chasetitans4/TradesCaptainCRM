@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processScheduledFollowUps } from '@/lib/followup/engine';
 import { apiLogger } from '@/lib/logger';
+import { verifyCronAuth } from '@/lib/auth/cron-guard';
 
 // POST /api/followup/process - Process scheduled follow-ups
 // This endpoint should be called by a cron job (e.g., every 5 minutes)
 export async function POST(request: NextRequest) {
   try {
-    // Verify cron secret for security
-    const authHeader = request.headers.get('authorization');
-    const cronSecret = process.env.CRON_SECRET;
-
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // Strict cron auth — fail-closed
+    const authError = verifyCronAuth(request);
+    if (authError) return authError;
 
     const result = await processScheduledFollowUps();
 
@@ -27,7 +24,10 @@ export async function POST(request: NextRequest) {
 }
 
 // GET /api/followup/process - Health check for cron job
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authError = verifyCronAuth(request);
+  if (authError) return authError;
+
   return NextResponse.json({
     status: 'ok',
     message: 'Follow-up processor is ready',

@@ -39,6 +39,7 @@ const publicRoutes = [
   '/admin/login',
   // Customer portal handles its own sessions
   '/portal',
+  '/screenshots-preview',
 ];
 
 // Routes that are for admin portal only

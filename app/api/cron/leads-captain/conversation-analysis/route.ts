@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processConversationsForAnalysis } from '@/lib/leads-captain/async-processor';
 import { jobLogger } from '@/lib/logger';
+import { verifyCronAuth } from '@/lib/auth/cron-guard';
 
 // Vercel cron configuration
 export const runtime = 'nodejs';
@@ -24,17 +25,9 @@ export const maxDuration = 60; // 60 second timeout
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
 
-  // Verify cron secret to prevent unauthorized access
-  const authHeader = request.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    jobLogger.warn({
-      msg: 'Unauthorized cron request',
-      path: '/api/cron/leads-captain/conversation-analysis',
-    });
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  // Strict cron auth — fail-closed
+  const authError = verifyCronAuth(request);
+  if (authError) return authError;
 
   try {
     jobLogger.info({
@@ -90,11 +83,13 @@ export async function GET(request: NextRequest) {
  * Useful for testing or processing specific conversations.
  */
 export async function POST(request: NextRequest) {
+  // Strict cron auth — same guard for manual triggers
+  const authError = verifyCronAuth(request);
+  if (authError) return authError;
+
   const startTime = Date.now();
 
   try {
-    // Check for admin authentication
-    // In production, this would verify the user is an admin
     const body = await request.json().catch(() => ({}));
 
     const {

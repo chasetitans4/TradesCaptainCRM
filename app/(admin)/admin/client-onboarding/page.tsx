@@ -49,27 +49,31 @@ interface ClientOnboarding {
 }
 
 const TRACK_ICONS: Record<PlanTrack | LegacyPlanTrack, React.ElementType> = {
-  // Active tracks
-  blue: Building2,
+  // Active tracks (v6.1)
+  crm: Building2,
+  blue: Building2, // Alias for crm
   web: Globe,
   seo_aeo: Search,
+  gold: Layers, // v6.1: Reactivated Gold bundles
   // Legacy tracks
   leads_captain: Phone,
   seo: Search,
   silver: Layers,
-  gold: Layers,
+  gold_legacy: Layers, // v6.1: Old gold plans
 };
 
 const TRACK_COLORS: Record<PlanTrack | LegacyPlanTrack, string> = {
-  // Active tracks
-  blue: 'text-blue-600 bg-blue-50',
+  // Active tracks (v6.1)
+  crm: 'text-blue-600 bg-blue-50',
+  blue: 'text-blue-600 bg-blue-50', // Alias for crm
   web: 'text-purple-600 bg-purple-50',
   seo_aeo: 'text-green-600 bg-green-50',
+  gold: 'text-yellow-600 bg-yellow-50', // v6.1: Reactivated Gold bundles
   // Legacy tracks
   leads_captain: 'text-cyan-600 bg-cyan-50',
   seo: 'text-green-600 bg-green-50',
   silver: 'text-gray-600 bg-gray-50',
-  gold: 'text-yellow-600 bg-yellow-50',
+  gold_legacy: 'text-yellow-600 bg-yellow-50', // v6.1: Old gold plans
 };
 
 export default function ClientOnboardingPage() {

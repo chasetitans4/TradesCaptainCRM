@@ -36,16 +36,24 @@ describe('Twilio status webhook route', () => {
   it('returns 400 for missing required fields', async () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
+      jest.doMock('next/headers', () => ({
+        headers: async () => ({
+          get: (key: string) => (key === 'x-twilio-signature' ? 'valid' : null),
+        }),
+      }));
+      jest.doMock('@/lib/twilio', () => ({
+        validateTwilioSignature: () => true,
+        updateMessageStatus: jest.fn(async () => ({ applied: true })),
+      }));
       const route = require('@/app/api/webhooks/twilio/status/route');
       const res: NextResponse = await route.POST(makeRequest({ MessageStatus: 'sent' }));
       expect(res.status).toBe(400);
     });
   });
 
-  it('returns 403 when signature invalid in production', async () => {
+  it('returns 403 when signature is invalid', async () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
-      process.env.NODE_ENV = 'production';
       jest.doMock('next/headers', () => ({
         headers: async () => ({
           get: (key: string) => (key === 'x-twilio-signature' ? 'bad' : null),
@@ -58,7 +66,6 @@ describe('Twilio status webhook route', () => {
       const route = require('@/app/api/webhooks/twilio/status/route');
       const res: NextResponse = await route.POST(makeRequest({ MessageSid: 'SMX', MessageStatus: 'sent' }));
       expect(res.status).toBe(403);
-      process.env.NODE_ENV = 'test';
     });
   });
 
@@ -154,10 +161,9 @@ describe('Twilio status webhook route', () => {
     });
   });
 
-  it('processes in production when signature is valid', async () => {
+  it('processes when signature is valid', async () => {
     await jest.isolateModulesAsync(async () => {
       mockNextServer();
-      process.env.NODE_ENV = 'production';
       jest.doMock('next/headers', () => ({
         headers: async () => ({ get: (k: string) => (k === 'x-twilio-signature' ? 'good' : null) }),
       }));
@@ -170,7 +176,6 @@ describe('Twilio status webhook route', () => {
       const res: NextResponse = await route.POST(makeRequest({ MessageSid: 'SM7', MessageStatus: 'queued' }));
       expect(res.status).toBe(200);
       expect(updateMock).toHaveBeenCalledWith('SM7', 'queued', undefined);
-      process.env.NODE_ENV = 'test';
     });
   });
 });

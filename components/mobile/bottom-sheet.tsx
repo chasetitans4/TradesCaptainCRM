@@ -49,8 +49,14 @@ export function BottomSheet({
             </div>
           )}
 
-          {/* Content */}
-          <div className="p-4 pb-8 overflow-y-auto overscroll-contain max-h-[85vh] touch-pan-y">{children}</div>
+          {/* Content - data-vaul-no-drag prevents drawer from intercepting scroll */}
+          <div
+            data-vaul-no-drag
+            className="p-4 pb-8 overflow-y-auto scrollbar-hide overscroll-contain max-h-[60vh] touch-pan-y"
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
+            {children}
+          </div>
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>

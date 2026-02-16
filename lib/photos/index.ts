@@ -165,7 +165,7 @@ export async function getJobPhotosServer(jobId: string): Promise<GroupedPhotos> 
 }
 
 /**
- * Delete a photo
+ * Delete a photo (client-side)
  */
 export async function deleteJobPhoto(photoId: string): Promise<void> {
   const supabase = createClient();
@@ -189,6 +189,42 @@ export async function deleteJobPhoto(photoId: string): Promise<void> {
     .from('job_photos')
     .delete()
     .eq('id', photoId);
+
+  if (error) throw error;
+}
+
+/**
+ * Delete a photo (server-side, with business_id ownership check)
+ */
+export async function deleteJobPhotoServer(photoId: string, businessId: string): Promise<void> {
+  const supabase = await createServerClient();
+
+  // Get storage path and verify business ownership
+  const { data: photo, error: fetchError } = await supabase
+    .from('job_photos')
+    .select('storage_path, business_id')
+    .eq('id', photoId)
+    .single();
+
+  if (fetchError || !photo) {
+    throw new Error('Photo not found');
+  }
+
+  if (photo.business_id !== businessId) {
+    throw new Error('Unauthorized');
+  }
+
+  if (photo.storage_path) {
+    await supabase.storage
+      .from('job-photos')
+      .remove([photo.storage_path]);
+  }
+
+  const { error } = await supabase
+    .from('job_photos')
+    .delete()
+    .eq('id', photoId)
+    .eq('business_id', businessId);
 
   if (error) throw error;
 }

@@ -121,6 +121,8 @@ function makeSupabase(overrides: {
       in: (_field: string, _vals: any[]) => builder,
       order: (_field: string, _opts: any) => builder,
       limit: (_n: number) => builder,
+      update: (_rec: any) => builder,
+      insert: (_rec: any) => Promise.resolve({ data: {}, error: null }),
       single: async () => {
         if (table === 'leads_captain_config') {
           return { data: cfg, error: null };
@@ -135,6 +137,14 @@ function makeSupabase(overrides: {
           };
         }
         return { data: null, error: null };
+      },
+      then: (resolve: any) => {
+        // For non-single queries, return data as array
+        if (table === 'leads_captain_conversations_v2') {
+          resolve({ data: [conversation], error: null });
+        } else {
+          resolve({ data: [], error: null });
+        }
       },
     };
     return builder;
@@ -199,33 +209,27 @@ function makeSupabase(overrides: {
         };
       }
       if (table === 'leads_captain_conversations_v2') {
+        // Generic chainable builder that supports all Supabase query methods
+        const createChainableBuilder = (): any => {
+          const builder: any = {
+            eq: () => builder,
+            in: () => builder,
+            order: () => builder,
+            limit: () => builder,
+            single: async () => ({ data: { ...conversation, opt_back_in_pending: false }, error: null }),
+            // Non-single queries return data as array
+            then: (resolve: any) => resolve({ data: [conversation], error: null }),
+          };
+          return builder;
+        };
         return {
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                in: () => ({
-                  order: () => ({
-                    limit: () => ({
-                      single: async () => ({ data: conversation, error: null }),
-                    }),
-                  }),
-                }),
-              }),
-            }),
-          }),
+          select: (_cols?: any) => createChainableBuilder(),
           insert: (_rec: any) => ({
             select: () => ({
               single: async () => ({ data: { ...conversation, id: 'conv-new' }, error: null }),
             }),
           }),
-          update: (_updates: any) => ({
-            eq: (_field1: string, _val1: any) => ({
-              eq: (_field2: string, _val2: any) => ({
-                eq: (_field3: string, _val3: any) =>
-                  Promise.resolve({ data: {}, error: null }),
-              }),
-            }),
-          }),
+          update: (_updates: any) => createChainableBuilder(),
         };
       }
       if (table === 'leads_captain_messages_v2') {
@@ -258,6 +262,26 @@ function makeSupabase(overrides: {
               single: async () => ({ data: { subscription_tier: 'gold' }, error: null }),
             }),
           }),
+        };
+      }
+      if (table === 'opt_out_log') {
+        return {
+          insert: (_rec: any) => Promise.resolve({ data: {}, error: null }),
+        };
+      }
+      if (table === 'follow_up_schedule') {
+        const chainable: any = {
+          eq: () => chainable,
+          is: () => Promise.resolve({ data: {}, error: null }),
+        };
+        return {
+          update: (_rec: any) => chainable,
+          insert: (_rec: any) => Promise.resolve({ data: {}, error: null }),
+        };
+      }
+      if (table === 'conversation_state_log') {
+        return {
+          insert: (_rec: any) => Promise.resolve({ data: {}, error: null }),
         };
       }
       return builderFor(table);
@@ -654,6 +678,7 @@ describe('LeadsCaptain v2 processor', () => {
           guardrails_applied: ['length_truncated'],
         }),
         requiresApproval: () => false,
+        isAIAllowedToRespond: () => ({ allowed: true, reason: null }),
       }));
       const { processInboundMessage } = require('@/lib/leads-captain/v2');
       const res = await processInboundMessage({
@@ -710,6 +735,7 @@ describe('LeadsCaptain v2 processor', () => {
           guardrails_applied: [],
         }),
         requiresApproval: () => true,
+        isAIAllowedToRespond: () => ({ allowed: true, reason: null }),
       }));
       const { processInboundMessage } = require('@/lib/leads-captain/v2');
       const res = await processInboundMessage({
@@ -807,6 +833,7 @@ describe('LeadsCaptain v2 processor', () => {
       jest.doMock('@/lib/leads-captain/v2/guardrails', () => ({
         generateAIResponse: async () => ({ content: 'AI', confidence: 90, model: 'claude', tokens_used: 10, guardrails_applied: [] }),
         requiresApproval: () => false,
+        isAIAllowedToRespond: () => ({ allowed: true, reason: null }),
       }));
       const { processInboundMessage } = require('@/lib/leads-captain/v2');
       const res = await processInboundMessage({

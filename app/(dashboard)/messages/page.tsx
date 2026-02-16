@@ -24,16 +24,47 @@ import {
   Wifi,
   WifiOff,
   Plus,
+  Mail,
+  PhoneCall,
+  Inbox,
+  Sparkles,
+  Info,
+  Briefcase,
 } from 'lucide-react';
+import { ContextDrawer } from '@/components/inbox';
 
 interface ConversationWithDetails extends SMSConversation {
-  customer?: Pick<Customer, 'id' | 'name' | 'phone'> | null;
+  customer?: Pick<Customer, 'id' | 'name' | 'phone' | 'email'> | null;
   last_message?: Pick<SMSMessage, 'id' | 'body' | 'direction' | 'created_at'> | null;
   last_message_at?: string | null;
   unread_count?: number;
   phone_number?: string;
   is_ai_enabled?: boolean;
 }
+
+interface LinkedEntity {
+  type: 'job' | 'lead' | 'customer' | 'invoice' | 'quote';
+  id: string;
+  title: string;
+  status?: string;
+  statusType?: 'active' | 'success' | 'warning' | 'danger' | 'muted' | 'info' | 'default';
+  amount?: number;
+  date?: string;
+}
+
+/**
+ * Channel filter tabs per Product Constitution - Converged Inbox
+ * All | SMS | Email | Calls | AI
+ */
+type ChannelFilter = 'all' | 'sms' | 'email' | 'calls' | 'ai';
+
+const CHANNEL_FILTERS: { value: ChannelFilter; label: string; icon: React.ElementType }[] = [
+  { value: 'all', label: 'All', icon: Inbox },
+  { value: 'sms', label: 'SMS', icon: MessageSquare },
+  { value: 'email', label: 'Email', icon: Mail },
+  { value: 'calls', label: 'Calls', icon: PhoneCall },
+  { value: 'ai', label: 'AI', icon: Sparkles },
+];
 
 export default function MessagesPage() {
   const router = useRouter();
@@ -43,7 +74,14 @@ export default function MessagesPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isConnected, setIsConnected] = useState(true);
+  const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
   const channelRef = useRef<RealtimeChannel | null>(null);
+
+  // Context drawer state
+  const [contextDrawerOpen, setContextDrawerOpen] = useState(false);
+  const [selectedConversation, setSelectedConversation] = useState<ConversationWithDetails | null>(null);
+  const [linkedEntities, setLinkedEntities] = useState<LinkedEntity[]>([]);
+  const [loadingContext, setLoadingContext] = useState(false);
 
   // Load user
   useEffect(() => {
@@ -70,7 +108,7 @@ export default function MessagesPage() {
         .from('sms_conversations')
         .select(`
           *,
-          customer:customers (id, name, phone)
+          customer:customers (id, name, phone, email)
         `)
         .eq('business_id', user.business_id)
         .order('last_message_at', { ascending: false });
@@ -217,8 +255,120 @@ export default function MessagesPage() {
     await loadConversations();
   };
 
-  // Filter conversations by search
+  // Fetch linked entities for context drawer
+  const fetchLinkedEntities = useCallback(async (customerId: string) => {
+    if (!user) return;
+
+    setLoadingContext(true);
+    const supabase = createClient();
+    const entities: LinkedEntity[] = [];
+
+    try {
+      // Fetch recent jobs for this customer
+      const { data: jobs } = await supabase
+        .from('jobs')
+        .select('id, title, status, scheduled_start')
+        .eq('customer_id', customerId)
+        .eq('business_id', user.business_id)
+        .order('scheduled_start', { ascending: false })
+        .limit(3);
+
+      if (jobs) {
+        for (const job of jobs) {
+          entities.push({
+            type: 'job',
+            id: job.id,
+            title: job.title || 'Untitled Job',
+            status: job.status?.replace('_', ' ') || 'scheduled',
+            statusType: job.status === 'completed' ? 'success' :
+                       job.status === 'in_progress' ? 'warning' :
+                       job.status === 'cancelled' ? 'danger' : 'muted',
+            date: job.scheduled_start ? new Date(job.scheduled_start).toLocaleDateString() : undefined,
+          });
+        }
+      }
+
+      // Fetch leads for this customer
+      const { data: leads } = await supabase
+        .from('leads')
+        .select('id, title, stage')
+        .eq('customer_id', customerId)
+        .eq('business_id', user.business_id)
+        .order('created_at', { ascending: false })
+        .limit(2);
+
+      if (leads) {
+        for (const lead of leads) {
+          entities.push({
+            type: 'lead',
+            id: lead.id,
+            title: lead.title || 'Untitled Lead',
+            status: lead.stage?.replace('_', ' ') || 'new',
+            statusType: lead.stage === 'won' ? 'success' :
+                       lead.stage === 'lost' ? 'danger' :
+                       lead.stage === 'quoted' ? 'warning' : 'info',
+          });
+        }
+      }
+
+      // Fetch unpaid invoices for this customer
+      const { data: invoices } = await supabase
+        .from('invoices')
+        .select('id, invoice_number, total, status')
+        .eq('customer_id', customerId)
+        .eq('business_id', user.business_id)
+        .in('status', ['sent', 'viewed', 'overdue'])
+        .order('created_at', { ascending: false })
+        .limit(2);
+
+      if (invoices) {
+        for (const invoice of invoices) {
+          entities.push({
+            type: 'invoice',
+            id: invoice.id,
+            title: `Invoice #${invoice.invoice_number || invoice.id.slice(0, 8)}`,
+            status: invoice.status || 'sent',
+            statusType: invoice.status === 'overdue' ? 'danger' :
+                       invoice.status === 'paid' ? 'success' : 'warning',
+            amount: invoice.total,
+          });
+        }
+      }
+
+      setLinkedEntities(entities);
+    } catch (error) {
+      console.error('Error fetching linked entities:', error);
+      setLinkedEntities([]);
+    } finally {
+      setLoadingContext(false);
+    }
+  }, [user]);
+
+  // Handle opening context drawer
+  const handleOpenContext = useCallback((conversation: ConversationWithDetails) => {
+    setSelectedConversation(conversation);
+    setContextDrawerOpen(true);
+    if (conversation.customer?.id) {
+      fetchLinkedEntities(conversation.customer.id);
+    } else {
+      setLinkedEntities([]);
+    }
+  }, [fetchLinkedEntities]);
+
+  // Filter conversations by search and channel
   const filteredConversations = conversations.filter((convo) => {
+    // Apply channel filter
+    // Currently all conversations are SMS, so 'all' and 'sms' show everything
+    // 'email', 'calls' will show empty for now (future implementation)
+    // 'ai' shows only AI-enabled conversations
+    if (channelFilter === 'email' || channelFilter === 'calls') {
+      return false; // No email/calls yet - future implementation
+    }
+    if (channelFilter === 'ai' && !convo.is_ai_enabled) {
+      return false;
+    }
+
+    // Apply search filter
     if (!searchQuery.trim()) return true;
 
     const query = searchQuery.toLowerCase();
@@ -249,16 +399,16 @@ export default function MessagesPage() {
         <div className="px-4 py-3">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-text">Messages</h1>
+              <h1 className="text-xl font-bold text-text">Inbox</h1>
               {unreadCount > 0 && (
                 <Badge className="bg-danger text-white">{unreadCount}</Badge>
               )}
               {/* Real-time connection status */}
               <div className="flex items-center gap-1">
                 {isConnected ? (
-                  <Wifi className="h-4 w-4 text-green-500" />
+                  <Wifi className="h-4 w-4 text-tc-success" />
                 ) : (
-                  <WifiOff className="h-4 w-4 text-red-500" />
+                  <WifiOff className="h-4 w-4 text-tc-danger" />
                 )}
               </div>
             </div>
@@ -270,6 +420,29 @@ export default function MessagesPage() {
             >
               <RefreshCw className={cn('h-5 w-5', refreshing && 'animate-spin')} />
             </Button>
+          </div>
+
+          {/* Channel Filter Tabs - Converged Inbox per Product Constitution */}
+          <div className="flex gap-1 mb-3 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
+            {CHANNEL_FILTERS.map((filter) => {
+              const Icon = filter.icon;
+              const isActive = channelFilter === filter.value;
+              return (
+                <button
+                  key={filter.value}
+                  onClick={() => setChannelFilter(filter.value)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors',
+                    isActive
+                      ? 'bg-primary text-white'
+                      : 'bg-surface-muted text-text-secondary hover:bg-muted'
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {filter.label}
+                </button>
+              );
+            })}
           </div>
 
           {/* Search */}
@@ -310,7 +483,11 @@ export default function MessagesPage() {
           </div>
         ) : (
           filteredConversations.map((convo) => (
-            <ConversationItem key={convo.id} conversation={convo} />
+            <ConversationItem
+              key={convo.id}
+              conversation={convo}
+              onOpenContext={() => handleOpenContext(convo)}
+            />
           ))
         )}
       </div>
@@ -338,25 +515,48 @@ export default function MessagesPage() {
           <span className="font-medium">AI Active</span>
         </Link>
       )}
+
+      {/* Context Drawer - Per Product Constitution Section 6.3 */}
+      <ContextDrawer
+        open={contextDrawerOpen}
+        onOpenChange={setContextDrawerOpen}
+        customer={selectedConversation?.customer ? {
+          id: selectedConversation.customer.id,
+          name: selectedConversation.customer.name,
+          phone: selectedConversation.customer.phone || undefined,
+          email: selectedConversation.customer.email || undefined,
+        } : null}
+        linkedEntities={linkedEntities}
+        nextAction={selectedConversation?.customer ? {
+          label: 'View Customer',
+          href: `/customers/${selectedConversation.customer.id}`,
+          icon: User,
+        } : undefined}
+      />
     </div>
   );
 }
 
-function ConversationItem({ conversation }: { conversation: ConversationWithDetails }) {
+function ConversationItem({
+  conversation,
+  onOpenContext,
+}: {
+  conversation: ConversationWithDetails;
+  onOpenContext: () => void;
+}) {
   const name = conversation.customer?.name || formatPhoneNumber(conversation.phone_number || '');
   const hasUnread = conversation.unread_count && conversation.unread_count > 0;
   const lastMessage = conversation.last_message;
 
   return (
-    <Link
-      href={`/messages/${conversation.id}`}
+    <div
       className={cn(
-        'flex items-center gap-3 p-4 hover:bg-muted/50 active:bg-muted transition-colors',
+        'flex items-center gap-3 p-4 hover:bg-muted/50 transition-colors',
         hasUnread && 'bg-primary/5'
       )}
     >
       {/* Avatar */}
-      <div className="relative">
+      <Link href={`/messages/${conversation.id}`} className="relative shrink-0">
         <Avatar
           fallback={
             conversation.customer?.name?.charAt(0) ||
@@ -370,10 +570,10 @@ function ConversationItem({ conversation }: { conversation: ConversationWithDeta
             <Bot className="h-3 w-3" />
           </div>
         )}
-      </div>
+      </Link>
 
-      {/* Content */}
-      <div className="flex-1 min-w-0">
+      {/* Content - taps to open message thread */}
+      <Link href={`/messages/${conversation.id}`} className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
           <p className={cn('font-medium text-text truncate', hasUnread && 'font-semibold')}>
             {name}
@@ -407,7 +607,7 @@ function ConversationItem({ conversation }: { conversation: ConversationWithDeta
               {formatPhoneNumber(conversation.phone_number || '')}
             </div>
           )}
-      </div>
+      </Link>
 
       {/* Unread badge */}
       {hasUnread && (
@@ -416,8 +616,25 @@ function ConversationItem({ conversation }: { conversation: ConversationWithDeta
         </Badge>
       )}
 
-      <ChevronRight className="h-5 w-5 text-text-muted shrink-0" />
-    </Link>
+      {/* Context button - opens drawer with linked jobs/invoices */}
+      {conversation.customer && (
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onOpenContext();
+          }}
+          className="p-2 rounded-lg hover:bg-muted active:bg-muted/80 transition-colors shrink-0"
+          aria-label="View context"
+        >
+          <Info className="h-5 w-5 text-text-muted" />
+        </button>
+      )}
+
+      <Link href={`/messages/${conversation.id}`} className="shrink-0">
+        <ChevronRight className="h-5 w-5 text-text-muted" />
+      </Link>
+    </div>
   );
 }
 

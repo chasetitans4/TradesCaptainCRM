@@ -10,7 +10,6 @@ import {
   Briefcase,
   Calendar,
   Menu,
-  Plus,
   Wrench,
   MoreHorizontal,
   MessageSquare,
@@ -23,31 +22,56 @@ import {
   HelpCircle,
   Clock,
   Zap,
+  Sun,
+  Inbox,
+  Heart,
+  UsersRound,
+  Camera,
+  Phone,
+  Star,
+  Wallet,
+  Bell,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Sidebar } from './sidebar';
 import { BottomSheet } from '@/components/mobile/bottom-sheet';
 
+/**
+ * Mobile bottom navigation - 5-tab structure per Product Constitution v2.0
+ * Today | Schedule | Jobs | Inbox | More
+ */
 const mobileNav = [
-  { name: 'My Day', href: '/my-day', icon: Zap },
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Today', href: '/my-day', icon: Sun },
+  { name: 'Schedule', href: '/calendar', icon: Calendar },
   { name: 'Jobs', href: '/jobs', icon: Briefcase },
-  { name: 'Calendar', href: '/calendar', icon: Calendar },
+  { name: 'Inbox', href: '/messages', icon: Inbox },
 ];
 
+/**
+ * More menu - features accessible via More tab
+ * Per Product Constitution: Business Health, Team, Customers, Reports, Settings, Help
+ */
 const secondaryNav = [
-  { name: 'Messages', href: '/messages', icon: MessageSquare, badge: true },
+  { name: 'Business Health', href: '/dashboard', icon: Heart },
+  { name: 'Team', href: '/team', icon: UsersRound },
+  { name: 'Customers', href: '/customers', icon: Users },
   { name: 'Leads', href: '/leads', icon: UserPlus },
-  { name: 'Invoices', href: '/invoices', icon: Receipt },
   { name: 'Quotes', href: '/quotes', icon: FileText },
+  { name: 'Invoices', href: '/invoices', icon: Receipt },
+  { name: 'Proof of Work', href: '/settings/proof-of-work', icon: Camera },
+  { name: 'Voice', href: '/voice', icon: Phone },
+  { name: 'Reviews', href: '/reviews', icon: Star },
+  { name: 'Timesheets', href: '/timesheets', icon: Clock },
+  { name: 'Expenses', href: '/expenses', icon: Wallet },
+  { name: 'Follow-ups', href: '/follow-ups', icon: Bell },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
   { name: 'Dispatch', href: '/dispatch', icon: Truck },
 ];
 
 const utilityNav = [
   { name: 'Settings', href: '/settings', icon: Settings },
-  { name: 'Help', href: '/help', icon: HelpCircle },
+  { name: 'Help & Training', href: '/help', icon: HelpCircle },
 ];
 
 const RECENT_PAGES_KEY = 'trades-captain-recent-pages';
@@ -61,21 +85,30 @@ interface RecentPage {
 
 function getPageName(pathname: string): string {
   const routes: Record<string, string> = {
-    '/dashboard': 'Dashboard',
-    '/my-day': 'My Day',
+    '/dashboard': 'Business Health',
+    '/my-day': 'Today',
     '/jobs': 'Jobs',
     '/customers': 'Customers',
-    '/calendar': 'Calendar',
-    '/messages': 'Messages',
+    '/team': 'Team',
+    '/calendar': 'Schedule',
+    '/messages': 'Inbox',
     '/leads': 'Leads',
     '/invoices': 'Invoices',
     '/quotes': 'Quotes',
     '/reports': 'Reports',
     '/dispatch': 'Dispatch',
     '/settings': 'Settings',
-    '/help': 'Help',
+    '/help': 'Help & Training',
     '/follow-ups': 'Follow-ups',
     '/promotions': 'Promotions',
+    '/settings/proof-of-work': 'Proof of Work',
+    '/voice': 'Voice',
+    '/calls': 'Call Log',
+    '/reviews': 'Reviews',
+    '/timesheets': 'Timesheets',
+    '/expenses': 'Expenses',
+    '/receipts': 'Receipts',
+    '/reminders': 'Reminders',
   };
 
   if (routes[pathname]) return routes[pathname];
@@ -100,6 +133,24 @@ export function MobileNav({ className, businessName, planName }: MobileNavProps)
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [recentPages, setRecentPages] = useState<RecentPage[]>([]);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  // Fetch platform logo on mount
+  useEffect(() => {
+    async function fetchPlatformLogo() {
+      try {
+        const res = await fetch('/api/platform/branding');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.branding?.logo_url) {
+          setLogoUrl(data.branding.logo_url);
+        }
+      } catch (error) {
+        console.error('Failed to fetch platform logo:', error);
+      }
+    }
+    fetchPlatformLogo();
+  }, []);
 
   // Load recent pages from localStorage
   useEffect(() => {
@@ -149,7 +200,7 @@ export function MobileNav({ className, businessName, planName }: MobileNavProps)
   return (
     <>
       {/* Top Bar */}
-      <div className={cn('fixed top-0 inset-x-0 z-50 h-14 bg-background border-b', className)}>
+      <div className={cn('fixed top-0 inset-x-0 z-50 h-14 bg-white border-b', className)}>
         <div className="h-full px-4 flex items-center justify-between">
           <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
             <SheetTrigger asChild>
@@ -166,37 +217,48 @@ export function MobileNav({ className, businessName, planName }: MobileNavProps)
             </SheetContent>
           </Sheet>
 
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-secondary-400 to-primary-600 flex items-center justify-center">
-              <Wrench className="w-4 h-4 text-white" />
-            </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-xs tracking-tight">TRADES</span>
-              <span className="font-bold text-xs -mt-0.5 bg-gradient-to-r from-secondary-400 to-primary-500 bg-clip-text text-transparent">
-                Captain
-              </span>
-            </div>
+          {/* Centered Logo */}
+          <Link href="/dashboard" className="flex items-center justify-center flex-1">
+            {logoUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={logoUrl}
+                alt="Logo"
+                className="h-10 w-auto max-w-[200px] object-contain"
+                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/trades-captain-logo.png'; }}
+              />
+            ) : (
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-secondary-400 to-primary-600 flex items-center justify-center">
+                  <Wrench className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-bold text-xs tracking-tight">TRADES</span>
+                  <span className="font-bold text-xs -mt-0.5 bg-gradient-to-r from-secondary-400 to-primary-500 bg-clip-text text-transparent">
+                    Captain
+                  </span>
+                </div>
+              </div>
+            )}
           </Link>
 
-          <Button size="icon" variant="ghost" asChild>
-            <Link href="/jobs/new">
-              <Plus className="w-5 h-5" />
-            </Link>
-          </Button>
+          {/* Spacer to balance hamburger menu */}
+          <div className="w-10" />
         </div>
       </div>
 
       {/* Bottom Tab Bar */}
       <div
         className={cn(
-          'fixed bottom-0 inset-x-0 z-50 bg-background border-t safe-area-pb',
+          'fixed bottom-0 inset-x-0 z-[60] bg-background border-t safe-area-pb',
           className
         )}
       >
         <nav className="h-16 flex items-center justify-around px-2">
           {mobileNav.map((item) => {
+            // Active if exact match, or prefix match for nested routes (except for root routes)
             const active = pathname === item.href ||
-              (item.href !== '/dashboard' && pathname.startsWith(item.href));
+              (item.href !== '/my-day' && item.href !== '/messages' && pathname.startsWith(item.href));
 
             return (
               <Link
@@ -278,9 +340,6 @@ export function MobileNav({ className, businessName, planName }: MobileNavProps)
                   >
                     <item.icon className="w-6 h-6" />
                     <span className="text-xs font-medium">{item.name}</span>
-                    {item.badge && (
-                      <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />
-                    )}
                   </Link>
                 );
               })}

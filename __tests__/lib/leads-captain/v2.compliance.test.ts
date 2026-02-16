@@ -30,17 +30,34 @@ describe('LeadsCaptain v2 compliance', () => {
               };
             }
             if (table === 'leads_captain_conversations_v2') {
+              const chainable: any = {
+                eq: () => chainable,
+                in: () => Promise.resolve({ data: {}, error: null }),
+                then: (resolve: any) => resolve({ data: [], error: null }),
+              };
               return {
-                update: () => ({
+                update: () => chainable,
+                select: () => chainable,
+              };
+            }
+            if (table === 'leads_captain_audit_log') {
+              return { insert: async () => ({ data: {}, error: null }) };
+            }
+            if (table === 'customers') {
+              return {
+                select: () => ({
                   eq: () => ({
                     eq: () => ({
-                      eq: () => Promise.resolve({ data: {}, error: null }),
+                      single: async () => ({ data: { id: 'cust1' }, error: null }),
                     }),
                   }),
                 }),
               };
             }
-            if (table === 'leads_captain_audit_log') {
+            if (table === 'opt_out_log') {
+              return { insert: async () => ({ data: {}, error: null }) };
+            }
+            if (table === 'conversation_state_log') {
               return { insert: async () => ({ data: {}, error: null }) };
             }
             return { select: () => ({}) };
@@ -103,6 +120,20 @@ describe('LeadsCaptain v2 compliance', () => {
               };
             }
             if (table === 'leads_captain_audit_log') {
+              return { insert: async () => ({ data: {}, error: null }) };
+            }
+            if (table === 'customers') {
+              return {
+                select: () => ({
+                  eq: () => ({
+                    eq: () => ({
+                      single: async () => ({ data: { id: 'cust1' }, error: null }),
+                    }),
+                  }),
+                }),
+              };
+            }
+            if (table === 'opt_out_log') {
               return { insert: async () => ({ data: {}, error: null }) };
             }
             return { select: () => ({}) };

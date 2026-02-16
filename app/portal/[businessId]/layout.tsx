@@ -23,7 +23,6 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import Image from 'next/image';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { NotificationBell } from '@/components/portal/notification-bell';
 import { MobileBottomNav } from '@/components/portal/mobile-bottom-nav';
@@ -40,6 +39,11 @@ interface BusinessInfo {
   logo_url?: string;
   primary_color?: string;
   secondary_color?: string;
+}
+
+interface PlatformSettings {
+  logo_url: string;
+  name: string;
 }
 
 interface CustomerInfo {
@@ -77,6 +81,7 @@ export default function PortalLayout({
 
   const [business, setBusiness] = useState<BusinessInfo | null>(null);
   const [customer, setCustomer] = useState<CustomerInfo | null>(null);
+  const [platform, setPlatform] = useState<PlatformSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -93,6 +98,7 @@ export default function PortalLayout({
 
         setBusiness(data.business);
         setCustomer(data.customer);
+        setPlatform(data.platform);
       } catch (error) {
         portalLogger.error({
           msg: 'Error loading portal data',
@@ -155,7 +161,7 @@ export default function PortalLayout({
 
   return (
     <BusinessThemeProvider primaryColor={primaryColor} secondaryColor={secondaryColor}>
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       {/* Demo Mode Banner */}
       <DemoModeBanner />
 
@@ -163,25 +169,22 @@ export default function PortalLayout({
       <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex flex-col flex-grow bg-white border-r border-gray-200">
           {/* Logo */}
-          <div className="flex items-center gap-3 h-16 px-6 border-b border-gray-200">
-            {business.logo_url ? (
-              <Image
-                src={business.logo_url}
-                alt={business.name}
-                width={96}
-                height={32}
-                className="h-8 w-auto object-contain"
-              />
-            ) : (
-              <Image src="/bluehq-logo.svg" alt="BLUE HQ" width={96} height={32} />
+          <div className="flex items-center justify-center gap-3 h-16 px-6 border-b border-gray-200">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={business.logo_url || platform?.logo_url || '/trades-captain-logo.png'}
+              alt={business.name || platform?.name || 'Trades Captain'}
+              className="h-10 w-auto max-w-[150px] object-contain"
+            />
+            {!business.logo_url && !platform?.logo_url && (
+              <span className="font-semibold text-gray-900 truncate">
+                {business.name}
+              </span>
             )}
-            <span className="font-semibold text-gray-900 truncate">
-              {business.name}
-            </span>
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-4 py-4 space-y-1">
+          <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
             {navItems.map((item) => {
               const href = `/portal/${businessId}${item.href}`;
               return (
@@ -255,23 +258,19 @@ export default function PortalLayout({
 
       {/* Mobile Header */}
       <header className="lg:hidden sticky top-0 z-40 bg-white border-b border-gray-200">
-        <div className="flex items-center justify-between h-14 px-4">
-          <div className="flex items-center gap-2">
-            {business.logo_url ? (
-              <Image
-                src={business.logo_url}
-                alt={business.name}
-                width={96}
-                height={32}
-                className="h-8 w-auto object-contain"
-              />
-            ) : (
-              <Image src="/bluehq-logo.svg" alt="BLUE HQ" width={96} height={32} />
-            )}
-            <span className="font-semibold text-gray-900">{business.name}</span>
+        <div className="relative flex items-center justify-between h-14 px-4">
+          <div className="w-10" /> {/* Spacer */}
+
+          <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={business.logo_url || platform?.logo_url || '/trades-captain-logo.svg'}
+              alt={business.name || platform?.name || 'Trades Captain'}
+              className="h-8 w-auto max-w-[120px] object-contain"
+            />
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 z-10">
             <NotificationBell businessId={businessId} />
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
@@ -359,7 +358,7 @@ export default function PortalLayout({
       </header>
 
       {/* Main Content */}
-      <main className="lg:pl-64 pb-20 lg:pb-0">
+      <main className="lg:pl-64 pb-20 lg:pb-0 min-h-screen overflow-y-auto">
         <div className="py-6 px-4 lg:px-8">{children}</div>
       </main>
 

@@ -34,6 +34,8 @@ import {
   CalendarDays,
   MessageSquare,
   History,
+  Mic,
+  FileCheck,
 } from 'lucide-react';
 
 interface SettingSection {
@@ -99,6 +101,21 @@ const SETTING_SECTIONS: { title: string; items: SettingSection[] }[] = [
         icon: Bot,
         permission: 'manage_ai_sms',
         badge: 'Pro',
+      },
+      {
+        href: '/settings/voice',
+        label: 'AI Voice Receptionist',
+        description: 'Voice minutes, greetings, emergency rules',
+        icon: Mic,
+        permission: 'manage_phone_settings',
+        badge: 'Pro',
+      },
+      {
+        href: '/settings/proof-of-work',
+        label: 'Proof of Work™',
+        description: 'Verified work records for customers',
+        icon: FileCheck,
+        permission: 'manage_settings',
       },
       {
         href: '/settings/sms-templates',

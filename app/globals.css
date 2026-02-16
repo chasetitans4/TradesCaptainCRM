@@ -37,6 +37,40 @@
 
     --radius: 0.625rem;
 
+    /* =====================================================
+       SEMANTIC DESIGN TOKENS (UI Constraints v2.0)
+       These map to tailwind semantic classes like bg-surface, text-primary
+       ===================================================== */
+
+    /* Backgrounds */
+    --color-background: #F7F8FA;
+    --color-surface: #FFFFFF;
+    --color-surface-muted: #EFF1F4;
+    --color-surface-elevated: #FFFFFF;
+
+    /* Text */
+    --color-text-primary: #0F172A;
+    --color-text-secondary: #475569;
+    --color-text-muted: #94A3B8;
+
+    /* Accent (Trades Captain Signature Blue) */
+    --color-accent: #2563EB;
+    --color-accent-muted: #DBEAFE;
+
+    /* Status Colors */
+    --color-success: #16A34A;
+    --color-success-muted: #DCFCE7;
+    --color-warning: #D97706;
+    --color-warning-muted: #FEF3C7;
+    --color-danger: #DC2626;
+    --color-danger-muted: #FEE2E2;
+    --color-info: #0284C7;
+    --color-info-muted: #DBEAFE;
+
+    /* Borders */
+    --color-border: #E2E8F0;
+    --color-border-muted: #EFF1F4;
+
     /* Sidebar - Dark charcoal from "TRADES" */
     --sidebar-bg: 222 47% 11%;
     --sidebar-foreground: 210 40% 98%;
@@ -98,6 +132,39 @@
     /* Business colors in dark mode */
     --business-primary: 217 91% 60%;
     --business-secondary: 199 89% 55%;
+
+    /* =====================================================
+       SEMANTIC DESIGN TOKENS - DARK MODE
+       ===================================================== */
+
+    /* Backgrounds */
+    --color-background: #0B1220;
+    --color-surface: #1A2332;
+    --color-surface-muted: #2A3444;
+    --color-surface-elevated: #2A3444;
+
+    /* Text */
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #CBD5E1;
+    --color-text-muted: #64748B;
+
+    /* Accent */
+    --color-accent: #3B82F6;
+    --color-accent-muted: #1E3A8A;
+
+    /* Status Colors */
+    --color-success: #22C55E;
+    --color-success-muted: #14532D;
+    --color-warning: #F59E0B;
+    --color-warning-muted: #78350F;
+    --color-danger: #EF4444;
+    --color-danger-muted: #7F1D1D;
+    --color-info: #3B82F6;
+    --color-info-muted: #1E3A8A;
+
+    /* Borders */
+    --color-border: #334155;
+    --color-border-muted: #1E293B;
   }
 }
 
@@ -262,21 +329,204 @@
     overscroll-behavior-y: contain;
   }
 
-  /* Prevent iOS rubber-band effect on main container */
+  /*
+   * Mobile scrolling - App Router compatible
+   * Uses a more flexible approach that works with any portal layout
+   */
   @media (max-width: 1023px) {
-    body {
-      position: fixed;
-      width: 100%;
+    /* Allow natural document scrolling */
+    html, body {
       height: 100%;
-      overflow: hidden;
+      overflow-x: hidden;
     }
 
-    #__next,
+    /* Main content areas should scroll naturally */
     main {
-      height: 100%;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
+      overscroll-behavior-y: contain;
     }
+  }
+
+  /* =====================================================
+     UI CONSTRAINTS v2.0 - DARK MODE SHADOWS
+     In dark mode, elevation = surface color, not shadow
+     ===================================================== */
+
+  .dark .shadow-sm,
+  .dark .shadow-md,
+  .dark .shadow-lg,
+  .dark .shadow-soft,
+  .dark .shadow-medium,
+  .dark .shadow-strong,
+  .dark .shadow-card,
+  .dark .shadow-card-hover {
+    box-shadow: none !important;
+  }
+
+  /* =====================================================
+     UI CONSTRAINTS v2.0 - TOUCH TARGETS
+     Minimum 48px for all interactive elements
+     Primary CTAs get 56px
+     ===================================================== */
+
+  button:not(.btn-icon):not([class*="size-"]):not(.touch-target-override),
+  [role="button"]:not(.btn-icon):not([class*="size-"]):not(.touch-target-override) {
+    min-height: 48px;
+  }
+
+  /* Primary CTAs get 56px */
+  .btn-primary,
+  [data-primary-cta="true"] {
+    min-height: 56px;
+  }
+
+  /* Form inputs minimum height */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  select,
+  textarea {
+    min-height: 48px;
+  }
+
+  /* Override for icon-only buttons */
+  .btn-icon,
+  .touch-target-override,
+  [class*="size-icon"] {
+    min-height: auto;
+  }
+
+  /* =====================================================
+     UI CONSTRAINTS v2.0 - CARD STYLING
+     Job cards with left edge color indicator
+     ===================================================== */
+
+  .card {
+    @apply bg-surface rounded-lg shadow-sm;
+  }
+
+  /* Card with status edge indicator */
+  .card-status-edge {
+    border-left-width: 4px;
+    border-left-style: solid;
+  }
+
+  /* Status edge colors */
+  .card-status-scheduled { border-left-color: #94A3B8; }
+  .card-status-on-my-way { border-left-color: #2563EB; }
+  .card-status-on-site { border-left-color: #2563EB; }
+  .card-status-completed { border-left-color: #16A34A; }
+  .card-status-paid { border-left-color: #16A34A; }
+  .card-status-paused { border-left-color: #D97706; }
+  .card-status-attention { border-left-color: #DC2626; }
+
+  /* =====================================================
+     UI CONSTRAINTS v2.0 - TYPOGRAPHY EMPHASIS
+     Money and counts get font-semibold
+     ===================================================== */
+
+  .text-money,
+  .text-count {
+    @apply font-semibold;
+  }
+}
+
+/* =====================================================
+   UTILITY CLASSES
+   ===================================================== */
+
+@layer utilities {
+  /* Smooth expand/collapse via grid row animation */
+  .expandable {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 200ms ease-out;
+  }
+
+  .expandable.open {
+    grid-template-rows: 1fr;
+  }
+
+  .expandable > * {
+    overflow: hidden;
+  }
+
+  /* Stagger utility for list entrance animations */
+  .stagger-item {
+    animation-fill-mode: both;
+  }
+
+  /* Hide scrollbar while maintaining scroll functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari, Opera */
+  }
+}
+
+/* =====================================================
+   TIER 3.1 — INPUT FOCUS FEEDBACK
+   Soft ring on focus, no scale
+   ===================================================== */
+
+input:focus,
+select:focus,
+textarea:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  transition: box-shadow 150ms ease-out, border-color 150ms ease-out;
+}
+
+/* =====================================================
+   TIER 5.1 — DARK MODE BORDER CLARITY
+   Stronger borders for cards in dark mode
+   ===================================================== */
+
+.dark .card {
+  border-color: hsl(var(--border-strong));
+}
+
+/* =====================================================
+   TIER 5.2 — FOCUS VISIBLE RING
+   Consistent keyboard focus indicator
+   ===================================================== */
+
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* =====================================================
+   TIER 5.3 — REDUCED MOTION COMPLIANCE
+   Respect prefers-reduced-motion
+   ===================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* =====================================================
+   TIER 5.5 — MOBILE SCROLL VISUAL SUPPRESSION
+   Zero visible scrollbars on mobile
+   Desktop behavior unchanged
+   ===================================================== */
+
+@media (max-width: 768px) {
+  * {
+    scrollbar-width: none;
+  }
+
+  * {
+    -ms-overflow-style: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
   }
 }

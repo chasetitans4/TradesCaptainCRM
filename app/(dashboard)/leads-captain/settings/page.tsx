@@ -73,14 +73,14 @@ export default function LeadsCaptainSettingsPage() {
       const configData = await configRes.json();
       const intentsData = await intentsRes.json();
 
-      if (configData.needs_setup) {
+      if (configData.needs_setup || configData.error || !configData.config) {
         router.push('/leads-captain');
         return;
       }
 
       setConfig(configData.config);
       setIntents(intentsData.intents || []);
-      setFormData(configData.config);
+      setFormData(configData.config || {});
     } catch (error) {
       lcSettingsLogger.error({
         msg: 'Error fetching settings',

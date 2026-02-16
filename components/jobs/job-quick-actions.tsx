@@ -43,10 +43,15 @@ const STATUS_TRANSITIONS: Record<JobStatus, { label: string; icon: React.ReactNo
   scheduled: [
     { label: 'Start Job', icon: <Play className="h-5 w-5" />, action: 'start' },
   ],
+  on_way: [
+    { label: 'Start Job', icon: <Play className="h-5 w-5" />, action: 'start' },
+  ],
   in_progress: [
     { label: 'Complete Job', icon: <CheckCircle2 className="h-5 w-5" />, action: 'complete' },
   ],
   completed: [],
+  return_needed: [],
+  callback: [],
   cancelled: [],
   no_show: [],
 };

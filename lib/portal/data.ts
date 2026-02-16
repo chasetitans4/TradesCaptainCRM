@@ -255,17 +255,17 @@ export async function getCustomerProfile(customerId: string) {
       .single();
 
     if (error) {
-      console.error('[Data] Error fetching customer:', error);
+      // console.error('[Data] Error fetching customer:', error);
       return null;
     }
     
     if (!data) {
-      console.log('[Data] Customer query returned no data');
+      // console.log('[Data] Customer query returned no data');
     }
 
     return data;
-  } catch (err) {
-    console.error('[Data] Exception fetching customer:', err);
+  } catch (_err) {
+    // console.error('[Data] Exception fetching customer:', err);
     return null;
   }
 }
@@ -278,11 +278,29 @@ export async function getBusinessForPortal(businessId: string) {
 
   const { data } = await supabase
     .from('businesses')
-    .select('*')
+    .select('id, name, phone, email, logo_url, primary_color')
     .eq('id', businessId)
     .single();
 
   return data;
+}
+
+/**
+ * Get platform settings for portal branding fallback
+ */
+export async function getPlatformSettings() {
+  try {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from('platform_settings')
+      .select('value')
+      .eq('key', 'platform_branding')
+      .single();
+    
+    return data?.value || null;
+  } catch {
+    return null;
+  }
 }
 
 /**

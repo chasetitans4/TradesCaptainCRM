@@ -19,14 +19,33 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Validate UUID format to prevent enumeration/injection
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(businessId)) {
+      return NextResponse.json(
+        { error: 'Invalid business ID' },
+        { status: 400 }
+      );
+    }
+
     // Use admin client to bypass RLS for public business info
     const supabase = createAdminClient();
 
-    const { data: business, error } = await supabase
-      .from('businesses')
-      .select('id, name, phone, email, logo_url, primary_color')
-      .eq('id', businessId)
-      .single();
+    const [businessResult, platformResult] = await Promise.all([
+      supabase
+        .from('businesses')
+        .select('id, name, phone, email, logo_url, primary_color')
+        .eq('id', businessId)
+        .single(),
+      supabase
+        .from('platform_settings')
+        .select('value')
+        .eq('key', 'platform_branding')
+        .single()
+    ]);
+
+    const business = businessResult.data;
+    const error = businessResult.error;
 
     if (error || !business) {
       return NextResponse.json(
@@ -35,7 +54,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(business);
+    const platformSettings = platformResult.data?.value || null;
+
+    return NextResponse.json({
+      ...business,
+      platform_settings: platformSettings
+    });
   } catch (error) {
     apiLogger.error({ error, context: 'Error in GET /api/portal/business' });
     return NextResponse.json(

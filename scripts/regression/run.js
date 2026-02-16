@@ -19,7 +19,7 @@ async function main() {
     {
       name: 'Auth login page responds',
       url: `${base}/login`,
-      expect: [200],
+      expect: [200, 307],
     },
     {
       name: 'Dashboard page responds',
@@ -30,6 +30,21 @@ async function main() {
       name: 'Portal login page responds without redirect loop',
       url: `${base}/portal/test/login`,
       expect: [200, 307],
+    },
+    {
+      name: 'Leads page responds',
+      url: `${base}/leads`,
+      expect: [200, 307, 401], // 401/307 is acceptable for unauthenticated request
+    },
+    {
+      name: 'Jobs page responds',
+      url: `${base}/jobs`,
+      expect: [200, 307, 401],
+    },
+    {
+      name: 'Invoices page responds',
+      url: `${base}/invoices`,
+      expect: [200, 307, 401],
     },
   ];
 

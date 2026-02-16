@@ -22,6 +22,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import type { UserWithBusiness, Job, Customer, JobNote, JobPhoto, JobStatus, User } from '@/types';
+import type { LucideIcon } from 'lucide-react';
 import {
   ArrowLeft,
   Phone,
@@ -45,10 +46,14 @@ import {
   Send,
   Trash2,
   AlertCircle,
+  Truck,
 } from 'lucide-react';
 import { MobileDetailHeader } from '@/components/ui/mobile-breadcrumb';
 import { BottomActionBar, BottomActionBarSpacer } from '@/components/mobile/bottom-action-bar';
+import { QuickActionBar, QuickActionBarSpacer } from '@/components/mobile/quick-action-bar';
+import { useJobQuickActions } from '@/hooks/useJobQuickActions';
 import { QuickContactBar } from '@/components/mobile/quick-contact-bar';
+import { ProgressStepper, type JobStage, type StepState } from '@/components/ui/progress-stepper';
 
 import { DocumentList } from '@/components/documents/document-list';
 
@@ -61,8 +66,11 @@ const STATUS_COLORS: Record<JobStatus, string> = {
   scheduled: 'bg-info/10 text-info border-info/20',
   in_progress: 'bg-warning/10 text-warning border-warning/20',
   completed: 'bg-success/10 text-success border-success/20',
+  return_needed: 'bg-warning/10 text-warning border-warning/20',
+  callback: 'bg-info/10 text-info border-info/20',
   cancelled: 'bg-danger/10 text-danger border-danger/20',
   no_show: 'bg-muted/10 text-muted-foreground border-muted/20',
+  on_way: 'bg-info/10 text-info border-info/20',
 };
 
 const STATUS_OPTIONS: { value: JobStatus; label: string; icon: React.ElementType }[] = [
@@ -71,6 +79,32 @@ const STATUS_OPTIONS: { value: JobStatus; label: string; icon: React.ElementType
   { value: 'completed', label: 'Completed', icon: CheckCircle },
   { value: 'cancelled', label: 'Cancelled', icon: XCircle },
 ];
+
+/**
+ * Map job status to Progress Stepper stage
+ * Per Product Constitution Section 6.2 - Job Detail v2
+ */
+function getProgressStepperStage(
+  status: JobStatus,
+  isPaid?: boolean
+): { stage: JobStage; state?: StepState } {
+  switch (status) {
+    case 'scheduled':
+      return { stage: 'scheduled' };
+    case 'in_progress':
+      // in_progress maps to on_site (active work)
+      return { stage: 'on_site' };
+    case 'completed':
+      // If paid, show paid stage; otherwise completed
+      return isPaid ? { stage: 'paid' } : { stage: 'completed' };
+    case 'cancelled':
+    case 'no_show':
+      // Show last known stage with paused state
+      return { stage: 'scheduled', state: 'paused' };
+    default:
+      return { stage: 'scheduled' };
+  }
+}
 
 export default function JobDetailPage() {
   const router = useRouter();
@@ -93,6 +127,9 @@ export default function JobDetailPage() {
 
   // Photo upload
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  // Notes section scroll ref
+  const notesRef = useRef<HTMLDivElement>(null);
 
   // Load user
   useEffect(() => {
@@ -347,19 +384,54 @@ export default function JobDetailPage() {
 
   const canEdit = user.role === 'owner' || user.role === 'admin' || job.assigned_user_id === user.id;
 
-  // Get next status action
-  const getNextStatusAction = () => {
+  /**
+   * Get primary CTA per Job State Matrix (Product Constitution Section 7)
+   *
+   * | Status    | CTA Label        | Behavior                    |
+   * |-----------|------------------|-----------------------------|
+   * | Scheduled | "On My Way"      | Transitions, starts timer   |
+   * | In Progress | "Complete Job" | Transitions to completed    |
+   * | Completed | "Send Invoice"   | Opens invoice creation      |
+   * | Completed | "Collect Payment"| If invoice exists           |
+   */
+  const getStateMatrixCTA = (): {
+    label: string;
+    status?: JobStatus;
+    icon: LucideIcon;
+    href?: string;
+    disabled?: boolean;
+    subtext?: string;
+  } | null => {
     switch (job.status) {
       case 'scheduled':
-        return { label: 'Start Job', status: 'in_progress' as JobStatus, icon: PlayCircle };
+        return {
+          label: 'On My Way',
+          status: 'in_progress',
+          icon: PlayCircle,
+        };
       case 'in_progress':
-        return { label: 'Complete Job', status: 'completed' as JobStatus, icon: CheckCircle };
+        return {
+          label: 'Complete Job',
+          status: 'completed',
+          icon: CheckCircle,
+        };
+      case 'completed':
+        // TODO: Check if invoice exists for this job
+        // For now, show "Send Invoice" as default action
+        return {
+          label: 'Send Invoice',
+          icon: FileText,
+          href: `/invoices/new?job_id=${job.id}`,
+        };
+      case 'cancelled':
+      case 'no_show':
+        return null;
       default:
         return null;
     }
   };
 
-  const nextAction = getNextStatusAction();
+  const stateMatrixCTA = getStateMatrixCTA();
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -430,6 +502,16 @@ export default function JobDetailPage() {
           </Sheet>
         </div>
       </header>
+
+      {/* Progress Stepper - Job Workflow Stages */}
+      {job.status !== 'cancelled' && job.status !== 'no_show' && (
+        <div className="px-4 py-3 bg-surface border-b border-border">
+          <ProgressStepper
+            currentStage={getProgressStepperStage(job.status).stage}
+            isPaused={getProgressStepperStage(job.status).state === 'paused'}
+          />
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="px-4 py-4 space-y-4">
@@ -642,7 +724,7 @@ export default function JobDetailPage() {
         </section>
 
         {/* Notes */}
-        <section className="card p-4">
+        <section ref={notesRef} className="card p-4">
           <h2 className="font-semibold text-text mb-3">Notes ({notes.length})</h2>
 
           {/* Add note input */}
@@ -702,34 +784,85 @@ export default function JobDetailPage() {
           )}
         </section>
 
-        {/* Bottom spacer for action bar */}
-        <BottomActionBarSpacer />
+        {/* Bottom spacer for Constitution-compliant Quick Action Bar */}
+        <QuickActionBarSpacer hasPrimaryCTA={canEdit && !!stateMatrixCTA} />
       </div>
 
-      {/* Bottom Action Bar - Mobile only */}
-      {canEdit && nextAction && (
-        <BottomActionBar
-          actions={[
-            ...(job.customer.phone ? [{
-              icon: Phone,
-              label: 'Call',
-              onClick: () => window.location.href = `tel:${job.customer.phone}`,
-            }] : []),
-            ...(address ? [{
-              icon: MapPin,
-              label: 'Navigate',
-              onClick: () => window.open(getSmartNavigationUrl(address), '_blank'),
-            }] : []),
-          ]}
-          primaryAction={{
-            icon: nextAction.icon,
-            label: nextAction.label,
-            onClick: () => updateStatus(nextAction.status),
-            disabled: updating,
-          }}
-        />
-      )}
+      {/* Constitution-Compliant Quick Action Bar (Section 3.7) */}
+      <JobQuickActionBarWrapper
+        job={job}
+        user={user}
+        canEdit={canEdit}
+        address={address}
+        onTakePhoto={() => fileInputRef.current?.click()}
+        onAddNote={() => {
+          // Scroll to notes section and focus input
+          notesRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }}
+        onUpdateStatus={updateStatus}
+        updating={updating}
+      />
     </div>
+  );
+}
+
+/**
+ * Wrapper component for Job Quick Action Bar
+ * Implements Design Constitution Section 3.7 - Contextual Action Patterns
+ */
+function JobQuickActionBarWrapper({
+  job,
+  user,
+  canEdit,
+  address,
+  onTakePhoto,
+  onAddNote,
+  onUpdateStatus,
+  updating,
+}: {
+  job: JobWithDetails;
+  user: UserWithBusiness;
+  canEdit: boolean;
+  address: string;
+  onTakePhoto: () => void;
+  onAddNote: () => void;
+  onUpdateStatus: (status: JobStatus) => void;
+  updating: boolean;
+}) {
+  const router = useRouter();
+
+  const { actions, primaryCTA } = useJobQuickActions(
+    {
+      jobId: job.id,
+      jobStatus: job.status,
+      customerId: job.customer.id,
+      customerPhone: job.customer.phone,
+      customerAddress: address,
+      canEdit,
+    },
+    {
+      onTakePhoto,
+      onAddNote,
+      onStartJob: () => onUpdateStatus('in_progress'),
+      onCompleteJob: () => onUpdateStatus('completed'),
+      onUpdateStatus,
+    }
+  );
+
+  // Don't show for cancelled/no-show jobs without edit permission
+  if (!canEdit && (job.status === 'cancelled' || job.status === 'no_show')) {
+    return null;
+  }
+
+  return (
+    <QuickActionBar
+      actions={actions}
+      primaryCTA={primaryCTA ? {
+        ...primaryCTA,
+        loading: updating,
+        disabled: updating || primaryCTA.disabled,
+      } : undefined}
+    />
   );
 }
 

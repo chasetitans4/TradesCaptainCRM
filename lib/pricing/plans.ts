@@ -1,17 +1,17 @@
 // =====================================================
-// TRADESCAPTAIN PRICING & PLANS CONFIGURATION - v6.3
-// Updated: January 2025
-// Terms: Month-to-month | $0 deposit | Cancel anytime
-// Changes: Blue Starter $39, Blue Pro 5 users, Leads Captain $49 add-on
+// TRADESCAPTAIN PRICING & PLANS CONFIGURATION - v6.1
+// Updated: January 2026
+// Terms: Month-to-month | Cancel anytime
+// Changes: Gold Bundles reintroduced, setup fees, new commission structure
 // =====================================================
 
-// Plan track types (v6.0: removed leads_captain, silver, gold; renamed seo to seo_aeo)
-export type PlanTrack = 'blue' | 'web' | 'seo_aeo';
+// Plan track types (v6.1: added 'crm' alias for 'blue', reactivated 'gold')
+export type PlanTrack = 'crm' | 'blue' | 'web' | 'seo_aeo' | 'gold';
 
 // Legacy plan tracks for existing subscriptions
-export type LegacyPlanTrack = 'leads_captain' | 'seo' | 'silver' | 'gold';
+export type LegacyPlanTrack = 'leads_captain' | 'seo' | 'silver' | 'gold_legacy';
 export type PlanTier = 'starter' | 'pro' | 'enterprise' | 'custom';
-export type PlanType = 'individual' | 'teams';
+export type PlanType = 'individual' | 'teams' | 'bundle';
 export type BillingFrequency = 'monthly' | 'annual';
 
 export interface PlanFeatures {
@@ -26,19 +26,29 @@ export interface PlanFeatures {
   includes_gbp: boolean;
   gbp_addon_available: boolean;
   includes_ai_sms: boolean;
-  includes_leads_captain: boolean; // v5.9: Leads Captain inclusion
+  includes_leads_captain: boolean; // v6.1: included in Gold bundles
   sms_limit?: number; // Monthly SMS limit
   citations?: number;
   requires_existing_website: boolean;
   features: string[];
   support_level?: 'email' | 'email_chat' | 'priority';
+  aeo_tier?: 'Foundation' | 'Authority' | 'Infrastructure'; // v6.1: AEO tier
+  allows_extra_locations?: boolean; // v6.1: Enterprise plans allow extra locations
 }
 
-// Available plan tracks (v6.0 - active only)
-export const PLAN_TRACKS: PlanTrack[] = ['blue', 'web', 'seo_aeo'];
+// Available plan tracks (v6.1 - active only)
+export const PLAN_TRACKS: PlanTrack[] = ['crm', 'web', 'seo_aeo', 'gold'];
 
 // Legacy plan tracks for existing subscriptions
-export const LEGACY_PLAN_TRACKS: LegacyPlanTrack[] = ['leads_captain', 'seo', 'silver', 'gold'];
+export const LEGACY_PLAN_TRACKS: LegacyPlanTrack[] = ['leads_captain', 'seo', 'silver', 'gold_legacy'];
+
+// v6.1: Bundle configuration
+export interface BundleIncludes {
+  crm: string;
+  web: string;
+  seo: string;
+  leads_captain: boolean;
+}
 
 export interface Plan {
   id: string;
@@ -46,6 +56,7 @@ export interface Plan {
   track: PlanTrack | LegacyPlanTrack;
   tier: PlanTier;
   type: PlanType;
+  setup_price: number; // v6.1: One-time setup fee
   monthly_price: number;
   annual_price: number;
   features: PlanFeatures;
@@ -54,21 +65,27 @@ export interface Plan {
   invoice_includes: string;
   is_active: boolean;
   is_discontinued?: boolean; // v6.0: true for removed products
+  is_bundle?: boolean; // v6.1: true for Gold bundles
+  bundle_includes?: BundleIncludes; // v6.1: What's included in bundle
+  setup_savings?: number; // v6.1: Savings vs buying individually
+  monthly_savings?: number; // v6.1: Monthly savings vs individual
 }
 
 export interface AddOn {
   id: string;
   name: string;
-  price: number;
-  billing_type: 'one_time' | 'recurring';
+  setup_price: number; // v6.1: One-time setup fee
+  monthly_price: number; // v6.1: Recurring monthly price
+  billing_type: 'one_time' | 'recurring' | 'setup_and_recurring';
   description: string;
   available_for: string[]; // plan IDs or wildcards like 'web_*'
   not_available_for: string[];
+  requires?: string[]; // v6.1: Required plans (e.g., 'web_enterprise OR gold_enterprise')
 }
 
 // =====================================================
-// LEADS CAPTAIN - DISCONTINUED (v6.0)
-// Now included in Blue Pro/Enterprise
+// LEADS CAPTAIN - v6.1 (Now $79/mo add-on)
+// Requires CRM or Gold bundle
 // =====================================================
 
 export const LEADS_CAPTAIN_PLANS: Plan[] = [
@@ -78,9 +95,10 @@ export const LEADS_CAPTAIN_PLANS: Plan[] = [
     track: 'leads_captain',
     tier: 'starter',
     type: 'individual',
-    monthly_price: 39,
-    annual_price: 398, // 15% discount (~2 months free)
-    description: 'AI Missed Call Text-Back (DISCONTINUED - Now in Blue Pro/Enterprise)',
+    setup_price: 0,
+    monthly_price: 79, // v6.1: Updated from $39/$49 to $79
+    annual_price: 806, // 15% discount
+    description: 'AI SMS Text-Back, Web Chat, Scheduling Integration',
     features: {
       users: 1,
       includes_website: false,
@@ -90,37 +108,39 @@ export const LEADS_CAPTAIN_PLANS: Plan[] = [
       gbp_addon_available: false,
       includes_ai_sms: true,
       includes_leads_captain: true,
-      sms_limit: 700, // Soft cap
+      sms_limit: 1000, // v6.1: increased
       requires_existing_website: false,
       support_level: 'email',
       features: [
+        'AI SMS text-back',
+        'AI Web Chat widget',
+        'Scheduling integration',
         'Dedicated phone number',
-        'Automatic text-back',
-        'AI SMS conversations',
-        '700 SMS messages/month (soft cap)',
+        '1,000 SMS messages/month',
         'Conversation dashboard',
       ],
     },
-    invoice_description: 'Leads Captain — AI Missed Call Text-Back',
-    invoice_includes: 'Dedicated phone number, AI SMS conversations, 700 SMS/month',
-    is_active: false, // DISCONTINUED
-    is_discontinued: true,
+    invoice_description: 'Leads Captain — AI SMS & Web Chat',
+    invoice_includes: 'AI SMS text-back, AI Web Chat, Scheduling integration',
+    is_active: true, // v6.1: Reactivated as add-on
+    is_discontinued: false,
   },
 ];
 
 // =====================================================
-// BLUE CRM PLANS - v6.3 pricing
-// Leads Captain is now a $49/mo add-on (not included)
+// CRM PLANS - v6.1 pricing (formerly Blue)
+// $0 setup fee, recurring monthly
 // =====================================================
 
-export const BLUE_PLANS: Plan[] = [
+export const CRM_PLANS: Plan[] = [
   {
-    id: 'blue_starter',
-    name: 'Blue Starter',
-    track: 'blue',
+    id: 'crm_starter',
+    name: 'CRM Starter',
+    track: 'crm',
     tier: 'starter',
     type: 'individual',
-    monthly_price: 39, // v6.3: reduced from $49
+    setup_price: 0,
+    monthly_price: 39,
     annual_price: 398, // 15% discount
     description: 'Perfect for solo contractors',
     features: {
@@ -131,63 +151,65 @@ export const BLUE_PLANS: Plan[] = [
       includes_local_seo: false,
       includes_gbp: false,
       gbp_addon_available: false,
-      includes_ai_sms: false, // v6.3: LC is now an add-on
+      includes_ai_sms: false,
       includes_leads_captain: false,
       requires_existing_website: false,
       support_level: 'email',
       features: [
-        'Blue CRM (1 user)',
+        'CRM (1 user)',
         '500 contacts',
         'Lead tracking',
         'Basic job management',
       ],
     },
-    invoice_description: 'Blue Starter — CRM Only',
-    invoice_includes: 'Blue CRM (1 user), 500 contacts, lead tracking, basic job management',
+    invoice_description: 'CRM Starter',
+    invoice_includes: 'CRM (1 user), 500 contacts, lead tracking, basic job management',
     is_active: true,
   },
   {
-    id: 'blue_pro',
-    name: 'Blue Pro',
-    track: 'blue',
+    id: 'crm_pro',
+    name: 'CRM Pro',
+    track: 'crm',
     tier: 'pro',
     type: 'individual',
+    setup_price: 0,
     monthly_price: 99,
     annual_price: 1010, // 15% discount
-    description: 'Advanced CRM for growing teams', // v6.3: updated description
+    description: 'Advanced CRM for growing teams',
     features: {
-      users: 5, // v6.3: increased from 3
+      users: 5,
       contacts: 2000,
       includes_website: false,
       includes_crm: true,
       includes_local_seo: false,
       includes_gbp: false,
       gbp_addon_available: false,
-      includes_ai_sms: false, // v6.3: LC is now an add-on
-      includes_leads_captain: false, // v6.3: LC is now an add-on
+      includes_ai_sms: false,
+      includes_leads_captain: false,
       requires_existing_website: false,
       support_level: 'email_chat',
       features: [
-        'Blue CRM (5 users)', // v6.3: updated
+        'CRM (5 users)',
         '2,000 contacts',
         'Lead tracking',
         'Full job management',
         'Two-way SMS',
         'Estimate templates',
         'Document storage',
-        '+$10/mo per additional user', // v6.3: added
+        '+$10/mo per additional user',
       ],
     },
-    invoice_description: 'Blue Pro — CRM',
-    invoice_includes: 'Blue CRM (5 users), 2,000 contacts',
+    invoice_description: 'CRM Pro',
+    invoice_includes: 'CRM (5 users), 2,000 contacts',
     is_active: true,
   },
   {
-    id: 'blue_enterprise',
-    name: 'Blue Enterprise',
-    track: 'blue',
+    id: 'crm_enterprise',
+    name: 'CRM Enterprise',
+    track: 'crm',
     tier: 'enterprise',
     type: 'individual',
+    setup_price: 0,
     monthly_price: 199,
     annual_price: 2030, // 15% discount
     description: 'Full-featured CRM with priority support',
@@ -199,12 +221,12 @@ export const BLUE_PLANS: Plan[] = [
       includes_local_seo: false,
       includes_gbp: false,
       gbp_addon_available: false,
-      includes_ai_sms: false, // v6.3: LC is now an add-on
-      includes_leads_captain: false, // v6.3: LC is now an add-on
+      includes_ai_sms: false,
+      includes_leads_captain: false,
       requires_existing_website: false,
       support_level: 'priority',
       features: [
-        'Blue CRM (10 users)',
+        'CRM (10 users)',
         'Unlimited contacts',
         'Lead tracking',
         'Full job management',
@@ -213,19 +235,22 @@ export const BLUE_PLANS: Plan[] = [
         'Document storage',
         'Calendar sync',
         'Auto follow-ups',
-        '+$10/mo per additional user', // v6.3: added
+        '+$10/mo per additional user',
         'Priority support',
       ],
     },
-    invoice_description: 'Blue Enterprise — CRM',
-    invoice_includes: 'Blue CRM (10 users), Unlimited contacts, Priority support',
+    invoice_description: 'CRM Enterprise',
+    invoice_includes: 'CRM (10 users), Unlimited contacts, Priority support',
     is_active: true,
   },
 ];
 
+// Legacy alias for backwards compatibility
+export const BLUE_PLANS = CRM_PLANS;
+
 // =====================================================
-// WEB PLANS (Website Only) - v5.9 pricing
-// Cloud hosting: 2 years included, then $15/mo
+// WEB PLANS (Website Only) - v6.1 pricing
+// Setup fee + monthly hosting/maintenance
 // =====================================================
 
 export const WEB_PLANS: Plan[] = [
@@ -235,8 +260,9 @@ export const WEB_PLANS: Plan[] = [
     track: 'web',
     tier: 'starter',
     type: 'individual',
-    monthly_price: 199,
-    annual_price: 2030, // 15% discount
+    setup_price: 2500, // v6.1: One-time setup
+    monthly_price: 49, // v6.1: Monthly hosting/maintenance
+    annual_price: 500, // 15% discount
     description: 'Professional 5-page website',
     features: {
       website_pages: '5',
@@ -255,7 +281,7 @@ export const WEB_PLANS: Plan[] = [
         'Basic on-page SEO',
         'Contact forms',
         'Domain name (1 year)',
-        'Cloud hosting (2 years included)',
+        'Cloud hosting included',
         'SSL certificate',
         '3 stock images/graphics',
         '1 design revision',
@@ -263,7 +289,7 @@ export const WEB_PLANS: Plan[] = [
       ],
     },
     invoice_description: 'Web Starter — Professional Website',
-    invoice_includes: '5 page website, domain, 2 years hosting, SSL',
+    invoice_includes: '$2,500 setup + $49/mo hosting. 5 page website, domain, hosting, SSL',
     is_active: true,
   },
   {
@@ -272,8 +298,9 @@ export const WEB_PLANS: Plan[] = [
     track: 'web',
     tier: 'pro',
     type: 'individual',
-    monthly_price: 299,
-    annual_price: 3050, // 15% discount
+    setup_price: 5000, // v6.1: One-time setup
+    monthly_price: 79, // v6.1: Monthly hosting/maintenance
+    annual_price: 806, // 15% discount
     description: 'Feature-rich 10-page website with blog',
     features: {
       website_pages: '10',
@@ -292,7 +319,7 @@ export const WEB_PLANS: Plan[] = [
         'Basic on-page SEO',
         'Contact forms',
         'Domain name (1 year)',
-        'Cloud hosting (2 years included)',
+        'Cloud hosting included',
         'SSL certificate',
         '6 stock images/graphics',
         '3 service area pages',
@@ -303,7 +330,7 @@ export const WEB_PLANS: Plan[] = [
       ],
     },
     invoice_description: 'Web Pro — Professional Website',
-    invoice_includes: '10 page website, domain, 2 years hosting, SSL, blog, service area pages',
+    invoice_includes: '$5,000 setup + $79/mo hosting. 10 page website, domain, hosting, SSL, blog',
     is_active: true,
   },
   {
@@ -312,8 +339,9 @@ export const WEB_PLANS: Plan[] = [
     track: 'web',
     tier: 'enterprise',
     type: 'individual',
-    monthly_price: 499,
-    annual_price: 5090, // 15% discount
+    setup_price: 10000, // v6.1: One-time setup
+    monthly_price: 99, // v6.1: Monthly hosting/maintenance
+    annual_price: 1010, // 15% discount
     description: 'Premium 15+ page website',
     features: {
       website_pages: '15+',
@@ -326,13 +354,14 @@ export const WEB_PLANS: Plan[] = [
       includes_ai_sms: false,
       includes_leads_captain: false,
       requires_existing_website: false,
+      allows_extra_locations: true, // v6.1: Can add extra locations
       features: [
         '15+ pages',
         'Mobile responsive',
         'Basic on-page SEO',
         'Contact forms',
         'Domain name (1 year)',
-        'Cloud hosting (2 years included)',
+        'Cloud hosting included',
         'SSL certificate',
         '9 stock images/graphics',
         '10 service area pages',
@@ -340,29 +369,32 @@ export const WEB_PLANS: Plan[] = [
         'Schema markup',
         '3 design revisions',
         'Delivery: 3-4 weeks',
+        'Extra locations available',
       ],
     },
     invoice_description: 'Web Enterprise — Professional Website',
-    invoice_includes: '15+ page website, domain, 2 years hosting, SSL, blog, 10 service area pages',
+    invoice_includes: '$10,000 setup + $99/mo hosting. 15+ page website, domain, hosting, SSL, blog',
     is_active: true,
   },
 ];
 
 // =====================================================
-// SEO/AEO PLANS - v6.0 pricing (renamed from Local SEO)
-// For existing websites - GBP Management INCLUDED
+// SEO/AEO PLANS - v6.1 pricing
+// Setup fee + monthly management
+// AEO Tiers: Foundation, Authority, Infrastructure
 // =====================================================
 
 export const SEO_AEO_PLANS: Plan[] = [
   {
-    id: 'seo_aeo_starter',
-    name: 'SEO/AEO Starter',
+    id: 'seo_starter',
+    name: 'SEO Starter',
     track: 'seo_aeo',
     tier: 'starter',
     type: 'individual',
-    monthly_price: 99,
-    annual_price: 1010, // 15% discount
-    description: 'GBP optimization & initial setup',
+    setup_price: 100, // v6.1: One-time setup
+    monthly_price: 300, // v6.1: Monthly management
+    annual_price: 3060, // 15% discount
+    description: 'Foundation AEO - GBP optimization & initial setup',
     features: {
       users: 0,
       includes_website: false,
@@ -374,7 +406,9 @@ export const SEO_AEO_PLANS: Plan[] = [
       includes_ai_sms: false,
       includes_leads_captain: false,
       requires_existing_website: true,
+      aeo_tier: 'Foundation', // v6.1
       features: [
+        'AEO Foundation tier',
         'GBP optimization (initial setup)',
         'Geogrid ranking report (monthly)',
         'Citation audit (initial)',
@@ -382,19 +416,20 @@ export const SEO_AEO_PLANS: Plan[] = [
         'SEO/AEO audit (initial only)',
       ],
     },
-    invoice_description: 'SEO/AEO Starter',
-    invoice_includes: 'GBP initial setup, monthly geogrid report, citation audit',
+    invoice_description: 'SEO Starter — Foundation AEO',
+    invoice_includes: '$100 setup + $300/mo. GBP setup, monthly reports, citation audit',
     is_active: true,
   },
   {
-    id: 'seo_aeo_pro',
-    name: 'SEO/AEO Pro',
+    id: 'seo_pro',
+    name: 'SEO Pro',
     track: 'seo_aeo',
     tier: 'pro',
     type: 'individual',
-    monthly_price: 199,
-    annual_price: 2030, // 15% discount
-    description: 'Setup + monthly review with citation building',
+    setup_price: 250, // v6.1: One-time setup
+    monthly_price: 500, // v6.1: Monthly management
+    annual_price: 5100, // 15% discount
+    description: 'Authority AEO - Full management with citation building',
     features: {
       users: 0,
       includes_website: false,
@@ -407,7 +442,9 @@ export const SEO_AEO_PLANS: Plan[] = [
       includes_leads_captain: false,
       citations: 30,
       requires_existing_website: true,
+      aeo_tier: 'Authority', // v6.1
       features: [
+        'AEO Authority tier',
         'GBP optimization (setup + monthly review)',
         '2 GBP posts/month',
         'Geogrid ranking report (bi-weekly)',
@@ -419,19 +456,20 @@ export const SEO_AEO_PLANS: Plan[] = [
         'SEO/AEO audit (quarterly)',
       ],
     },
-    invoice_description: 'SEO/AEO Pro',
-    invoice_includes: 'GBP monthly review, 2 posts/mo, bi-weekly reports, 30 citations, competitor tracking',
+    invoice_description: 'SEO Pro — Authority AEO',
+    invoice_includes: '$250 setup + $500/mo. GBP management, 30 citations, bi-weekly reports',
     is_active: true,
   },
   {
-    id: 'seo_aeo_enterprise',
-    name: 'SEO/AEO Enterprise',
+    id: 'seo_enterprise',
+    name: 'SEO Enterprise',
     track: 'seo_aeo',
     tier: 'enterprise',
     type: 'individual',
-    monthly_price: 299, // Updated from $249 to $299 per v6.0
-    annual_price: 3050, // 15% discount
-    description: 'Full GBP management with strategy calls',
+    setup_price: 500, // v6.1: One-time setup
+    monthly_price: 1500, // v6.1: Monthly management
+    annual_price: 15300, // 15% discount
+    description: 'Infrastructure AEO - Full management with strategy calls',
     features: {
       users: 0,
       includes_website: false,
@@ -444,7 +482,10 @@ export const SEO_AEO_PLANS: Plan[] = [
       includes_leads_captain: false,
       citations: 50,
       requires_existing_website: true,
+      aeo_tier: 'Infrastructure', // v6.1
+      allows_extra_locations: true, // v6.1: Can add extra locations
       features: [
+        'AEO Infrastructure tier',
         'Full GBP management',
         '4 GBP posts/month',
         'Geogrid ranking report (weekly)',
@@ -455,10 +496,11 @@ export const SEO_AEO_PLANS: Plan[] = [
         'Review monitoring alerts',
         'SEO/AEO audit (quarterly)',
         'Strategy review call (quarterly)',
+        'Extra locations available',
       ],
     },
-    invoice_description: 'SEO/AEO Enterprise',
-    invoice_includes: 'Full GBP management, 4 posts/mo, weekly reports, 50 citations, quarterly strategy calls',
+    invoice_description: 'SEO Enterprise — Infrastructure AEO',
+    invoice_includes: '$500 setup + $1,500/mo. Full GBP, 50 citations, weekly reports, strategy calls',
     is_active: true,
   },
 ];
@@ -468,7 +510,7 @@ export const SEO_PLANS = SEO_AEO_PLANS;
 
 // =====================================================
 // SILVER BUNDLE - DISCONTINUED (v6.0)
-// Website + CRM + Leads Captain (no Local SEO)
+// Legacy only - for existing subscriptions
 // =====================================================
 
 export const SILVER_PLANS: Plan[] = [
@@ -478,8 +520,9 @@ export const SILVER_PLANS: Plan[] = [
     track: 'silver',
     tier: 'starter',
     type: 'individual',
+    setup_price: 0,
     monthly_price: 249,
-    annual_price: 2540, // 15% discount
+    annual_price: 2540,
     description: 'Website + CRM + Leads Captain bundle (DISCONTINUED)',
     features: {
       website_pages: '5',
@@ -494,19 +537,10 @@ export const SILVER_PLANS: Plan[] = [
       includes_leads_captain: true,
       sms_limit: 700,
       requires_existing_website: false,
-      features: [
-        'Web Starter (5 pages)',
-        'Blue Starter CRM',
-        'Leads Captain included',
-        'Domain name (1 year)',
-        'Cloud hosting (2 years)',
-        '500 contacts',
-        '1 team member',
-        '700 SMS/month',
-      ],
+      features: ['Legacy plan - no longer available'],
     },
-    invoice_description: 'Silver Starter — Website + CRM + Leads Captain',
-    invoice_includes: '5 page website, Blue CRM, Leads Captain, 700 SMS/mo',
+    invoice_description: 'Silver Starter (Legacy)',
+    invoice_includes: 'Legacy bundle',
     is_active: false,
     is_discontinued: true,
   },
@@ -516,8 +550,9 @@ export const SILVER_PLANS: Plan[] = [
     track: 'silver',
     tier: 'pro',
     type: 'individual',
+    setup_price: 0,
     monthly_price: 349,
-    annual_price: 3560, // 15% discount
+    annual_price: 3560,
     description: 'Enhanced bundle with two-way SMS (DISCONTINUED)',
     features: {
       website_pages: '10',
@@ -532,21 +567,10 @@ export const SILVER_PLANS: Plan[] = [
       includes_leads_captain: true,
       sms_limit: 700,
       requires_existing_website: false,
-      features: [
-        'Web Pro (10 pages)',
-        'Blue Pro CRM',
-        'Leads Captain included',
-        'Domain name (1 year)',
-        'Cloud hosting (2 years)',
-        '2,000 contacts',
-        '3 team members',
-        '700 SMS/month',
-        'Two-way SMS',
-        '3 service area pages',
-      ],
+      features: ['Legacy plan - no longer available'],
     },
-    invoice_description: 'Silver Pro — Website + CRM + Leads Captain',
-    invoice_includes: '10 page website, Blue Pro CRM, Leads Captain, 700 SMS/mo, two-way SMS',
+    invoice_description: 'Silver Pro (Legacy)',
+    invoice_includes: 'Legacy bundle',
     is_active: false,
     is_discontinued: true,
   },
@@ -556,8 +580,9 @@ export const SILVER_PLANS: Plan[] = [
     track: 'silver',
     tier: 'enterprise',
     type: 'individual',
+    setup_price: 0,
     monthly_price: 499,
-    annual_price: 5090, // 15% discount
+    annual_price: 5090,
     description: 'Premium bundle with unlimited contacts (DISCONTINUED)',
     features: {
       website_pages: '15+',
@@ -572,41 +597,202 @@ export const SILVER_PLANS: Plan[] = [
       includes_leads_captain: true,
       sms_limit: 700,
       requires_existing_website: false,
-      features: [
-        'Web Enterprise (15+ pages)',
-        'Blue Enterprise CRM',
-        'Leads Captain included',
-        'Domain name (1 year)',
-        'Cloud hosting (2 years)',
-        'Unlimited contacts',
-        '10 team members',
-        '700 SMS/month',
-        'Two-way SMS',
-        '10 service area pages',
-      ],
+      features: ['Legacy plan - no longer available'],
     },
-    invoice_description: 'Silver Enterprise — Website + CRM + Leads Captain',
-    invoice_includes: '15+ page website, Blue Enterprise CRM, Leads Captain, 700 SMS/mo',
+    invoice_description: 'Silver Enterprise (Legacy)',
+    invoice_includes: 'Legacy bundle',
     is_active: false,
     is_discontinued: true,
   },
 ];
 
 // =====================================================
-// GOLD BUNDLE - DISCONTINUED (v6.0)
-// Website + CRM + Leads Captain + Local SEO
+// GOLD BUNDLES - v6.1 (REACTIVATED)
+// CRM + Website + SEO + Leads Captain
+// Significant savings vs buying individually
 // =====================================================
 
 export const GOLD_PLANS: Plan[] = [
   {
     id: 'gold_starter',
-    name: 'Gold Starter',
+    name: 'Gold Starter Bundle',
     track: 'gold',
     tier: 'starter',
-    type: 'individual',
+    type: 'bundle',
+    setup_price: 1999, // v6.1: Bundle setup
+    monthly_price: 399, // v6.1: Bundle monthly
+    annual_price: 4070, // 15% discount
+    description: 'Complete package: CRM + Website + SEO + Leads Captain',
+    features: {
+      website_pages: '5',
+      users: 1,
+      contacts: 500,
+      includes_website: true,
+      includes_crm: true,
+      includes_local_seo: true,
+      local_seo_tier: 'starter',
+      includes_gbp: true,
+      gbp_addon_available: false,
+      includes_ai_sms: true,
+      includes_leads_captain: true,
+      sms_limit: 1000,
+      requires_existing_website: false,
+      aeo_tier: 'Foundation',
+      features: [
+        'CRM Starter (1 user, 500 contacts)',
+        'Web Starter (5 pages)',
+        'SEO Starter (Foundation AEO)',
+        'Leads Captain included',
+        'AI SMS text-back + Web Chat',
+        'Domain name (1 year)',
+        'Cloud hosting included',
+        '1,000 SMS/month',
+        'Monthly geogrid report',
+        'Save $601 on setup',
+        'Save $68/mo vs individual',
+      ],
+    },
+    invoice_description: 'Gold Starter Bundle',
+    invoice_includes: '$1,999 setup + $399/mo. CRM + Website + SEO + Leads Captain',
+    is_active: true,
+    is_bundle: true,
+    bundle_includes: {
+      crm: 'crm_starter',
+      web: 'web_starter',
+      seo: 'seo_starter',
+      leads_captain: true,
+    },
+    setup_savings: 601, // $2,600 individual - $1,999 bundle
+    monthly_savings: 68, // $467 individual - $399 bundle
+  },
+  {
+    id: 'gold_pro',
+    name: 'Gold Pro Bundle',
+    track: 'gold',
+    tier: 'pro',
+    type: 'bundle',
+    setup_price: 3999, // v6.1: Bundle setup
+    monthly_price: 649, // v6.1: Bundle monthly
+    annual_price: 6620, // 15% discount
+    description: 'Professional all-in-one for growing businesses',
+    features: {
+      website_pages: '10',
+      users: 5,
+      contacts: 2000,
+      includes_website: true,
+      includes_crm: true,
+      includes_local_seo: true,
+      local_seo_tier: 'pro',
+      includes_gbp: true,
+      gbp_addon_available: false,
+      includes_ai_sms: true,
+      includes_leads_captain: true,
+      sms_limit: 2000,
+      citations: 30,
+      requires_existing_website: false,
+      aeo_tier: 'Authority',
+      features: [
+        'CRM Pro (5 users, 2,000 contacts)',
+        'Web Pro (10 pages)',
+        'SEO Pro (Authority AEO)',
+        'Leads Captain included',
+        'AI SMS text-back + Web Chat',
+        'Domain name (1 year)',
+        'Cloud hosting included',
+        '2,000 SMS/month',
+        '30 citations',
+        'Bi-weekly geogrid report',
+        'Save $1,251 on setup',
+        'Save $108/mo vs individual',
+      ],
+    },
+    invoice_description: 'Gold Pro Bundle',
+    invoice_includes: '$3,999 setup + $649/mo. CRM + Website + SEO + Leads Captain',
+    is_active: true,
+    is_bundle: true,
+    bundle_includes: {
+      crm: 'crm_pro',
+      web: 'web_pro',
+      seo: 'seo_pro',
+      leads_captain: true,
+    },
+    setup_savings: 1251, // $5,250 individual - $3,999 bundle
+    monthly_savings: 108, // $757 individual - $649 bundle
+  },
+  {
+    id: 'gold_enterprise',
+    name: 'Gold Enterprise Bundle',
+    track: 'gold',
+    tier: 'enterprise',
+    type: 'bundle',
+    setup_price: 7999, // v6.1: Bundle setup
+    monthly_price: 1499, // v6.1: Bundle monthly
+    annual_price: 15290, // 15% discount
+    description: 'Enterprise all-in-one with extra location support',
+    features: {
+      website_pages: '15+',
+      users: 10,
+      contacts: 'unlimited',
+      includes_website: true,
+      includes_crm: true,
+      includes_local_seo: true,
+      local_seo_tier: 'enterprise',
+      includes_gbp: true,
+      gbp_addon_available: false,
+      includes_ai_sms: true,
+      includes_leads_captain: true,
+      sms_limit: 3000,
+      citations: 50,
+      requires_existing_website: false,
+      aeo_tier: 'Infrastructure',
+      allows_extra_locations: true, // v6.1: Can add extra locations
+      features: [
+        'CRM Enterprise (10 users, unlimited contacts)',
+        'Web Enterprise (15+ pages)',
+        'SEO Enterprise (Infrastructure AEO)',
+        'Leads Captain included',
+        'AI SMS text-back + Web Chat',
+        'Domain name (1 year)',
+        'Cloud hosting included',
+        '3,000 SMS/month',
+        '50 citations',
+        'Weekly geogrid report',
+        'Strategy review calls',
+        'Extra locations available',
+        'Save $2,501 on setup',
+        'Save $378/mo vs individual',
+      ],
+    },
+    invoice_description: 'Gold Enterprise Bundle',
+    invoice_includes: '$7,999 setup + $1,499/mo. CRM + Website + SEO + Leads Captain + Extra locations',
+    is_active: true,
+    is_bundle: true,
+    bundle_includes: {
+      crm: 'crm_enterprise',
+      web: 'web_enterprise',
+      seo: 'seo_enterprise',
+      leads_captain: true,
+    },
+    setup_savings: 2501, // $10,500 individual - $7,999 bundle
+    monthly_savings: 378, // $1,877 individual - $1,499 bundle
+  },
+];
+
+// =====================================================
+// LEGACY GOLD BUNDLES - v6.0 (for existing subscriptions)
+// =====================================================
+
+export const GOLD_LEGACY_PLANS: Plan[] = [
+  {
+    id: 'gold_starter_legacy',
+    name: 'Gold Starter (Legacy)',
+    track: 'gold_legacy',
+    tier: 'starter',
+    type: 'bundle',
+    setup_price: 0,
     monthly_price: 299,
-    annual_price: 3050, // 15% discount
-    description: 'Complete package: Website + CRM + Leads Captain + SEO (DISCONTINUED)',
+    annual_price: 3050,
+    description: 'Legacy Gold Starter (DISCONTINUED)',
     features: {
       website_pages: '5',
       users: 3,
@@ -621,33 +807,23 @@ export const GOLD_PLANS: Plan[] = [
       includes_leads_captain: true,
       sms_limit: 700,
       requires_existing_website: false,
-      features: [
-        'Web Starter (5 pages)',
-        'Blue Pro CRM (3 users)',
-        'Leads Captain included',
-        'Local SEO Starter',
-        'GBP optimization',
-        'Domain name (1 year)',
-        'Cloud hosting (2 years)',
-        '2,000 contacts',
-        '700 SMS/month',
-        'Monthly geogrid report',
-      ],
+      features: ['Legacy plan - no longer available'],
     },
-    invoice_description: 'Gold Starter — Website + CRM + Leads Captain + Local SEO',
-    invoice_includes: '5 page website, Blue Pro CRM (3 users), Leads Captain, Local SEO Starter',
+    invoice_description: 'Gold Starter (Legacy)',
+    invoice_includes: 'Legacy bundle',
     is_active: false,
     is_discontinued: true,
   },
   {
-    id: 'gold_pro',
-    name: 'Gold Pro',
-    track: 'gold',
+    id: 'gold_pro_legacy',
+    name: 'Gold Pro (Legacy)',
+    track: 'gold_legacy',
     tier: 'pro',
-    type: 'individual',
+    type: 'bundle',
+    setup_price: 0,
     monthly_price: 399,
-    annual_price: 4070, // 15% discount
-    description: 'Recommended all-in-one for growing businesses (DISCONTINUED)',
+    annual_price: 4070,
+    description: 'Legacy Gold Pro (DISCONTINUED)',
     features: {
       website_pages: '10',
       users: 3,
@@ -663,36 +839,23 @@ export const GOLD_PLANS: Plan[] = [
       sms_limit: 700,
       citations: 30,
       requires_existing_website: false,
-      features: [
-        'Web Pro (10 pages)',
-        'Blue Pro CRM (3 users)',
-        'Leads Captain included',
-        'Local SEO Pro',
-        'GBP management + 2 posts/mo',
-        'Domain name (1 year)',
-        'Cloud hosting (2 years)',
-        '2,000 contacts',
-        '700 SMS/month',
-        'Up to 30 citations',
-        'Bi-weekly geogrid report',
-        'Competitor comparison',
-        'Review monitoring',
-      ],
+      features: ['Legacy plan - no longer available'],
     },
-    invoice_description: 'Gold Pro — Website + CRM + Leads Captain + Local SEO Pro',
-    invoice_includes: '10 page website, Blue Pro CRM (3 users), Leads Captain, Local SEO Pro, 30 citations',
+    invoice_description: 'Gold Pro (Legacy)',
+    invoice_includes: 'Legacy bundle',
     is_active: false,
     is_discontinued: true,
   },
   {
-    id: 'gold_enterprise',
-    name: 'Gold Enterprise',
-    track: 'gold',
+    id: 'gold_enterprise_legacy',
+    name: 'Gold Enterprise (Legacy)',
+    track: 'gold_legacy',
     tier: 'enterprise',
-    type: 'individual',
+    type: 'bundle',
+    setup_price: 0,
     monthly_price: 598,
-    annual_price: 6100, // 15% discount
-    description: 'Premium all-in-one with full features (DISCONTINUED)',
+    annual_price: 6100,
+    description: 'Legacy Gold Enterprise (DISCONTINUED)',
     features: {
       website_pages: '15+',
       users: 10,
@@ -708,96 +871,111 @@ export const GOLD_PLANS: Plan[] = [
       sms_limit: 700,
       citations: 50,
       requires_existing_website: false,
-      features: [
-        'Web Enterprise (15+ pages)',
-        'Blue Enterprise CRM (10 users)',
-        'Leads Captain included',
-        'Local SEO Enterprise',
-        'Full GBP management + 4 posts/mo',
-        'Domain name (1 year)',
-        'Cloud hosting (2 years)',
-        'Unlimited contacts',
-        '700 SMS/month',
-        'Up to 50 citations',
-        'Weekly geogrid report',
-        'Competitor comparison',
-        'Review monitoring',
-      ],
+      features: ['Legacy plan - no longer available'],
     },
-    invoice_description: 'Gold Enterprise — Website + CRM + Leads Captain + Local SEO Enterprise',
-    invoice_includes: '15+ page website, Blue Enterprise CRM (10 users), Leads Captain, Local SEO Enterprise, 50 citations',
+    invoice_description: 'Gold Enterprise (Legacy)',
+    invoice_includes: 'Legacy bundle',
     is_active: false,
     is_discontinued: true,
   },
 ];
 
 // =====================================================
-// ADD-ONS - v6.3
+// ADD-ONS - v6.1
 // =====================================================
 
 export const ADDONS: AddOn[] = [
   {
     id: 'leads_captain_addon',
     name: 'Leads Captain',
-    price: 49, // v6.3: New add-on pricing
+    setup_price: 0,
+    monthly_price: 79, // v6.1: Updated to $79/mo
     billing_type: 'recurring',
-    description: 'AI-powered missed call text-back with SMS automation',
-    available_for: ['blue_starter', 'blue_pro', 'blue_enterprise'],
-    not_available_for: ['web_*', 'seo_aeo_*', 'silver_*', 'gold_*'],
+    description: 'AI SMS text-back, Web Chat, Scheduling integration',
+    available_for: ['crm_*', 'gold_*'], // v6.1: Requires CRM or Gold
+    not_available_for: ['web_*', 'seo_*', 'silver_*'],
+    requires: ['crm_*', 'gold_*'],
   },
   {
     id: 'extra_user',
     name: 'Extra User',
-    price: 10,
+    setup_price: 0,
+    monthly_price: 10,
     billing_type: 'recurring',
-    description: 'Additional user seat for Blue CRM plans (Pro/Enterprise only)',
-    available_for: ['blue_pro', 'blue_enterprise'], // v6.3: Not available for Starter
-    not_available_for: ['blue_starter', 'web_*', 'seo_aeo_*', 'silver_*', 'gold_*', 'leads_captain'],
+    description: 'Additional user seat for CRM plans (Pro/Enterprise only)',
+    available_for: ['crm_pro', 'crm_enterprise', 'gold_pro', 'gold_enterprise'],
+    not_available_for: ['crm_starter', 'web_*', 'seo_*', 'silver_*', 'gold_starter'],
+  },
+  {
+    id: 'web_extra_location',
+    name: 'Extra Web Location',
+    setup_price: 5000, // v6.1: $5,000 setup per location
+    monthly_price: 99, // v6.1: $99/mo per location
+    billing_type: 'setup_and_recurring',
+    description: 'Additional website for another business location',
+    available_for: ['web_enterprise', 'gold_enterprise'],
+    not_available_for: ['web_starter', 'web_pro', 'crm_*', 'seo_*', 'gold_starter', 'gold_pro'],
+    requires: ['web_enterprise', 'gold_enterprise'],
+  },
+  {
+    id: 'seo_extra_location',
+    name: 'Extra SEO Location',
+    setup_price: 0, // v6.1: No setup fee
+    monthly_price: 750, // v6.1: $750/mo per location
+    billing_type: 'recurring',
+    description: 'SEO management for additional business location',
+    available_for: ['seo_enterprise', 'gold_enterprise'],
+    not_available_for: ['seo_starter', 'seo_pro', 'crm_*', 'web_*', 'gold_starter', 'gold_pro'],
+    requires: ['seo_enterprise', 'gold_enterprise'],
   },
   {
     id: 'background_video',
     name: 'Background Video Creation',
-    price: 99,
+    setup_price: 99,
+    monthly_price: 0,
     billing_type: 'one_time',
     description: 'Custom background video for hero section',
-    available_for: ['web_*'],
-    not_available_for: ['blue_*', 'seo_aeo_*', 'leads_captain'],
+    available_for: ['web_*', 'gold_*'],
+    not_available_for: ['crm_*', 'seo_*'],
   },
   {
     id: 'textual_page_update',
     name: 'Textual Page Update',
-    price: 29,
+    setup_price: 29,
+    monthly_price: 0,
     billing_type: 'one_time',
     description: 'Text changes beyond monthly allowance (per page)',
-    available_for: ['web_*'],
-    not_available_for: ['blue_*', 'seo_aeo_*', 'leads_captain'],
+    available_for: ['web_*', 'gold_*'],
+    not_available_for: ['crm_*', 'seo_*'],
   },
   {
     id: 'design_page_update',
     name: 'Design Page Update',
-    price: 69,
+    setup_price: 69,
+    monthly_price: 0,
     billing_type: 'one_time',
     description: 'Layout/design changes to existing page (per page)',
-    available_for: ['web_*'],
-    not_available_for: ['blue_*', 'seo_aeo_*', 'leads_captain'],
+    available_for: ['web_*', 'gold_*'],
+    not_available_for: ['crm_*', 'seo_*'],
   },
 ];
 
 // =====================================================
-// ALL PLANS COMBINED (v6.3 - active plans only)
+// ALL PLANS COMBINED (v6.1 - active plans only)
 // =====================================================
 
 export const ALL_PLANS: Plan[] = [
-  ...BLUE_PLANS,
+  ...CRM_PLANS,
   ...WEB_PLANS,
   ...SEO_AEO_PLANS,
+  ...GOLD_PLANS,
+  ...LEADS_CAPTAIN_PLANS, // v6.1: Leads Captain is now active as add-on
 ];
 
 // Legacy plans for existing subscriptions (includes discontinued)
 export const LEGACY_PLANS: Plan[] = [
-  ...LEADS_CAPTAIN_PLANS,
   ...SILVER_PLANS,
-  ...GOLD_PLANS,
+  ...GOLD_LEGACY_PLANS,
 ];
 
 // All plans including legacy (for lookups)
@@ -812,19 +990,33 @@ export const ALL_PLANS_WITH_LEGACY: Plan[] = [
 
 export function getPlanById(planId: string): Plan | undefined {
   // Search all plans including legacy for backward compatibility
-  return ALL_PLANS_WITH_LEGACY.find(p => p.id === planId);
+  // Also handle 'blue_*' -> 'crm_*' mapping for backwards compatibility
+  let plan = ALL_PLANS_WITH_LEGACY.find(p => p.id === planId);
+  if (!plan && planId.startsWith('blue_')) {
+    const crmId = planId.replace('blue_', 'crm_');
+    plan = ALL_PLANS_WITH_LEGACY.find(p => p.id === crmId);
+  }
+  return plan;
 }
 
 export function getActivePlanById(planId: string): Plan | undefined {
-  return ALL_PLANS.find(p => p.id === planId && p.is_active);
+  let plan = ALL_PLANS.find(p => p.id === planId && p.is_active);
+  if (!plan && planId.startsWith('blue_')) {
+    const crmId = planId.replace('blue_', 'crm_');
+    plan = ALL_PLANS.find(p => p.id === crmId && p.is_active);
+  }
+  return plan;
 }
 
 export function getPlansByTrack(track: PlanTrack | LegacyPlanTrack): Plan[] {
-  return ALL_PLANS_WITH_LEGACY.filter(p => p.track === track && p.is_active);
+  // Handle 'blue' -> 'crm' mapping
+  const mappedTrack = track === 'blue' ? 'crm' : track;
+  return ALL_PLANS_WITH_LEGACY.filter(p => p.track === mappedTrack && p.is_active);
 }
 
 export function getActivePlansByTrack(track: PlanTrack): Plan[] {
-  return ALL_PLANS.filter(p => p.track === track && p.is_active && !p.is_discontinued);
+  const mappedTrack = track === 'blue' ? 'crm' : track;
+  return ALL_PLANS.filter(p => p.track === mappedTrack && p.is_active && !p.is_discontinued);
 }
 
 export function getPlansByTier(tier: PlanTier): Plan[] {
@@ -870,14 +1062,16 @@ export function calculateAnnualDiscount(monthlyPrice: number): number {
 
 export function getTrackLabel(track: PlanTrack | LegacyPlanTrack): string {
   const labels: Record<PlanTrack | LegacyPlanTrack, string> = {
-    blue: 'Blue CRM',
-    web: 'Web (Website)',
+    crm: 'CRM',
+    blue: 'CRM', // Legacy alias
+    web: 'Website',
     seo_aeo: 'SEO/AEO',
+    gold: 'Gold Bundle',
     // Legacy tracks
-    leads_captain: 'Leads Captain (Discontinued)',
-    seo: 'Local SEO (Now SEO/AEO)',
+    leads_captain: 'Leads Captain',
+    seo: 'SEO/AEO',
     silver: 'Silver Bundle (Discontinued)',
-    gold: 'Gold Bundle (Discontinued)',
+    gold_legacy: 'Gold Bundle (Legacy)',
   };
   return labels[track] || track;
 }
@@ -896,4 +1090,33 @@ export function getTierLabel(tier: PlanTier): string {
 export function isPlanDiscontinued(planId: string): boolean {
   const plan = getPlanById(planId);
   return plan?.is_discontinued === true || plan?.is_active === false;
+}
+
+// v6.1: Check if a plan is a bundle
+export function isPlanBundle(planId: string): boolean {
+  const plan = getPlanById(planId);
+  return plan?.is_bundle === true;
+}
+
+// v6.1: Get total price (setup + first month)
+export function getTotalFirstPayment(planId: string): number {
+  const plan = getPlanById(planId);
+  if (!plan) return 0;
+  return plan.setup_price + plan.monthly_price;
+}
+
+// v6.1: Get bundle savings
+export function getBundleSavings(planId: string): { setup: number; monthly: number } | null {
+  const plan = getPlanById(planId);
+  if (!plan || !plan.is_bundle) return null;
+  return {
+    setup: plan.setup_savings || 0,
+    monthly: plan.monthly_savings || 0,
+  };
+}
+
+// v6.1: Check if plan allows extra locations
+export function allowsExtraLocations(planId: string): boolean {
+  const plan = getPlanById(planId);
+  return plan?.features.allows_extra_locations === true;
 }

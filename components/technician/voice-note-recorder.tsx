@@ -25,9 +25,13 @@ export function VoiceNoteRecorder({
   const [duration, setDuration] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
 
+  const [amplitudes, setAmplitudes] = useState<number[]>([0, 0, 0, 0, 0]);
+
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const audioChunks = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animFrameRef = useRef<number | null>(null);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -80,6 +84,30 @@ export function VoiceNoteRecorder({
       setIsRecording(true);
       setDuration(0);
 
+      // Set up amplitude analyser
+      try {
+        const audioCtx = new AudioContext();
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 32;
+        source.connect(analyser);
+        analyserRef.current = analyser;
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const updateAmplitudes = () => {
+          analyser.getByteFrequencyData(dataArray);
+          const bars = [0, 1, 2, 3, 4].map(i => {
+            const idx = Math.floor((i / 5) * dataArray.length);
+            return dataArray[idx] / 255;
+          });
+          setAmplitudes(bars);
+          animFrameRef.current = requestAnimationFrame(updateAmplitudes);
+        };
+        updateAmplitudes();
+      } catch {
+        // AudioContext unavailable — fallback handled in render
+      }
+
       // Start timer
       timerRef.current = setInterval(() => {
         setDuration((prev) => {
@@ -106,6 +134,11 @@ export function VoiceNoteRecorder({
       mediaRecorder.current.stop();
       setIsRecording(false);
     }
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    setAmplitudes([0, 0, 0, 0, 0]);
   }, []);
 
   // Upload voice note
@@ -215,6 +248,22 @@ export function VoiceNoteRecorder({
           )}
         </button>
       </div>
+
+      {/* Amplitude bars */}
+      {isRecording && (
+        <div className="flex items-end gap-1 h-8 mb-4">
+          {amplitudes.map((amp, i) => (
+            <div
+              key={i}
+              className="w-1.5 rounded-full bg-danger transition-all duration-75"
+              style={{
+                height: `${Math.max(4, amp * 32)}px`,
+                opacity: 0.5 + amp * 0.5,
+              }}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Duration display */}
       <div className="text-2xl font-mono mb-2">

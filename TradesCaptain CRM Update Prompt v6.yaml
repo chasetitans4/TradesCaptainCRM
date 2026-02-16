@@ -1,0 +1,25 @@
+TradesCaptain CRM Update Prompt v6.1
+INSTRUCTIONS: Copy and paste this entire prompt to your AI coding assistant (Claude, Cursor, etc.) to update the TradesCaptain CRM backend, database, and Stripe configuration.
+AI PROMPT BEGINS HERE
+---
+Update the TradesCaptain CRM backend to reflect v6.1 product and commission structure including the new Gold Bundles. This includes database schema, product configuration, Stripe products/prices, and commission calculation logic.
+GOLD BUNDLES (NEW)
+gold_starter: {   name: "Gold Starter Bundle",   setup: 1999,   monthly: 399,  includes: ["crm_starter", "web_starter", "seo_starter", "leads_captain"],  setupSavings: 601,  monthlySavings: 68}gold_pro: {   name: "Gold Pro Bundle",   setup: 3999,   monthly: 649,  includes: ["crm_pro", "web_pro", "seo_pro", "leads_captain"],  setupSavings: 1251,  monthlySavings: 108}gold_enterprise: {   name: "Gold Enterprise Bundle",   setup: 7999,   monthly: 1499,  includes: ["crm_enterprise", "web_enterprise", "seo_enterprise", "leads_captain"],  setupSavings: 2501,  monthlySavings: 378,  allowsExtraLocations: true}
+CRM PRODUCTS
+crm_starter: { name: "CRM Starter", setup: 0, monthly: 39 }crm_pro: { name: "CRM Pro", setup: 0, monthly: 99 }crm_enterprise: { name: "CRM Enterprise", setup: 0, monthly: 199 }
+WEBSITE PRODUCTS
+web_starter: { name: "Web Starter", setup: 2500, monthly: 49 }web_pro: { name: "Web Pro", setup: 5000, monthly: 79 }web_enterprise: { name: "Web Enterprise", setup: 10000, monthly: 99 }web_extra_location: { name: "Extra Web Location", setup: 5000, monthly: 99, requires: "web_enterprise OR gold_enterprise" }
+SEO/AEO PRODUCTS
+seo_starter: { name: "SEO Starter", setup: 100, monthly: 300, aeoTier: "Foundation" }seo_pro: { name: "SEO Pro", setup: 250, monthly: 500, aeoTier: "Authority" }seo_enterprise: { name: "SEO Enterprise", setup: 500, monthly: 1500, aeoTier: "Infrastructure" }seo_extra_location: { name: "Extra SEO Location", setup: 0, monthly: 750, requires: "seo_enterprise OR gold_enterprise" }
+LEADS CAPTAIN
+leads_captain: {   name: "Leads Captain",   setup: 0,   monthly: 79,   requires: "crm_* OR gold_*",  features: ["AI SMS text-back", "AI Web Chat", "Scheduling integration"]}
+COMMISSION CONFIGURATION
+// Up-front commission (on setup fees + first month)CRM products: 50%All other products (including Gold Bundles): 40%// Recurring commission (monthly)All products: 15%// Qualificationupfront_qualification_days: 30recurring_qualification_days: 60// Bonusesmonthly_bonus: 5% of monthly revenue if 10+ qualified salesyearly_bonus: 5% of annual revenue, cutoff Oct 15, paid Nov 1
+STRIPE CONFIGURATION
+// Gold BundlesGold Starter: $1,999 one-time + $399/month recurringGold Pro: $3,999 one-time + $649/month recurringGold Enterprise: $7,999 one-time + $1,499/month recurring// CRM (recurring only)CRM Starter: $39/monthCRM Pro: $99/monthCRM Enterprise: $199/month// Websites (setup + recurring)Web Starter: $2,500 one-time + $49/monthWeb Pro: $5,000 one-time + $79/monthWeb Enterprise: $10,000 one-time + $99/monthWeb Extra Location: $5,000 one-time + $99/month// SEO/AEO (setup + recurring)SEO Starter: $100 one-time + $300/monthSEO Pro: $250 one-time + $500/monthSEO Enterprise: $500 one-time + $1,500/monthSEO Extra Location: $750/month// Add-onLeads Captain: $79/month
+DATABASE SCHEMA
+-- Add bundle trackingALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS bundle_id VARCHAR(50);ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS is_bundle BOOLEAN DEFAULT FALSE;-- Add extra locations trackingCREATE TABLE IF NOT EXISTS subscription_locations (  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),  subscription_id UUID REFERENCES subscriptions(id),  location_type VARCHAR(20) NOT NULL,  -- 'web' or 'seo'  location_name VARCHAR(255),  setup_paid BOOLEAN DEFAULT FALSE,  created_at TIMESTAMP DEFAULT NOW());
+ENVIRONMENT VARIABLES
+COMMISSION_CRM_UPFRONT=0.50COMMISSION_OTHER_UPFRONT=0.40COMMISSION_RECURRING=0.15COMMISSION_UPFRONT_DAYS=30COMMISSION_RECURRING_DAYS=60BONUS_MONTHLY_RATE=0.05BONUS_MONTHLY_MIN_SALES=10BONUS_YEARLY_RATE=0.05BONUS_YEARLY_CUTOFF=10-15BONUS_YEARLY_PAYOUT=11-01PAYOUT_DAY=15
+---
+AI PROMPT ENDS HERE
