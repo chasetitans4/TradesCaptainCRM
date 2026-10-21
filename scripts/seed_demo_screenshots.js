@@ -10,14 +10,15 @@
 const { createClient } = require('@supabase/supabase-js');
 
 // ─── Config (matches existing seed scripts) ─────────────────────────────────
-const SUPABASE_URL = 'https://abafispmjdpryjkevath.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiYWZpc3BtamRwcnlqa2V2YXRoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NzQ2NTY5MywiZXhwIjoyMDgzMDQxNjkzfQ.86C0pVyYqUSInbIpOD-Z7IZVyr3utniyht9WZx96M98';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const BUSINESS_ID = '11111111-1111-1111-1111-111111111111';
-const USER_EMAIL = 'admin@tradescaptain.com';
-const USER_PASSWORD = 'AdminPass123!';
+const USER_EMAIL = process.env.DEMO_EMAIL;
+const USER_PASSWORD = process.env.DEMO_PASSWORD;
 const TECH_EMAIL = 'jake@reliableplumbing.com';
 
+if (!SUPABASE_URL || !SUPABASE_KEY || !USER_EMAIL || !USER_PASSWORD) throw new Error('Set Supabase and demo credentials in the environment for an isolated demo project.');
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ─── Deterministic UUIDs ─────────────────────────────────────────────────────
@@ -1348,7 +1349,7 @@ async function main() {
   console.log('Done! Data seeded for "Reliable Plumbing Co."');
   console.log('');
   console.log('Login: admin@tradescaptain.com');
-  console.log('Password: AdminPass123!');
+  console.log('Password supplied through DEMO_PASSWORD');
   console.log('');
   console.log('Entities:');
   console.log('  • 7 customers');

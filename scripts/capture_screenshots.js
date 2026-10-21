@@ -13,15 +13,15 @@
  * Usage: node scripts/capture_screenshots.js
  */
 
-const { chromium } = require('playwright');
+const { chromium } = require('@playwright/test');
 const fs = require('fs');
 const path = require('path');
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
-const SCREENSHOTS_DIR = path.join(__dirname, '..', 'screenshots');
-const LOGIN_EMAIL = 'admin@tradescaptain.com';
-const LOGIN_PASSWORD = 'AdminPass123!';
+const SCREENSHOTS_DIR = path.join(__dirname, '..', 'public', 'screenshots-preview');
+const LOGIN_EMAIL = process.env.DEMO_EMAIL;
+const LOGIN_PASSWORD = process.env.DEMO_PASSWORD;
 
 // Known IDs from seed script
 const SARAH_CUSTOMER_ID = '22222222-2222-2222-2222-222222222201';
@@ -534,6 +534,7 @@ async function captureRouteSummary(context, theme) {
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
+  if (!LOGIN_EMAIL || !LOGIN_PASSWORD) throw new Error('Set DEMO_EMAIL and DEMO_PASSWORD for the isolated demo account.');
   console.log('╔══════════════════════════════════════╗');
   console.log('║  SCREENSHOT CAPTURE — PLAYWRIGHT     ║');
   console.log('╚══════════════════════════════════════╝');
@@ -590,7 +591,7 @@ async function main() {
   await browser.close();
 
   console.log('\n═══════════════════════════════════════');
-  console.log(`Done! ${fs.readdirSync(SCREENSHOTS_DIR).filter(f => f.endsWith('.png')).length} screenshots saved to ./screenshots/`);
+  console.log(`Done! ${fs.readdirSync(SCREENSHOTS_DIR).filter(f => f.endsWith('.png')).length} screenshots saved to ./public/screenshots-preview/`);
   console.log('═══════════════════════════════════════');
 }
 
