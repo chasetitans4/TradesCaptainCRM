@@ -17,7 +17,7 @@ GitHub recommends revoking or rotating secrets first; rewriting history does not
 
 ## Scope to approve
 
-`purge-sensitive-paths.txt` contains 44 exact historical paths. It includes `.env.example`, generated files containing key material, and credential/default-password-bearing manual scripts. The complete candidate inventory also retains false positives, test fixtures, public keys, and documentation placeholders; those are not automatically treated as compromised files.
+`purge-sensitive-paths.txt` contains 45 exact historical paths (including the additional admin SQL file found during the final current-tree sweep). It includes `.env.example`, generated files containing key material, and credential/default-password-bearing manual scripts. The complete candidate inventory also retains false positives, test fixtures, public keys, and documentation placeholders; those are not automatically treated as compromised files.
 
 The path-filter strategy removes the entire listed file from every old commit, not just its credential lines. This changes commit IDs and may remove commits that become empty. It also removes those files at branch tips. **Before running the purge, first prepare and review sanitized current copies, then restore the approved copies to the rewritten tips.** Do not restore an original unsanitized file.
 
@@ -26,7 +26,7 @@ If preserving each script's historical content is preferred, choose a separately
 ## Preparation after explicit approval
 
 1. Complete rotations and record which accounts/environments need new values; do not put credentials in this repository or PR.
-2. Apply the proposed blank `.env.example`; sanitize or remove the other credential-bearing current files. Keep scripts' configured behavior intact and avoid running them against live services.
+2. Reconfirm the sanitized current tree: the blank `.env.example` and current credential-bearing file cleanup have been applied. Keep scripts' configured behavior intact and avoid running them against live services.
 3. Finish the behavior-preserving cleanup and validate its current tree. Save an approved **source-only** snapshot of the affected current files outside Git history. Do not use a bundle of old history as the public restoration artifact.
 4. Coordinate a write freeze. Merge or close affected PRs as appropriate, and record all branch/tag tips immediately before the rewrite. Resolve any changes since this audit before proceeding.
 5. Use a fresh mirror clone in a new directory. Install git-filter-repo with `--sensitive-data-removal` support (GitHub specifies version 2.47 or newer). Do not use `--force` to bypass its fresh-clone check.
@@ -38,7 +38,7 @@ The following PowerShell is a proposed procedure. It has **not** been executed. 
 ```powershell
 $repoUrl = 'https://github.com/chasetitans4/TradesCaptainCRM.git'
 $taskRoot = 'C:/Users/chase/Documents/Codex/2026-10-20/i-x20'
-$reviewDir = Join-Path $taskRoot 'outputs/step-1-secret-review'
+$reviewDir = Join-Path $taskRoot 'outputs/repo-presentable/security'
 $mirror = Join-Path $taskRoot 'work/TradesCaptainCRM-purge.git'
 if (Test-Path -LiteralPath $mirror) { throw 'Use a new, empty mirror path.' }
 
@@ -95,4 +95,4 @@ Immediately before this push, compare the current remote branch/tag **names** wi
 
 Verify all remote heads/tags again, make a fresh clone, and rescan. Coordinate replacement of old developer clones so merges do not reintroduce the old history. Review forks, GitHub PR refs/caches, CI artifacts/logs, releases, and external clones separately. Where appropriate, contact GitHub Support with the first changed commits and affected PR refs; a force push alone does not clear all cached copies. Recreate the final presentation PR against the rewritten history as needed.
 
-No provider service was contacted to test credentials, and no rotation, history rewrite, force push, or PR creation has been attempted for this request.
+No provider service was contacted to test credentials. No credential rotation, history rewrite or force push has been performed. PR creation for the current-tree cleanup is authorized separately; this plan does not authorize a history update.
