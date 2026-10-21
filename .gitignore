@@ -18,3 +18,71 @@ temp/
 .k6/
 components/ui/nul
 screenshots/
+
+# Retired manual scripts with locally preserved credentials
+/scripts/check_platform_settings.js
+/scripts/comprehensive-test-suite.js
+/scripts/create-test-business-fetch.js
+/scripts/create-test-business.js
+/scripts/create-test-customer.js
+/scripts/debug-portal-login.js
+/scripts/debug_onboarding_tables.js
+/scripts/diagnose_404.js
+/scripts/diagnose_browser.js
+/scripts/diagnose_tables.js
+/scripts/inspect-customer.js
+/scripts/seed_business.py
+/scripts/seed_captain_login.js
+/scripts/seed_crm_user.js
+/scripts/seed_portal_data.js
+/scripts/set_portal_password.js
+/scripts/setup_admin.sql
+/scripts/setup_admin_portal_user.js
+/scripts/setup_crm_user.js
+/scripts/test-dashboard-api.js
+/scripts/test-login-api.js
+/scripts/test-login-endpoint.js
+/scripts/test-recent-features.js
+/scripts/test-session-api.js
+/scripts/test_login.js
+/scripts/update-test-customer-password.js
+/scripts/verify-password-hash.js
+/scripts/verify-portal-login.js
+/scripts/verify_admin_login.js
+/scripts/verify_admin_login_endpoint.js
+/scripts/verify_auth_flow.js
+/scripts/verify_login.js
+/scripts/verify_schema.js
+
+# Generated output, local audits, and backup files
+*.tsbuildinfo
+.next-portal/
+.next*/
+.idea/
+backups/
+*.bak
+tmp_*
+ts-errors.txt
+*.log
+!/.env.example
+
+# Accidental files and unused nested checkout
+/-remote origin
+/CRMLatest.txt
+/delete_nul.js
+/e --abbrev-ref HEAD
+/erschaseDownloadstrades-captain-crmtrades-captain-crm
+/erschaseDownloadstrades-captain-crmtrades-captain-crm
+/how origin
+/package-lock.json.bak
+/package.json.bak
+/striperoute.ts ^
+/temp_head.txt
+/tmp_mutating_adminclient_no_guard_candidates.txt
+/tmp_service_role_no_auth_candidates.txt
+/tmp_unauth_routes.txt
+/ts-errors.txt
+/tsconfig.admin.tsbuildinfo
+/tsconfig.tsbuildinfo
+/upabase db push
+/trades-captain-crm/

@@ -169,5 +169,10 @@
       "react": "$react",
       "react-dom": "$react-dom"
     }
+  },
+  "description": "Mobile-first CRM for trade service businesses, with scheduling, dispatch, invoicing, and customer portals.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chasetitans4/TradesCaptainCRM.git"
   }
 }

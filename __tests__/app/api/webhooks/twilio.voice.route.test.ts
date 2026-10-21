@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
 import type { NextResponse } from 'next/server';
 
 // Helper to mock Next.js server response
@@ -36,8 +36,27 @@ function makeRequest(form: Record<string, string>) {
 }
 
 describe('Twilio voice webhook route', () => {
+  const originalToken = process.env.TWILIO_AUTH_TOKEN;
+  afterEach(() => {
+    if (originalToken === undefined) delete process.env.TWILIO_AUTH_TOKEN;
+    else process.env.TWILIO_AUTH_TOKEN = originalToken;
+  });
   beforeEach(() => {
     jest.resetModules();
+    process.env.TWILIO_AUTH_TOKEN = 'test-token';
+    jest.doMock('next/headers', () => ({
+      headers: async () => ({ get: () => 'test-signature' }),
+    }));
+  });
+
+  it('returns 403 when the authentication token is missing', async () => {
+    await jest.isolateModulesAsync(async () => {
+      mockNextServer();
+      delete process.env.TWILIO_AUTH_TOKEN;
+      const route = require('@/app/api/webhooks/twilio/voice/route');
+      const res = await route.POST(makeRequest({ From: '+15550000000', To: '+15551112222', CallSid: 'CA_NO_TOKEN' }));
+      expect(res.status).toBe(403);
+    });
   });
 
   it('returns 403 when signature invalid in production', async () => {
